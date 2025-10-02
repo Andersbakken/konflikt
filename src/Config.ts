@@ -6,13 +6,12 @@ import fs from "fs";
 // }
 
 export class Config extends EventEmitter {
-    #server?:
-
     constructor(filePath?: string) {
         super();
         try {
             if (filePath) {
-                const config = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+                const config = JSON.parse(fs.readFileSync(filePath, "utf-8"));
+                console.log("Got config", config);
             }
         } catch (e: unknown) {
             throw new Error(`Failed to load config: ${e}`);

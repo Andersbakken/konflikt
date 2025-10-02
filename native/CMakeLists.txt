@@ -12,21 +12,21 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 include_directories(${CMAKE_JS_INC})
 
 # Include native headers
-include_directories(${CMAKE_SOURCE_DIR}/native/include)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
 
 # Source files
 set(SOURCE_FILES
-    native/src/konflikt_native.cpp
+    src/konflikt_native.cpp
 )
 
 # Platform-specific sources and libraries
 if(APPLE)
-    list(APPEND SOURCE_FILES native/src/platform_macos.cpp)
+    list(APPEND SOURCE_FILES src/platform_macos.cpp)
     find_library(APPLICATION_SERVICES ApplicationServices)
     find_library(CARBON Carbon)
     set(PLATFORM_LIBS ${APPLICATION_SERVICES} ${CARBON})
 elseif(UNIX)
-    list(APPEND SOURCE_FILES native/src/platform_x11.cpp)
+    list(APPEND SOURCE_FILES src/platform_x11.cpp)
     find_package(X11 REQUIRED)
     if(NOT X11_XTest_FOUND)
         message(FATAL_ERROR "XTest extension not found")
@@ -52,7 +52,7 @@ target_link_libraries(${PROJECT_NAME} ${CMAKE_JS_LIB} ${PLATFORM_LIBS})
 # Include Node-API
 execute_process(
     COMMAND node -p "require('node-addon-api').include"
-    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/..
     OUTPUT_VARIABLE NODE_ADDON_API_DIR
 )
 string(REGEX REPLACE "[\r\n\"]" "" NODE_ADDON_API_DIR ${NODE_ADDON_API_DIR})
@@ -72,5 +72,5 @@ endif()
 
 # Build output directory
 set_target_properties(${PROJECT_NAME} PROPERTIES
-    LIBRARY_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/build/Release
+    LIBRARY_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/../build/Release
 )

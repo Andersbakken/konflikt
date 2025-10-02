@@ -1,7 +1,7 @@
-import fs from "fs";
-import path from "path";
 import { Konflikt } from "./Konflikt";
 import { homedir } from "os";
+import fs from "fs";
+import path from "path";
 
 const usage = `Usage: konflikt [options]
 Options:

@@ -1,16 +1,24 @@
-import fs from 'fs';
+import { Config } from "./Config.js";
+import { KonfliktNative } from "./native.js";
 
 export class Konflikt {
+    #config: Config;
+    #native: KonfliktNative;
+
     constructor(configPath?: string) {
-        try {
-            if (configPath) {
-                const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
-            }
-        } catch (e: unknown) {
-            throw new Error(`Failed to load config: ${e}`);
-        }
+        this.#config = new Config(configPath);
+        this.#native = new KonfliktNative();
     }
 
-    // should auto-discover peers
-    async init(): Promise<void> {}
+    get config(): Config {
+        return this.#config;
+    }
+
+    get native(): KonfliktNative {
+        return this.#native;
+    }
+
+    init(): void {
+        console.log("Initializing Konflikt...", this.#config);
+    }
 }

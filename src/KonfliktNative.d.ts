@@ -74,26 +74,22 @@ declare class KonfliktNative {
     get desktop(): KonfliktDesktop;
     get state(): KonfliktState;
 
+    on(type: "desktopChanged", listener: (event: KonfliktDesktopEvent) => void): void;
+    on(type: "keyPress", listener: (event: KonfliktKeyPressEvent) => void): void;
+    on(type: "keyRelease", listener: (event: KonfliktKeyReleaseEvent) => void): void;
+    on(type: "mouseMove", listener: (event: KonfliktMouseMoveEvent) => void): void;
     on(type: "mousePress", listener: (event: KonfliktMouseButtonPressEvent) => void): void;
-    off(type: "mousePress", listener: (event: KonfliktMouseButtonPressEvent) => void): void;
-
     on(type: "mouseRelease", listener: (event: KonfliktMouseButtonReleaseEvent) => void): void;
+
+    off(type: "desktopChanged", listener: (event: KonfliktDesktopEvent) => void): void;
+    off(type: "keyPress", listener: (event: KonfliktKeyPressEvent) => void): void;
+    off(type: "keyRelease", listener: (event: KonfliktKeyReleaseEvent) => void): void;
+    off(type: "mouseMove", listener: (event: KonfliktMouseMoveEvent) => void): void;
+    off(type: "mousePress", listener: (event: KonfliktMouseButtonPressEvent) => void): void;
     off(type: "mouseRelease", listener: (event: KonfliktMouseButtonReleaseEvent) => void): void;
 
-    on(type: "mouseMove", listener: (event: KonfliktMouseMoveEvent) => void): void;
-    off(type: "mouseMove", listener: (event: KonfliktMouseMoveEvent) => void): void;
-
-    on(type: "keyPress", listener: (event: KonfliktKeyPressEvent) => void): void;
-    off(type: "keyPress", listener: (event: KonfliktKeyPressEvent) => void): void;
-
-    on(type: "keyRelease", listener: (event: KonfliktKeyReleaseEvent) => void): void;
-    off(type: "keyRelease", listener: (event: KonfliktKeyReleaseEvent) => void): void;
-
-    on(type: "desktopChanged", listener: (event: KonfliktDesktopEvent) => void): void;
-    off(type: "desktopChanged", listener: (event: KonfliktDesktopEvent) => void): void;
-
+    sendKeyEvent(event: KonfliktKeyPressEvent | KonfliktKeyReleaseEvent): void;
     sendMouseEvent(
         event: KonfliktMouseButtonPressEvent | KonfliktMouseButtonReleaseEvent | KonfliktMouseMoveEvent
     ): void;
-    sendKeyEvent(event: KonfliktKeyPressEvent | KonfliktKeyReleaseEvent): void;
 }

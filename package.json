@@ -4,9 +4,17 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "build": "npm run build:native && tsc",
-    "build:native": "cmake-js compile",
-    "rebuild": "cmake-js rebuild",
+    "build": "npm run lint && run-p build:native build:ts",
+    "build:ts": "tsc",
+    "build:native": "cmake-js compile --directory native",
+    "rebuild:native": "cmake-js rebuild --directory native",
+    "lint": "eslint src --ext .ts --format unix",
+    "lint:fix": "eslint src --ext .ts --fix",
+    "prettier-write": "prettier --write . --ignore-path .prettierignore",
+    "prettier-check": "prettier --check . --ignore-path .prettierignore",
+    "clean:dist": "del-cli dist/*",
+    "clean:build": "del-cli build/*",
+    "clean": "del-cli dist/* build/*",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "",
@@ -14,8 +22,17 @@
   "keywords": [],
   "devDependencies": {
     "@types/node": "^24.6.2",
+    "@types/ws": "^8.18.1",
+    "@typescript-eslint/eslint-plugin": "^8.45.0",
+    "@typescript-eslint/parser": "^8.45.0",
     "cmake-js": "^7.3.1",
+    "del-cli": "^7.0.0",
+    "eslint": "^8.57.1",
+    "eslint-plugin-import": "^2.32.0",
+    "eslint-plugin-sort-imports-es6-autofix": "^0.6.0",
     "node-addon-api": "^8.5.0",
+    "npm-run-all": "^4.1.5",
+    "prettier": "^3.6.2",
     "typescript": "^5.9.3"
   },
   "dependencies": {

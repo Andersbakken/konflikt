@@ -1,4 +1,4 @@
-import { NodeType } from "./NodeType";
+import type { NodeType } from "./NodeType";
 
 export interface Node {
     address: string | undefined;
