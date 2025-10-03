@@ -160,6 +160,16 @@ KonfliktNative::KonfliktNative(const Napi::CallbackInfo& info)
 }
 
 KonfliktNative::~KonfliktNative() {
+    // Release all thread-safe functions first
+    for (auto& pair : listeners_) {
+        for (auto& tsfn : pair.second.listeners) {
+            tsfn.Release();
+        }
+        pair.second.listeners.clear();
+    }
+    listeners_.clear();
+
+    // Then stop the platform hook
     if (platform_hook_) {
         platform_hook_->stop_listening();
         platform_hook_->shutdown();
@@ -275,16 +285,30 @@ void KonfliktNative::SendKeyEvent(const Napi::CallbackInfo& info) {
 }
 
 void KonfliktNative::HandlePlatformEvent(const Event& event) {
+    if (!is_listening_) {
+        return;
+    }
+
     auto it = listeners_.find(event.type);
-    if (it == listeners_.end()) {
+    if (it == listeners_.end() || it->second.listeners.empty()) {
         return;
     }
 
     for (auto& tsfn : it->second.listeners) {
         // Call the thread-safe function with the event
-        tsfn.BlockingCall([event](Napi::Env env, Napi::Function jsCallback) {
-            jsCallback.Call({EventToObject(env, event)});
+        auto status = tsfn.NonBlockingCall([event](Napi::Env env, Napi::Function jsCallback) {
+            try {
+                jsCallback.Call({EventToObject(env, event)});
+            } catch (...) {
+                // Silently ignore errors in callbacks
+            }
         });
+
+        // If the call fails, it means the JS context is being destroyed
+        if (status != napi_ok) {
+            is_listening_ = false;
+            break;
+        }
     }
 }
 

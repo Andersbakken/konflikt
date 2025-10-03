@@ -1,11 +1,11 @@
-declare const enum KonfliktMouseButton {
+export const enum KonfliktMouseButton {
     None = 0x0,
     Left = 0x1,
     Right = 0x2,
     Middle = 0x4
 }
 
-declare const enum KonfliktKeyboardModifier {
+export const enum KonfliktKeyboardModifier {
     None = 0x000,
     LeftShift = 0x001,
     RightShift = 0x002,
@@ -20,57 +20,57 @@ declare const enum KonfliktKeyboardModifier {
     ScrollLock = 0x400
 }
 
-declare interface KonfliktState {
+export interface KonfliktState {
     keyboardModifiers: KonfliktKeyboardModifier;
     mouseButtons: KonfliktMouseButton;
     x: number;
     y: number;
 }
 
-declare interface KonfliktEvent extends KonfliktState {
+export interface KonfliktEvent extends KonfliktState {
     timestamp: number;
 }
 
-declare interface KonfliktMouseMoveEvent extends KonfliktEvent {
+export interface KonfliktMouseMoveEvent extends KonfliktEvent {
     type: "mouseMove";
 }
 
-declare interface KonfliktMouseButtonEvent extends KonfliktEvent {
+export interface KonfliktMouseButtonEvent extends KonfliktEvent {
     button: KonfliktMouseButton;
 }
 
-declare interface KonfliktMouseButtonPressEvent extends KonfliktMouseButtonEvent {
+export interface KonfliktMouseButtonPressEvent extends KonfliktMouseButtonEvent {
     type: "mousePress";
 }
 
-declare interface KonfliktMouseButtonReleaseEvent extends KonfliktMouseButtonEvent {
+export interface KonfliktMouseButtonReleaseEvent extends KonfliktMouseButtonEvent {
     type: "mouseRelease";
 }
 
-declare interface KonfliktKeyEvent extends KonfliktEvent {
+export interface KonfliktKeyEvent extends KonfliktEvent {
     keycode: number;
     text: string | undefined;
 }
 
-declare interface KonfliktKeyPressEvent extends KonfliktKeyEvent {
+export interface KonfliktKeyPressEvent extends KonfliktKeyEvent {
     type: "keyPress";
 }
 
-declare interface KonfliktKeyReleaseEvent extends KonfliktKeyEvent {
+export interface KonfliktKeyReleaseEvent extends KonfliktKeyEvent {
     type: "keyRelease";
 }
 
-declare interface KonfliktDesktop {
+export interface KonfliktDesktop {
     width: number;
     height: number;
 }
 
-declare interface KonfliktDesktopEvent {
+export interface KonfliktDesktopEvent {
     type: "desktopChanged";
     desktop: KonfliktDesktop;
 }
 
-declare class KonfliktNative {
+export declare class KonfliktNative {
     get desktop(): KonfliktDesktop;
     get state(): KonfliktState;
 

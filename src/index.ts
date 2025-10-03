@@ -10,7 +10,11 @@ Options:
   --config, -c   Path to config file (default: ~/.config/Konflikt/config.json)
 `;
 
-let configPath: string = path.join(homedir(), ".config", "Konflikt", "config.json");
+let configPath: string | undefined = path.join(homedir(), ".config", "Konflikt", "config.json");
+if (!fs.existsSync(configPath)) {
+    configPath = undefined;
+}
+
 for (let idx = 2; idx < process.argv.length; ++idx) {
     const arg = process.argv[idx];
     if (arg === "--help" || arg === "-h") {
@@ -33,9 +37,29 @@ for (let idx = 2; idx < process.argv.length; ++idx) {
     }
 }
 
+let konflikt: Konflikt;
 try {
-    const konflikt = new Konflikt(configPath);
+    konflikt = new Konflikt(configPath);
     konflikt.init();
+
+    // Keep the process running
+    console.log("Konflikt is running. Press Ctrl+C to exit.");
+
+    // Handle graceful shutdown
+    process.on("SIGINT", (): void => {
+        console.log("\nShutting down...");
+        process.exit(0);
+    });
+
+    process.on("SIGTERM", (): void => {
+        console.log("\nShutting down...");
+        process.exit(0);
+    });
+
+    // Keep process alive
+    setInterval((): void => {
+        // Just keep the event loop running
+    }, 1000);
 } catch (e: unknown) {
     console.error(usage);
     console.error("Error initializing Konflikt:", e);

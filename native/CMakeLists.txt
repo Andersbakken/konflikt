@@ -70,7 +70,7 @@ elseif(UNIX)
     target_link_libraries(${PROJECT_NAME} pthread)
 endif()
 
-# Build output directory
+# Build output directory based on build type
 set_target_properties(${PROJECT_NAME} PROPERTIES
-    LIBRARY_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/../build/Release
+    LIBRARY_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/../build/${CMAKE_BUILD_TYPE}
 )

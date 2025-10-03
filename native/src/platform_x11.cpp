@@ -37,14 +37,26 @@ public:
             return false;
         }
 
+        // Open data connection for queries and sending events
         display_ = XOpenDisplay(nullptr);
         if (!display_) {
             return false;
         }
 
+        // Open separate connection for XRecord (must be separate!)
         record_display_ = XOpenDisplay(nullptr);
         if (!record_display_) {
             XCloseDisplay(display_);
+            display_ = nullptr;
+            return false;
+        }
+
+        // Check if XRecord extension is available
+        int major, minor;
+        if (!XRecordQueryVersion(record_display_, &major, &minor)) {
+            XCloseDisplay(record_display_);
+            XCloseDisplay(display_);
+            record_display_ = nullptr;
             display_ = nullptr;
             return false;
         }
@@ -192,14 +204,22 @@ public:
 
         is_running_ = false;
 
-        if (record_context_) {
-            XRecordDisableContext(record_display_, record_context_);
-            XRecordFreeContext(record_display_, record_context_);
-            record_context_ = 0;
+        // Disable the record context from a different thread to interrupt XRecordEnableContext
+        if (record_context_ && record_display_) {
+            // Use the data display to disable the context
+            XRecordDisableContext(display_, record_context_);
+            XFlush(display_);
         }
 
+        // Wait for thread to exit
         if (listener_thread_.joinable()) {
             listener_thread_.join();
+        }
+
+        // Clean up the context
+        if (record_context_ && record_display_) {
+            XRecordFreeContext(record_display_, record_context_);
+            record_context_ = 0;
         }
     }
 
@@ -224,6 +244,11 @@ private:
 
     static void RecordEventCallback(XPointer closure, XRecordInterceptData* data) {
         auto* hook = reinterpret_cast<X11Hook*>(closure);
+
+        if (!hook->is_running_) {
+            XRecordFreeData(data);
+            return;
+        }
 
         if (data->category != XRecordFromServer) {
             XRecordFreeData(data);
@@ -276,13 +301,19 @@ private:
                 event.type = EventType::KeyPress;
                 event.keycode = event_data[1];
 
-                // Try to get text representation
-                KeySym keysym = XKeycodeToKeysym(hook->display_, event.keycode, 0);
+                // Get text representation using XKeysymToString
+                KeySym keysym = XkbKeycodeToKeysym(hook->display_, event.keycode, 0, 0);
                 if (keysym != NoSymbol) {
-                    char buf[32];
-                    int len = XLookupString((XKeyEvent*)nullptr, buf, sizeof(buf), &keysym, nullptr);
-                    if (len > 0) {
-                        event.text = std::string(buf, len);
+                    char* keyname = XKeysymToString(keysym);
+                    if (keyname) {
+                        // For printable characters, convert to actual character
+                        if (keysym >= 0x20 && keysym <= 0x7E) {
+                            event.text = std::string(1, static_cast<char>(keysym));
+                        } else if (keysym >= 0x100 && keysym <= 0x10FFFF) {
+                            // Unicode character
+                            event.text = std::string(1, static_cast<char>(keysym & 0xFF));
+                        }
+                        // For special keys, we could set keyname, but let's leave text empty
                     }
                 }
 
@@ -294,13 +325,19 @@ private:
                 event.type = EventType::KeyRelease;
                 event.keycode = event_data[1];
 
-                // Try to get text representation
-                KeySym keysym = XKeycodeToKeysym(hook->display_, event.keycode, 0);
+                // Get text representation using XKeysymToString
+                KeySym keysym = XkbKeycodeToKeysym(hook->display_, event.keycode, 0, 0);
                 if (keysym != NoSymbol) {
-                    char buf[32];
-                    int len = XLookupString((XKeyEvent*)nullptr, buf, sizeof(buf), &keysym, nullptr);
-                    if (len > 0) {
-                        event.text = std::string(buf, len);
+                    char* keyname = XKeysymToString(keysym);
+                    if (keyname) {
+                        // For printable characters, convert to actual character
+                        if (keysym >= 0x20 && keysym <= 0x7E) {
+                            event.text = std::string(1, static_cast<char>(keysym));
+                        } else if (keysym >= 0x100 && keysym <= 0x10FFFF) {
+                            // Unicode character
+                            event.text = std::string(1, static_cast<char>(keysym & 0xFF));
+                        }
+                        // For special keys, we could set keyname, but let's leave text empty
                     }
                 }
 
@@ -324,6 +361,7 @@ private:
         XRecordRange* range = XRecordAllocRange();
 
         if (!range) {
+            fprintf(stderr, "KonfliktNative: Failed to allocate XRecordRange\n");
             is_running_ = false;
             return;
         }
@@ -336,17 +374,29 @@ private:
         XFree(range);
 
         if (!record_context_) {
+            fprintf(stderr, "KonfliktNative: Failed to create XRecord context\n");
             is_running_ = false;
             return;
         }
 
         XSync(record_display_, False);
 
+        fprintf(stderr, "KonfliktNative: Starting XRecord event loop...\n");
+
+        // XRecordEnableContext blocks until XRecordDisableContext is called
+        // This is the main event loop - it will only return when we stop listening
         if (!XRecordEnableContext(record_display_, record_context_, RecordEventCallback,
                                   reinterpret_cast<XPointer>(this))) {
+            fprintf(stderr, "KonfliktNative: XRecordEnableContext failed or was disabled\n");
             is_running_ = false;
             return;
         }
+
+        // We only get here when XRecordDisableContext is called or there's an error
+        // Process any remaining events
+        fprintf(stderr, "KonfliktNative: XRecord event loop exited\n");
+        XSync(record_display_, False);
+        is_running_ = false;
     }
 
     Display* display_{nullptr};
