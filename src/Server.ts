@@ -1,25 +1,19 @@
-import { WebSocketServer } from "ws";
 import Fastify from "fastify";
+import WebSocket from "ws";
 import type { FastifyInstance, FastifyListenOptions } from "fastify";
-// import type { IncomingMessage } from "http";
-import type WebSocket from "ws";
-
-// Extend WebSocket type with heartbeat tracking
-// interface HeartbeatWebSocket extends WebSocket {
-//     isAlive?: boolean;
-// }
+import type { IncomingMessage } from "http";
 
 export class Server {
     #fastify: FastifyInstance;
-    #wss: WebSocketServer;
+    #wss: WebSocket.WebSocketServer;
     #heartbeatInterval: ReturnType<typeof setInterval> | undefined = undefined;
 
     constructor(readonly port: number = 3000) {
         this.#fastify = Fastify({ logger: true });
-        this.#wss = new WebSocketServer({ noServer: true });
+        this.#wss = new WebSocket.WebSocketServer({ noServer: true });
 
         // this.#registerRoutes();
-        // this.#setupWebSocket();
+        this.#setupWebSocket();
         // this.#setupUpgradeHandling();
     }
 
@@ -64,75 +58,70 @@ export class Server {
 
     // /** Register HTTP routes */
     // #registerRoutes(): void {
-    //     this.fastify.get("/", async () => {
+    //     this.#fastify.get("/", async () => {
     //         return { message: "Hello from Fastify + ws + TypeScript + Class!" };
     //     });
 
-    //     this.fastify.post<{ Body: unknown }>("/api/echo", async (request: string) => {
+    //     this.#fastify.post<{ Body: unknown }>("/api/echo", async (request: string) => {
     //         return { echoed: request.body };
     //     });
     // }
 
     // /** Setup WebSocket server events */
-    // #setupWebSocket(): void {
-    //     this.wss.on("connection", (socket: HeartbeatWebSocket, req: IncomingMessage) => {
-    //         socket.isAlive = true;
-    //         socket.on("pong", () => (socket.isAlive = true));
+    #setupWebSocket(): void {
+        this.#wss.on("connection", (socket: WebSocket, req: IncomingMessage) => {
+            this.#fastify.log.info({ url: req.url }, "WebSocket connection opened");
 
-    //         this.fastify.log.info({ url: req.url }, "WebSocket connection opened");
+            socket.on("message", (_raw: WebSocket.RawData) => {
+                // let text: string;
+                // if (raw instanceof Buffer) {
+                //     text = raw.toString("utf-8");
+                // } else if (raw instanceof ArrayBuffer) {
+                //     text = Buffer.from(raw).toString("utf-8");
+                // } else {
+                //     assert(Array.isArray(raw));
+                //     text = Buffer.concat(...raw).toString("utf-8");
+                // }
+                // this.#fastify.log.info({ msg: text }, "Received WS message");
+                // // Try JSON echo
+                // try {
+                //     const parsed: unknown = JSON.parse(text);
+                //     if (typeof parsed === "object" && parsed && "type" in parsed && parsed.type === "echo") {
+                //         socket.send(JSON.stringify({ type: "echo", data: ("data" in parsed ? parsed.data : undefined }));
+                //         return;
+                //     }
+                // } catch {
+                //     // ignore parse error, just broadcast text
+                // }
+                // // Broadcast to all clients
+                // this.wss.clients.forEach((client) => {
+                //     const c = client as HeartbeatWebSocket;
+                //     if (c.readyState === WebSocket.OPEN) {
+                //         c.send(
+                //             JSON.stringify({
+                //                 from: req.socket.remoteAddress,
+                //                 message: text
+                //             })
+                //         );
+                //     }
+                // });
+            });
 
-    //         socket.on("message", (raw: WebSocket.RawData) => {
-    //             let text: string;
-    //             if (raw instanceof Buffer) {
-    //                 text = raw.toString("utf-8");
-    //             } else if (raw instanceof ArrayBuffer) {
-    //                 text = Buffer.from(raw).toString("utf-8");
-    //             } else {
-    //                 assert(Array.isArray(raw));
-    //                 text = Buffer.concat(...raw).toString("utf-8");
-    //             }
-    //             this.fastify.log.info({ msg: text }, "Received WS message");
+            socket.on("close", () => {
+                // this.#fastify.log.info("WebSocket connection closed");
+            });
 
-    //             // Try JSON echo
-    //             try {
-    //                 const parsed: unknown = JSON.parse(text);
-    //                 if (typeof parsed === "object" && parsed && "type" in parsed && parsed.type === "echo") {
-    //                     socket.send(JSON.stringify({ type: "echo", data: ("data" in parsed ? parsed.data : undefined  }));
-    //                     return;
-    //                 }
-    //             } catch {
-    //                 // ignore parse error, just broadcast text
-    //             }
+            socket.on("error", (_err: Error) => {
+                // this.#fastify.log.error(err, "WebSocket error");
+            });
 
-    //             // Broadcast to all clients
-    //             this.wss.clients.forEach((client) => {
-    //                 const c = client as HeartbeatWebSocket;
-    //                 if (c.readyState === WebSocket.OPEN) {
-    //                     c.send(
-    //                         JSON.stringify({
-    //                             from: req.socket.remoteAddress,
-    //                             message: text
-    //                         })
-    //                     );
-    //                 }
-    //             });
-    //         });
-
-    //         socket.on("close", () => {
-    //             this.fastify.log.info("WebSocket connection closed");
-    //         });
-
-    //         socket.on("error", (err: Error) => {
-    //             this.fastify.log.error(err, "WebSocket error");
-    //         });
-
-    //         // Welcome message
-    //         socket.send(JSON.stringify({ type: "welcome", message: "connected to /ws" }));
-    //     });
-    // }
+            // Welcome message
+            // socket.send(JSON.stringify({ type: "welcome", message: "connected to /ws" }));
+        });
+    }
 
     // #setupUpgradeHandling(): void {
-    //     this.fastify.server.on("upgrade", (request, socket, head) => {
+    //     this.#fastify.server.on("upgrade", (request, socket, head) => {
     //         if (request.url?.startsWith("/ws")) {
     //             this.wss.handleUpgrade(request, socket, head, (ws) => {
     //                 this.wss.emit("connection", ws, request);
