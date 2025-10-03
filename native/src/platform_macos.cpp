@@ -188,7 +188,7 @@ public:
 
 private:
     static CGEventRef EventTapCallback(
-        CGEventTapProxy proxy,
+        CGEventTapProxy /*proxy*/,
         CGEventType type,
         CGEventRef cg_event,
         void* user_info
