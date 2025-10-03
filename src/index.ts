@@ -55,11 +55,6 @@ try {
         console.log("\nShutting down...");
         process.exit(0);
     });
-
-    // Keep process alive
-    setInterval((): void => {
-        // Just keep the event loop running
-    }, 1000);
 } catch (e: unknown) {
     console.error(usage);
     console.error("Error initializing Konflikt:", e);

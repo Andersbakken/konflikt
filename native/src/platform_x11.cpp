@@ -1,63 +1,109 @@
 #ifdef __linux__
 
 #include "konflikt_native.hpp"
-#include <X11/Xlib.h>
-#include <X11/extensions/XTest.h>
-#include <X11/extensions/record.h>
-#include <X11/keysym.h>
-#include <X11/Xutil.h>
-#include <X11/XKBlib.h>
+#include <xcb/xcb.h>
+#include <xcb/xinput.h>
+#include <xcb/xtest.h>
+// xcb/xkb.h uses 'explicit' as a variable name which conflicts with C++ keyword
+// We only need xkbcommon, not the xcb xkb header
+#include <xkbcommon/xkbcommon.h>
+#include <xkbcommon/xkbcommon-x11.h>
 #include <thread>
 #include <atomic>
 #include <mutex>
 #include <cstring>
 
-// X11 defines macros that conflict with our enum names
-#undef KeyPress
-#undef KeyRelease
-#undef None
-
 namespace konflikt {
 
-// Re-define X11 event constants we need
-constexpr int X11_KeyPress = 2;
-constexpr int X11_KeyRelease = 3;
-constexpr int X11_ButtonPress = 4;
-constexpr int X11_ButtonRelease = 5;
-constexpr int X11_MotionNotify = 6;
-
-class X11Hook : public IPlatformHook {
+class XCBHook : public IPlatformHook {
 public:
-    X11Hook() = default;
-    ~X11Hook() override = default;
+    XCBHook() = default;
+    ~XCBHook() override = default;
 
     bool initialize() override {
-        // Initialize X11 thread support
-        if (!XInitThreads()) {
+        // Connect to X server
+        connection_ = xcb_connect(nullptr, &screen_number_);
+        if (xcb_connection_has_error(connection_)) {
             return false;
         }
 
-        // Open data connection for queries and sending events
-        display_ = XOpenDisplay(nullptr);
-        if (!display_) {
+        // Get screen
+        const xcb_setup_t* setup = xcb_get_setup(connection_);
+        xcb_screen_iterator_t iter = xcb_setup_roots_iterator(setup);
+        for (int i = 0; i < screen_number_; i++) {
+            xcb_screen_next(&iter);
+        }
+        screen_ = iter.data;
+
+        if (!screen_) {
+            xcb_disconnect(connection_);
+            connection_ = nullptr;
             return false;
         }
 
-        // Open separate connection for XRecord (must be separate!)
-        record_display_ = XOpenDisplay(nullptr);
-        if (!record_display_) {
-            XCloseDisplay(display_);
-            display_ = nullptr;
+        // Query XInput2 extension
+        const xcb_query_extension_reply_t* xinput_ext = xcb_get_extension_data(connection_, &xcb_input_id);
+        if (!xinput_ext || !xinput_ext->present) {
+            fprintf(stderr, "KonfliktNative: XInput2 extension not available\n");
+            xcb_disconnect(connection_);
+            connection_ = nullptr;
+            return false;
+        }
+        xinput_opcode_ = xinput_ext->major_opcode;
+        xinput_first_event_ = xinput_ext->first_event;
+
+        // Query XTest extension
+        const xcb_query_extension_reply_t* xtest_ext = xcb_get_extension_data(connection_, &xcb_test_id);
+        if (!xtest_ext || !xtest_ext->present) {
+            fprintf(stderr, "KonfliktNative: XTest extension not available\n");
+            xcb_disconnect(connection_);
+            connection_ = nullptr;
             return false;
         }
 
-        // Check if XRecord extension is available
-        int major, minor;
-        if (!XRecordQueryVersion(record_display_, &major, &minor)) {
-            XCloseDisplay(record_display_);
-            XCloseDisplay(display_);
-            record_display_ = nullptr;
-            display_ = nullptr;
+        // Setup XKB for key translation
+        // First, initialize the XKB extension
+        xkb_x11_setup_xkb_extension(connection_,
+                                     XKB_X11_MIN_MAJOR_XKB_VERSION,
+                                     XKB_X11_MIN_MINOR_XKB_VERSION,
+                                     XKB_X11_SETUP_XKB_EXTENSION_NO_FLAGS,
+                                     nullptr, nullptr, nullptr, nullptr);
+
+        int32_t device_id = xkb_x11_get_core_keyboard_device_id(connection_);
+        if (device_id == -1) {
+            fprintf(stderr, "KonfliktNative: Failed to get keyboard device\n");
+            xcb_disconnect(connection_);
+            connection_ = nullptr;
+            return false;
+        }
+
+        xkb_context_ = xkb_context_new(XKB_CONTEXT_NO_FLAGS);
+        if (!xkb_context_) {
+            fprintf(stderr, "KonfliktNative: Failed to create XKB context\n");
+            xcb_disconnect(connection_);
+            connection_ = nullptr;
+            return false;
+        }
+
+        xkb_keymap_ = xkb_x11_keymap_new_from_device(xkb_context_, connection_, device_id, XKB_KEYMAP_COMPILE_NO_FLAGS);
+        if (!xkb_keymap_) {
+            fprintf(stderr, "KonfliktNative: Failed to create XKB keymap\n");
+            xkb_context_unref(xkb_context_);
+            xkb_context_ = nullptr;
+            xcb_disconnect(connection_);
+            connection_ = nullptr;
+            return false;
+        }
+
+        xkb_state_ = xkb_x11_state_new_from_device(xkb_keymap_, connection_, device_id);
+        if (!xkb_state_) {
+            fprintf(stderr, "KonfliktNative: Failed to create XKB state\n");
+            xkb_keymap_unref(xkb_keymap_);
+            xkb_keymap_ = nullptr;
+            xkb_context_unref(xkb_context_);
+            xkb_context_ = nullptr;
+            xcb_disconnect(connection_);
+            connection_ = nullptr;
             return false;
         }
 
@@ -68,65 +114,74 @@ public:
     void shutdown() override {
         stop_listening();
 
-        if (display_) {
-            XCloseDisplay(display_);
-            display_ = nullptr;
+        if (xkb_state_) {
+            xkb_state_unref(xkb_state_);
+            xkb_state_ = nullptr;
         }
 
-        if (record_display_) {
-            XCloseDisplay(record_display_);
-            record_display_ = nullptr;
+        if (xkb_keymap_) {
+            xkb_keymap_unref(xkb_keymap_);
+            xkb_keymap_ = nullptr;
+        }
+
+        if (xkb_context_) {
+            xkb_context_unref(xkb_context_);
+            xkb_context_ = nullptr;
+        }
+
+        if (connection_) {
+            xcb_disconnect(connection_);
+            connection_ = nullptr;
         }
     }
 
     State get_state() const override {
         State state{};
 
-        if (!display_) {
+        if (!connection_ || !screen_) {
             return state;
         }
 
-        // Get mouse position and button state
-        Window root = DefaultRootWindow(display_);
-        Window root_return, child_return;
-        int root_x, root_y, win_x, win_y;
-        unsigned int mask;
+        // Query pointer
+        xcb_query_pointer_cookie_t cookie = xcb_query_pointer(connection_, screen_->root);
+        xcb_query_pointer_reply_t* reply = xcb_query_pointer_reply(connection_, cookie, nullptr);
 
-        XQueryPointer(display_, root, &root_return, &child_return,
-                      &root_x, &root_y, &win_x, &win_y, &mask);
+        if (reply) {
+            state.x = reply->root_x;
+            state.y = reply->root_y;
 
-        state.x = root_x;
-        state.y = root_y;
+            // Parse button mask
+            if (reply->mask & XCB_BUTTON_MASK_1) {
+                state.mouse_buttons |= ToUInt32(MouseButton::Left);
+            }
+            if (reply->mask & XCB_BUTTON_MASK_3) {
+                state.mouse_buttons |= ToUInt32(MouseButton::Right);
+            }
+            if (reply->mask & XCB_BUTTON_MASK_2) {
+                state.mouse_buttons |= ToUInt32(MouseButton::Middle);
+            }
 
-        // Parse button mask
-        if (mask & Button1Mask) {
-            state.mouse_buttons |= ToUInt32(MouseButton::Left);
-        }
-        if (mask & Button3Mask) {
-            state.mouse_buttons |= ToUInt32(MouseButton::Right);
-        }
-        if (mask & Button2Mask) {
-            state.mouse_buttons |= ToUInt32(MouseButton::Middle);
-        }
+            // Parse modifier mask
+            if (reply->mask & XCB_MOD_MASK_SHIFT) {
+                state.keyboard_modifiers |= ToUInt32(KeyboardModifier::LeftShift);
+            }
+            if (reply->mask & XCB_MOD_MASK_CONTROL) {
+                state.keyboard_modifiers |= ToUInt32(KeyboardModifier::LeftControl);
+            }
+            if (reply->mask & XCB_MOD_MASK_1) { // Alt
+                state.keyboard_modifiers |= ToUInt32(KeyboardModifier::LeftAlt);
+            }
+            if (reply->mask & XCB_MOD_MASK_4) { // Super
+                state.keyboard_modifiers |= ToUInt32(KeyboardModifier::LeftSuper);
+            }
+            if (reply->mask & XCB_MOD_MASK_LOCK) { // Caps Lock
+                state.keyboard_modifiers |= ToUInt32(KeyboardModifier::CapsLock);
+            }
+            if (reply->mask & XCB_MOD_MASK_2) { // Num Lock
+                state.keyboard_modifiers |= ToUInt32(KeyboardModifier::NumLock);
+            }
 
-        // Parse modifier mask
-        if (mask & ShiftMask) {
-            state.keyboard_modifiers |= ToUInt32(KeyboardModifier::LeftShift);
-        }
-        if (mask & ControlMask) {
-            state.keyboard_modifiers |= ToUInt32(KeyboardModifier::LeftControl);
-        }
-        if (mask & Mod1Mask) {
-            state.keyboard_modifiers |= ToUInt32(KeyboardModifier::LeftAlt);
-        }
-        if (mask & Mod4Mask) {
-            state.keyboard_modifiers |= ToUInt32(KeyboardModifier::LeftSuper);
-        }
-        if (mask & LockMask) {
-            state.keyboard_modifiers |= ToUInt32(KeyboardModifier::CapsLock);
-        }
-        if (mask & Mod2Mask) {
-            state.keyboard_modifiers |= ToUInt32(KeyboardModifier::NumLock);
+            free(reply);
         }
 
         return state;
@@ -135,36 +190,38 @@ public:
     Desktop get_desktop() const override {
         Desktop desktop{};
 
-        if (!display_) {
+        if (!screen_) {
             return desktop;
         }
 
-        Screen* screen = DefaultScreenOfDisplay(display_);
-        desktop.width = WidthOfScreen(screen);
-        desktop.height = HeightOfScreen(screen);
+        desktop.width = screen_->width_in_pixels;
+        desktop.height = screen_->height_in_pixels;
 
         return desktop;
     }
 
     void send_mouse_event(const Event& event) override {
-        if (!display_) {
+        if (!connection_) {
             return;
         }
 
         switch (event.type) {
             case EventType::MouseMove:
-                XTestFakeMotionEvent(display_, -1, event.state.x, event.state.y, CurrentTime);
+                xcb_test_fake_input(connection_, XCB_MOTION_NOTIFY, 0, XCB_CURRENT_TIME,
+                                   screen_->root, event.state.x, event.state.y, 0);
                 break;
 
             case EventType::MousePress: {
-                unsigned int button = ButtonFromMouseButton(event.button);
-                XTestFakeButtonEvent(display_, button, True, CurrentTime);
+                uint8_t button = ButtonFromMouseButton(event.button);
+                xcb_test_fake_input(connection_, XCB_BUTTON_PRESS, button, XCB_CURRENT_TIME,
+                                   XCB_NONE, 0, 0, 0);
                 break;
             }
 
             case EventType::MouseRelease: {
-                unsigned int button = ButtonFromMouseButton(event.button);
-                XTestFakeButtonEvent(display_, button, False, CurrentTime);
+                uint8_t button = ButtonFromMouseButton(event.button);
+                xcb_test_fake_input(connection_, XCB_BUTTON_RELEASE, button, XCB_CURRENT_TIME,
+                                   XCB_NONE, 0, 0, 0);
                 break;
             }
 
@@ -172,17 +229,18 @@ public:
                 break;
         }
 
-        XFlush(display_);
+        xcb_flush(connection_);
     }
 
     void send_key_event(const Event& event) override {
-        if (!display_) {
+        if (!connection_) {
             return;
         }
 
-        bool is_press = (event.type == EventType::KeyPress);
-        XTestFakeKeyEvent(display_, event.keycode, is_press ? True : False, CurrentTime);
-        XFlush(display_);
+        uint8_t event_type = (event.type == EventType::KeyPress) ? XCB_KEY_PRESS : XCB_KEY_RELEASE;
+        xcb_test_fake_input(connection_, event_type, event.keycode, XCB_CURRENT_TIME,
+                           XCB_NONE, 0, 0, 0);
+        xcb_flush(connection_);
     }
 
     void start_listening() override {
@@ -204,81 +262,166 @@ public:
 
         is_running_ = false;
 
-        // Disable the record context from a different thread to interrupt XRecordEnableContext
-        if (record_context_ && record_display_) {
-            // Use the data display to disable the context
-            XRecordDisableContext(display_, record_context_);
-            XFlush(display_);
-        }
-
         // Wait for thread to exit
         if (listener_thread_.joinable()) {
             listener_thread_.join();
         }
-
-        // Clean up the context
-        if (record_context_ && record_display_) {
-            XRecordFreeContext(record_display_, record_context_);
-            record_context_ = 0;
-        }
     }
 
 private:
-    static unsigned int ButtonFromMouseButton(MouseButton button) {
+    static uint8_t ButtonFromMouseButton(MouseButton button) {
         switch (button) {
-            case MouseButton::Left: return Button1;
-            case MouseButton::Right: return Button3;
-            case MouseButton::Middle: return Button2;
-            default: return Button1;
+            case MouseButton::Left: return XCB_BUTTON_INDEX_1;
+            case MouseButton::Right: return XCB_BUTTON_INDEX_3;
+            case MouseButton::Middle: return XCB_BUTTON_INDEX_2;
+            default: return XCB_BUTTON_INDEX_1;
         }
     }
 
-    static MouseButton MouseButtonFromButton(unsigned int button) {
+    static MouseButton MouseButtonFromButton(uint32_t button) {
         switch (button) {
-            case Button1: return MouseButton::Left;
-            case Button3: return MouseButton::Right;
-            case Button2: return MouseButton::Middle;
+            case XCB_BUTTON_INDEX_1: return MouseButton::Left;
+            case XCB_BUTTON_INDEX_3: return MouseButton::Right;
+            case XCB_BUTTON_INDEX_2: return MouseButton::Middle;
             default: return static_cast<MouseButton>(0);
         }
     }
 
-    static void RecordEventCallback(XPointer closure, XRecordInterceptData* data) {
-        auto* hook = reinterpret_cast<X11Hook*>(closure);
-
-        if (!hook->is_running_) {
-            XRecordFreeData(data);
+    void RunEventLoop() {
+        if (!connection_) {
+            fprintf(stderr, "KonfliktNative: No connection in event loop\n");
+            is_running_ = false;
             return;
         }
 
-        if (data->category != XRecordFromServer) {
-            XRecordFreeData(data);
+        // Select XInput2 raw events
+        // Use ALL_MASTER_DEVICES to avoid getting duplicate events from slave devices
+        struct {
+            xcb_input_event_mask_t header;
+            uint32_t mask;
+        } event_mask;
+
+        event_mask.header.deviceid = XCB_INPUT_DEVICE_ALL_MASTER;
+        event_mask.header.mask_len = 1;
+        event_mask.mask = XCB_INPUT_XI_EVENT_MASK_RAW_KEY_PRESS |
+                         XCB_INPUT_XI_EVENT_MASK_RAW_KEY_RELEASE |
+                         XCB_INPUT_XI_EVENT_MASK_RAW_BUTTON_PRESS |
+                         XCB_INPUT_XI_EVENT_MASK_RAW_BUTTON_RELEASE |
+                         XCB_INPUT_XI_EVENT_MASK_RAW_MOTION;
+
+        xcb_void_cookie_t cookie = xcb_input_xi_select_events_checked(
+            connection_, screen_->root, 1, &event_mask.header);
+
+        xcb_generic_error_t* error = xcb_request_check(connection_, cookie);
+        if (error) {
+            fprintf(stderr, "KonfliktNative: Failed to select XInput2 events: %d\n", error->error_code);
+            free(error);
+            is_running_ = false;
             return;
         }
 
-        if (!hook->event_callback) {
-            XRecordFreeData(data);
-            return;
+        xcb_flush(connection_);
+        fprintf(stderr, "KonfliktNative: Starting XInput2 event loop...\n");
+
+        // Event loop
+        while (is_running_) {
+            xcb_generic_event_t* event = xcb_poll_for_event(connection_);
+
+            if (!event) {
+                // Check for connection errors
+                int err = xcb_connection_has_error(connection_);
+                if (err) {
+                    fprintf(stderr, "KonfliktNative: XCB connection error: %d\n", err);
+                    break;
+                }
+
+                // No event, sleep briefly to avoid busy-waiting
+                std::this_thread::sleep_for(std::chrono::milliseconds(1));
+                continue;
+            }
+
+            uint8_t response_type = event->response_type & ~0x80;
+
+            // Check if this is an XInput2 event
+            if (response_type == XCB_GE_GENERIC) {
+                xcb_ge_generic_event_t* ge = reinterpret_cast<xcb_ge_generic_event_t*>(event);
+
+                if (ge->extension == xinput_opcode_) {
+                    ProcessXInputEvent(ge);
+                }
+            }
+
+            free(event);
         }
 
-        const auto* event_data = reinterpret_cast<const unsigned char*>(data->data);
-        int event_type = event_data[0] & 0x7F;
+        fprintf(stderr, "KonfliktNative: XInput2 event loop exited (is_running=%d)\n", is_running_.load());
+        is_running_ = false;
+    }
+
+    void ProcessXInputEvent(xcb_ge_generic_event_t* ge) {
+        if (!event_callback) {
+            return;
+        }
 
         Event event{};
         event.timestamp = GetTimestamp();
-        event.state = hook->get_state();
+        event.state = get_state();
 
         bool should_dispatch = false;
 
-        switch (event_type) {
-            case X11_MotionNotify:
-                event.type = EventType::MouseMove;
+        switch (ge->event_type) {
+            case XCB_INPUT_RAW_KEY_PRESS: {
+                auto* key_event = reinterpret_cast<xcb_input_raw_key_press_event_t*>(ge);
+                event.type = EventType::KeyPress;
+                event.keycode = key_event->detail;
+
+                // Get text representation using xkbcommon
+                if (xkb_state_) {
+                    xkb_keysym_t keysym = xkb_state_key_get_one_sym(xkb_state_, event.keycode);
+                    if (keysym != XKB_KEY_NoSymbol) {
+                        char buf[32];
+                        int len = xkb_keysym_to_utf8(keysym, buf, sizeof(buf));
+                        if (len > 0 && len < (int)sizeof(buf)) {
+                            event.text = std::string(buf, len);
+                        }
+                    }
+                    // Update state for the key press
+                    xkb_state_update_key(xkb_state_, event.keycode, XKB_KEY_DOWN);
+                }
+
                 should_dispatch = true;
                 break;
+            }
 
-            case X11_ButtonPress: {
-                unsigned int button = event_data[1];
+            case XCB_INPUT_RAW_KEY_RELEASE: {
+                auto* key_event = reinterpret_cast<xcb_input_raw_key_release_event_t*>(ge);
+                event.type = EventType::KeyRelease;
+                event.keycode = key_event->detail;
+
+                // Get text representation using xkbcommon
+                if (xkb_state_) {
+                    xkb_keysym_t keysym = xkb_state_key_get_one_sym(xkb_state_, event.keycode);
+                    if (keysym != XKB_KEY_NoSymbol) {
+                        char buf[32];
+                        int len = xkb_keysym_to_utf8(keysym, buf, sizeof(buf));
+                        if (len > 0 && len < (int)sizeof(buf)) {
+                            event.text = std::string(buf, len);
+                        }
+                    }
+                    // Update state for the key release
+                    xkb_state_update_key(xkb_state_, event.keycode, XKB_KEY_UP);
+                }
+
+                should_dispatch = true;
+                break;
+            }
+
+            case XCB_INPUT_RAW_BUTTON_PRESS: {
+                auto* button_event = reinterpret_cast<xcb_input_raw_button_press_event_t*>(ge);
+                uint32_t button = button_event->detail;
+
                 // Filter out scroll wheel events (buttons 4-7)
-                if (button >= Button1 && button <= Button3) {
+                if (button >= XCB_BUTTON_INDEX_1 && button <= XCB_BUTTON_INDEX_3) {
                     event.type = EventType::MousePress;
                     event.button = MouseButtonFromButton(button);
                     should_dispatch = true;
@@ -286,10 +429,12 @@ private:
                 break;
             }
 
-            case X11_ButtonRelease: {
-                unsigned int button = event_data[1];
+            case XCB_INPUT_RAW_BUTTON_RELEASE: {
+                auto* button_event = reinterpret_cast<xcb_input_raw_button_release_event_t*>(ge);
+                uint32_t button = button_event->detail;
+
                 // Filter out scroll wheel events (buttons 4-7)
-                if (button >= Button1 && button <= Button3) {
+                if (button >= XCB_BUTTON_INDEX_1 && button <= XCB_BUTTON_INDEX_3) {
                     event.type = EventType::MouseRelease;
                     event.button = MouseButtonFromButton(button);
                     should_dispatch = true;
@@ -297,50 +442,8 @@ private:
                 break;
             }
 
-            case X11_KeyPress: {
-                event.type = EventType::KeyPress;
-                event.keycode = event_data[1];
-
-                // Get text representation using XKeysymToString
-                KeySym keysym = XkbKeycodeToKeysym(hook->display_, event.keycode, 0, 0);
-                if (keysym != NoSymbol) {
-                    char* keyname = XKeysymToString(keysym);
-                    if (keyname) {
-                        // For printable characters, convert to actual character
-                        if (keysym >= 0x20 && keysym <= 0x7E) {
-                            event.text = std::string(1, static_cast<char>(keysym));
-                        } else if (keysym >= 0x100 && keysym <= 0x10FFFF) {
-                            // Unicode character
-                            event.text = std::string(1, static_cast<char>(keysym & 0xFF));
-                        }
-                        // For special keys, we could set keyname, but let's leave text empty
-                    }
-                }
-
-                should_dispatch = true;
-                break;
-            }
-
-            case X11_KeyRelease: {
-                event.type = EventType::KeyRelease;
-                event.keycode = event_data[1];
-
-                // Get text representation using XKeysymToString
-                KeySym keysym = XkbKeycodeToKeysym(hook->display_, event.keycode, 0, 0);
-                if (keysym != NoSymbol) {
-                    char* keyname = XKeysymToString(keysym);
-                    if (keyname) {
-                        // For printable characters, convert to actual character
-                        if (keysym >= 0x20 && keysym <= 0x7E) {
-                            event.text = std::string(1, static_cast<char>(keysym));
-                        } else if (keysym >= 0x100 && keysym <= 0x10FFFF) {
-                            // Unicode character
-                            event.text = std::string(1, static_cast<char>(keysym & 0xFF));
-                        }
-                        // For special keys, we could set keyname, but let's leave text empty
-                    }
-                }
-
+            case XCB_INPUT_RAW_MOTION: {
+                event.type = EventType::MouseMove;
                 should_dispatch = true;
                 break;
             }
@@ -350,64 +453,26 @@ private:
         }
 
         if (should_dispatch) {
-            hook->event_callback(event);
+            event_callback(event);
         }
-
-        XRecordFreeData(data);
     }
 
-    void RunEventLoop() {
-        XRecordClientSpec clients = XRecordAllClients;
-        XRecordRange* range = XRecordAllocRange();
+    xcb_connection_t* connection_{nullptr};
+    xcb_screen_t* screen_{nullptr};
+    int screen_number_{0};
+    uint8_t xinput_opcode_{0};
+    uint8_t xinput_first_event_{0};
 
-        if (!range) {
-            fprintf(stderr, "KonfliktNative: Failed to allocate XRecordRange\n");
-            is_running_ = false;
-            return;
-        }
+    struct xkb_context* xkb_context_{nullptr};
+    struct xkb_keymap* xkb_keymap_{nullptr};
+    struct xkb_state* xkb_state_{nullptr};
 
-        range->device_events.first = X11_KeyPress;
-        range->device_events.last = X11_MotionNotify;
-
-        record_context_ = XRecordCreateContext(record_display_, 0, &clients, 1, &range, 1);
-
-        XFree(range);
-
-        if (!record_context_) {
-            fprintf(stderr, "KonfliktNative: Failed to create XRecord context\n");
-            is_running_ = false;
-            return;
-        }
-
-        XSync(record_display_, False);
-
-        fprintf(stderr, "KonfliktNative: Starting XRecord event loop...\n");
-
-        // XRecordEnableContext blocks until XRecordDisableContext is called
-        // This is the main event loop - it will only return when we stop listening
-        if (!XRecordEnableContext(record_display_, record_context_, RecordEventCallback,
-                                  reinterpret_cast<XPointer>(this))) {
-            fprintf(stderr, "KonfliktNative: XRecordEnableContext failed or was disabled\n");
-            is_running_ = false;
-            return;
-        }
-
-        // We only get here when XRecordDisableContext is called or there's an error
-        // Process any remaining events
-        fprintf(stderr, "KonfliktNative: XRecord event loop exited\n");
-        XSync(record_display_, False);
-        is_running_ = false;
-    }
-
-    Display* display_{nullptr};
-    Display* record_display_{nullptr};
-    XRecordContext record_context_{0};
     std::thread listener_thread_;
     std::atomic<bool> is_running_{false};
 };
 
 std::unique_ptr<IPlatformHook> CreatePlatformHook() {
-    return std::make_unique<X11Hook>();
+    return std::make_unique<XCBHook>();
 }
 
 } // namespace konflikt

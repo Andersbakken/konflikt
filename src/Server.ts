@@ -31,8 +31,9 @@ export class Server {
         try {
             const addr = await this.#fastify.listen(opts);
             this.#fastify.log.info(`HTTP listening at ${addr}, WS at ws://localhost:${this.port}/ws`);
-        } catch (err) {
+        } catch (err: unknown) {
             this.#fastify.log.error(err);
+            console.error("Failed to start server:", err);
             process.exit(1);
         }
 

@@ -304,11 +304,9 @@ void KonfliktNative::HandlePlatformEvent(const Event& event) {
             }
         });
 
-        // If the call fails, it means the JS context is being destroyed
-        if (status != napi_ok) {
-            is_listening_ = false;
-            break;
-        }
+        // If the call fails repeatedly, it might mean the JS context is being destroyed
+        // But we shouldn't stop listening on a single failure
+        (void)status;  // Ignore status for now
     }
 }
 
