@@ -1,6 +1,3 @@
 /build/
 /dist/
 /node_modules/
-/native/build/
-/native/build-debug/
-/native/build-release/
