@@ -1,6 +1,7 @@
 import { ServerConsole } from "./ServerConsole";
 import { ServiceDiscovery } from "./ServiceDiscovery";
 import { debug, error, log, verbose } from "./Log";
+import { isInputEventMessage, isInstanceInfoMessage } from "./messageValidation";
 import Fastify from "fastify";
 import WebSocket from "ws";
 import type { Config } from "./Config";
@@ -9,7 +10,6 @@ import type { Duplex } from "stream";
 import type { FastifyInstance, FastifyListenOptions } from "fastify";
 import type { IncomingMessage } from "http";
 import type { InputEventMessage, InstanceInfoMessage } from "./messageValidation";
-import { isInputEventMessage, isInstanceInfoMessage } from "./messageValidation";
 
 export class Server {
     #fastify: FastifyInstance;
@@ -21,10 +21,10 @@ export class Server {
     #version: string;
     #capabilities: string[];
     #console: ServerConsole;
-    
+
     // Regular WebSocket connections (non-console)
     #regularConnections: Set<WebSocket> = new Set();
-    
+
     // Message handler callback for input events
     #messageHandler?: (message: InputEventMessage | InstanceInfoMessage) => void;
 
@@ -99,6 +99,11 @@ export class Server {
         this.#setupUpgradeHandling();
     }
 
+    /** Get console instance for log broadcasting */
+    get console(): ServerConsole {
+        return this.#console;
+    }
+
     /** Get service discovery instance for external access */
     get serviceDiscovery(): ServiceDiscovery {
         return this.#serviceDiscovery;
@@ -107,11 +112,6 @@ export class Server {
     /** Set config for console commands */
     setConfig(config: Config): void {
         this.#console.setConfig(config);
-    }
-
-    /** Get console instance for log broadcasting */
-    get console(): ServerConsole {
-        return this.#console;
     }
 
     /** Set message handler for input events and instance info */
@@ -219,15 +219,19 @@ export class Server {
 
     #handleRegularConnection(socket: WebSocket, req: IncomingMessage): void {
         verbose(`Handling regular WS connection from ${req.socket.remoteAddress}`);
-        
+
         // Add to regular connections set
         this.#regularConnections.add(socket);
 
-        socket.on("message", (raw: WebSocket.RawData) => {
+        socket.on("message", (text: WebSocket.RawData) => {
+            if (typeof text !== "string") {
+                verbose("Received non-text message from client, ignoring");
+                return;
+            }
+
             try {
-                const text = raw.toString("utf8");
                 const parsed = JSON.parse(text);
-                
+
                 // Handle input event messages
                 if (isInputEventMessage(parsed) || isInstanceInfoMessage(parsed)) {
                     if (this.#messageHandler) {

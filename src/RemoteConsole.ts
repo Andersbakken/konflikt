@@ -1,7 +1,7 @@
+import { type ConsoleMessage, isConsoleMessage } from "./messageValidation";
+import { LogLevel, debug, error } from "./Log";
 import { createInterface } from "readline";
 import WebSocket from "ws";
-import { LogLevel, debug, error } from "./Log";
-import { type ConsoleMessage, isConsoleMessage } from "./messageValidation";
 
 export class RemoteConsole {
     #readline: ReturnType<typeof createInterface>;
@@ -62,9 +62,13 @@ export class RemoteConsole {
                     process.exit(0);
                 });
 
-                this.#ws.on("message", (data: WebSocket.RawData) => {
+                this.#ws.on("message", (text: WebSocket.RawData) => {
+                    if (typeof text !== "string") {
+                        error("Received non-text message from server");
+                        return;
+                    }
+
                     try {
-                        const text = data.toString("utf8");
                         const parsed = JSON.parse(text);
                         if (!isConsoleMessage(parsed)) {
                             error("Invalid console message format from server");

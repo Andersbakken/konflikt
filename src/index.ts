@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { Config } from "./Config";
-import { Konflikt } from "./Konflikt";
-import { LogLevel, debug, error, log, setConsoleLevel, setLogFile } from "./Log";
+import { LogLevel, setConsoleLevel, setLogFile } from "./Log";
+import { main } from "./main";
 import { startRemoteConsole } from "./startRemoteConsole";
 
 // Handle help and version before config loading
@@ -94,46 +94,18 @@ if (typeof consoleConfig === "string" && consoleConfig !== "true") {
 } else {
     // Continue with normal server startup
 
-// Set log file if configured
-const logFile = config.logFile;
-if (logFile) {
-    setLogFile(logFile);
-}
-
-let konflikt: Konflikt;
-async function main(): Promise<void> {
-    try {
-        konflikt = new Konflikt(config);
-        await konflikt.init();
-
-        // Keep the process running
-        debug("Konflikt is running. Press Ctrl+C to exit.");
-
-        // Handle graceful shutdown
-        process.on("SIGINT", (): void => {
-            log("\nShutting down...");
-            if (konflikt.console) {
-                konflikt.console.stop();
-            }
-            process.exit(0);
-        });
-
-        process.on("SIGTERM", (): void => {
-            log("\nShutting down...");
-            if (konflikt.console) {
-                konflikt.console.stop();
-            }
-            process.exit(0);
-        });
-    } catch (e: unknown) {
-        error("Error initializing Konflikt:", e);
-        process.exit(1);
+    // Set log file if configured
+    const logFile = config.logFile;
+    if (logFile) {
+        setLogFile(logFile);
     }
-}
 
-main().catch((e: unknown) => {
-    console.error("Fatal error:", e);
-    process.exit(1);
-});
-
+    main(config)
+        .then(() => {
+            process.exit();
+        })
+        .catch((e: unknown) => {
+            console.error("Fatal error:", e);
+            process.exit(1);
+        });
 }

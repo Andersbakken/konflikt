@@ -1,0 +1,28 @@
+import { Konflikt } from "./Konflikt";
+import { debug, log } from "./Log";
+import type { Config } from "./Config";
+
+export async function main(config: Config): Promise<void> {
+    const konflikt = new Konflikt(config);
+    await konflikt.init();
+
+    // Keep the process running
+    debug("Konflikt is running. Press Ctrl+C to exit.");
+
+    // Handle graceful shutdown
+    process.on("SIGINT", (): void => {
+        log("\nShutting down...");
+        if (konflikt.console) {
+            konflikt.console.stop();
+        }
+        process.exit(0);
+    });
+
+    process.on("SIGTERM", (): void => {
+        log("\nShutting down...");
+        if (konflikt.console) {
+            konflikt.console.stop();
+        }
+        process.exit(0);
+    });
+}

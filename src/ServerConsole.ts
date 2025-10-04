@@ -1,8 +1,8 @@
 import { type ConsoleCommandMessage, isConsoleCommandMessage } from "./messageValidation";
 import { debug, error } from "./Log";
+import WebSocket from "ws";
 import type { Config } from "./Config";
 import type { IncomingMessage } from "http";
-import WebSocket from "ws";
 
 export class ServerConsole {
     #config: Config | undefined;

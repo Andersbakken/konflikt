@@ -5,7 +5,7 @@ import { createHash } from "crypto";
 import { createNativeLogger, setLogBroadcaster, verbose } from "./Log";
 import { hostname, platform } from "os";
 import type { Config } from "./Config.js";
-import type { InputEventMessage, InstanceInfoMessage } from "./messageValidation";
+import type { InputEventData, InputEventMessage, InstanceInfoMessage } from "./messageValidation";
 import type {
     KonfliktDesktopEvent,
     KonfliktKeyPressEvent,
@@ -29,6 +29,11 @@ export interface ConnectedInstanceInfo {
     lastSeen: number;
 }
 
+export interface CursorPosition {
+    x: number;
+    y: number;
+}
+
 export class Konflikt {
     #config: Config;
     #native: KonfliktNative;
@@ -38,7 +43,7 @@ export class Konflikt {
     // Active instance management
     #currentMode: "source" | "target" | "auto";
     #isActiveInstance: boolean = false;
-    #lastCursorPosition: { x: number; y: number } = { x: 0, y: 0 };
+    #lastCursorPosition: CursorPosition = { x: 0, y: 0 };
     #screenBounds: Rect;
 
     // Same-display detection for loop prevention
@@ -54,7 +59,7 @@ export class Konflikt {
         this.#currentMode = config.mode;
 
         // Generate machine and display identifiers for loop detection
-        this.#machineId = this.#generateMachineId();
+        this.#machineId = Konflikt.#generateMachineId();
         this.#displayId = this.#generateDisplayId();
 
         // Calculate screen bounds from config
@@ -165,6 +170,24 @@ export class Konflikt {
         // Remote console mode is handled in index.ts and doesn't reach here
     }
 
+    // Method to be called by Server when receiving network messages
+    handleNetworkMessage(message: InputEventMessage | InstanceInfoMessage): void {
+        if (message.type === "input_event") {
+            this.#handleInputEvent(message);
+            // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+        } else if (message.type !== "instance_info") {
+            throw new Error(`Unknown message type: ${JSON.stringify(message)}`);
+        } else {
+            this.#handleInstanceInfo(message);
+        }
+    }
+
+    static pointInRect(point: CursorPosition, rect: Rect): boolean {
+        return (
+            point.x >= rect.x && point.x < rect.x + rect.width && point.y >= rect.y && point.y < rect.y + rect.height
+        );
+    }
+
     // Active instance management methods
     #updateCursorPosition(x: number, y: number): void {
         this.#lastCursorPosition = { x, y };
@@ -178,7 +201,10 @@ export class Konflikt {
             this.#isActiveInstance = true;
         } else if (this.#currentMode === "target") {
             this.#isActiveInstance = false;
-        } else if (this.#currentMode === "auto") {
+            // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+        } else if (this.#currentMode !== "auto") {
+            throw new Error(`Unexpected mode: ${this.#currentMode}`);
+        } else {
             // Check if cursor is within this instance's screen bounds
             this.#isActiveInstance = this.#isCursorInScreenBounds(this.#lastCursorPosition);
         }
@@ -191,21 +217,8 @@ export class Konflikt {
         }
     }
 
-    #isCursorInScreenBounds(position: { x: number; y: number }): boolean {
+    #isCursorInScreenBounds(position: CursorPosition): boolean {
         return Konflikt.pointInRect(position, this.#screenBounds);
-    }
-
-    static pointInRect(point: { x: number; y: number }, rect: Rect): boolean {
-        return (
-            point.x >= rect.x && point.x < rect.x + rect.width && point.y >= rect.y && point.y < rect.y + rect.height
-        );
-    }
-
-    // Same-display detection methods
-    #generateMachineId(): string {
-        // Create a unique but consistent identifier for this machine
-        const machineInfo = `${hostname()}-${platform()}-${process.env.USER || process.env.USERNAME || "unknown"}`;
-        return createHash("sha256").update(machineInfo).digest("hex").substring(0, 16);
     }
 
     #generateDisplayId(): string {
@@ -270,17 +283,8 @@ export class Konflikt {
 
     // Input event broadcasting methods for source/target architecture
     #broadcastInputEvent(
-        eventType: "keyPress" | "keyRelease" | "mousePress" | "mouseRelease" | "mouseMove", 
-        eventData: {
-            x: number;
-            y: number;
-            timestamp: number;
-            keyboardModifiers: number;
-            mouseButtons: number;
-            keycode?: number;
-            text?: string;
-            button?: number;
-        }
+        eventType: "keyPress" | "keyRelease" | "mousePress" | "mouseRelease" | "mouseMove",
+        eventData: InputEventData
     ): void {
         const message: InputEventMessage = {
             type: "input_event",
@@ -293,7 +297,7 @@ export class Konflikt {
 
         // Broadcast to all connected WebSocket clients (excluding console connections)
         this.#server.broadcastToClients(JSON.stringify(message));
-        
+
         verbose(`Broadcasted ${eventType} event from source instance ${this.#config.instanceId}`);
     }
 
@@ -304,11 +308,7 @@ export class Konflikt {
         }
 
         // Update connected instance info for same-display detection
-        this.#updateConnectedInstance(
-            message.sourceInstanceId,
-            message.sourceDisplayId,
-            message.sourceMachineId
-        );
+        this.#updateConnectedInstance(message.sourceInstanceId, message.sourceDisplayId, message.sourceMachineId);
 
         // Don't execute events from the same instance
         if (message.sourceInstanceId === this.#config.instanceId) {
@@ -322,16 +322,7 @@ export class Konflikt {
 
     #executeInputEvent(
         eventType: "keyPress" | "keyRelease" | "mousePress" | "mouseRelease" | "mouseMove",
-        eventData: {
-            x: number;
-            y: number;
-            timestamp: number;
-            keyboardModifiers: number;
-            mouseButtons: number;
-            keycode?: number;
-            text?: string;
-            button?: number;
-        }
+        eventData: InputEventData
     ): void {
         try {
             if (eventType === "keyPress" || eventType === "keyRelease") {
@@ -378,15 +369,6 @@ export class Konflikt {
         // Update our tracking of connected instances
         this.#updateConnectedInstance(message.instanceId, message.displayId, message.machineId);
         verbose(`Received instance info from ${message.instanceId}`);
-    }
-
-    // Method to be called by Server when receiving network messages
-    handleNetworkMessage(message: InputEventMessage | InstanceInfoMessage): void {
-        if (message.type === "input_event") {
-            this.#handleInputEvent(message);
-        } else if (message.type === "instance_info") {
-            this.#handleInstanceInfo(message);
-        }
     }
 
     #onDesktopChanged(event: KonfliktDesktopEvent): void {
@@ -498,5 +480,12 @@ export class Konflikt {
             keyboardModifiers: event.keyboardModifiers,
             mouseButtons: event.mouseButtons
         });
+    }
+
+    // Same-display detection methods
+    static #generateMachineId(): string {
+        // Create a unique but consistent identifier for this machine
+        const machineInfo = `${hostname()}-${platform()}-${process.env.USER || process.env.USERNAME || "unknown"}`;
+        return createHash("sha256").update(machineInfo).digest("hex").substring(0, 16);
     }
 }

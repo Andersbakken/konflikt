@@ -31,23 +31,25 @@ export interface ConsoleLogMessage {
 export type ConsoleMessage = ConsoleResponseMessage | ConsoleErrorMessage | ConsolePongMessage | ConsoleLogMessage;
 
 // Input event message types for source/target architecture
+export interface InputEventData {
+    x: number;
+    y: number;
+    timestamp: number;
+    keyboardModifiers: number;
+    mouseButtons: number;
+    // Additional fields for specific event types
+    keycode?: number | undefined;
+    text?: string | undefined;
+    button?: number | undefined;
+}
+
 export interface InputEventMessage {
     type: "input_event";
     sourceInstanceId: string;
     sourceDisplayId: string;
     sourceMachineId: string;
     eventType: "keyPress" | "keyRelease" | "mousePress" | "mouseRelease" | "mouseMove";
-    eventData: {
-        x: number;
-        y: number;
-        timestamp: number;
-        keyboardModifiers: number;
-        mouseButtons: number;
-        // Additional fields for specific event types
-        keycode?: number;
-        text?: string;
-        button?: number;
-    };
+    eventData: InputEventData;
 }
 
 export interface InstanceInfoMessage {
@@ -89,12 +91,14 @@ export function isConsoleMessage(obj: unknown): obj is ConsoleMessage {
         case "pong":
             return !("timestamp" in obj) || typeof (obj as { timestamp: unknown }).timestamp === "number";
         case "console_log":
-            return "level" in obj && 
-                   typeof obj.level === "string" && 
-                   ["verbose", "debug", "log", "error"].includes(obj.level) &&
-                   "message" in obj && 
-                   typeof obj.message === "string" &&
-                   (!("timestamp" in obj) || typeof (obj as { timestamp: unknown }).timestamp === "number");
+            return (
+                "level" in obj &&
+                typeof obj.level === "string" &&
+                ["verbose", "debug", "log", "error"].includes(obj.level) &&
+                "message" in obj &&
+                typeof obj.message === "string" &&
+                (!("timestamp" in obj) || typeof (obj as { timestamp: unknown }).timestamp === "number")
+            );
         default:
             return false;
     }
@@ -104,7 +108,7 @@ export function isInputEventMessage(obj: unknown): obj is InputEventMessage {
     if (typeof obj !== "object" || obj === null || !("type" in obj) || obj.type !== "input_event") {
         return false;
     }
-    
+
     const msg = obj as Record<string, unknown>;
     return (
         typeof msg.sourceInstanceId === "string" &&
@@ -126,7 +130,7 @@ export function isInstanceInfoMessage(obj: unknown): obj is InstanceInfoMessage 
     if (typeof obj !== "object" || obj === null || !("type" in obj) || obj.type !== "instance_info") {
         return false;
     }
-    
+
     const msg = obj as Record<string, unknown>;
     return (
         typeof msg.instanceId === "string" &&
