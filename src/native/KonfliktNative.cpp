@@ -253,8 +253,9 @@ KonfliktNative::~KonfliktNative()
 {
     // Release all thread-safe functions first
     for (auto &pair : mListeners) {
-        for (auto &tsfn : pair.second.listeners) {
-            tsfn.Release();
+        for (auto &entry : pair.second.listeners) {
+            entry.tsfn.Release();
+            entry.funcRef.Reset();
         }
         pair.second.listeners.clear();
     }
@@ -330,7 +331,15 @@ void KonfliktNative::On(const Napi::CallbackInfo &info)
         0,
         1);
 
-    mListeners[type].listeners.push_back(std::move(tsfn));
+    // Create function reference for comparison
+    Napi::FunctionReference funcRef = Napi::Persistent(listener);
+
+    // Store both
+    ListenerEntry entry;
+    entry.tsfn = std::move(tsfn);
+    entry.funcRef = std::move(funcRef);
+    
+    mListeners[type].listeners.push_back(std::move(entry));
 
     // Start listening if not already started
     if (!mIsListening && mPlatformHook) {
@@ -349,6 +358,7 @@ void KonfliktNative::Off(const Napi::CallbackInfo &info)
     }
 
     std::string typeStr = info[0].As<Napi::String>().Utf8Value();
+    Napi::Function targetListener = info[1].As<Napi::Function>();
 
     // Convert type string to EventType
     EventType type;
@@ -368,11 +378,23 @@ void KonfliktNative::Off(const Napi::CallbackInfo &info)
         return;
     }
 
-    // Remove listener (simplified - in real implementation would need to track by function reference)
+    // Find and remove the specific listener
     auto it = mListeners.find(type);
-    if (it != mListeners.end() && !it->second.listeners.empty()) {
-        it->second.listeners.back().Release();
-        it->second.listeners.pop_back();
+    if (it != mListeners.end()) {
+        auto &listeners = it->second.listeners;
+        
+        for (auto listenerIt = listeners.begin(); listenerIt != listeners.end(); ++listenerIt) {
+            // Compare the function references
+            if (listenerIt->funcRef.Value().StrictEquals(targetListener)) {
+                // Release resources
+                listenerIt->tsfn.Release();
+                listenerIt->funcRef.Reset();
+                
+                // Remove from vector
+                listeners.erase(listenerIt);
+                break;
+            }
+        }
     }
 }
 
@@ -402,14 +424,14 @@ void KonfliktNative::SendKeyEvent(const Napi::CallbackInfo &info)
     mPlatformHook->sendKeyEvent(event);
 }
 
-void KonfliktNative::showCursor(const Napi::CallbackInfo &info)
+void KonfliktNative::showCursor(const Napi::CallbackInfo &/*info*/)
 {
     if (mPlatformHook) {
         mPlatformHook->showCursor();
     }
 }
 
-void KonfliktNative::hideCursor(const Napi::CallbackInfo &info)
+void KonfliktNative::hideCursor(const Napi::CallbackInfo &/*info*/)
 {
     if (mPlatformHook) {
         mPlatformHook->hideCursor();
@@ -438,9 +460,9 @@ void KonfliktNative::handlePlatformEvent(const Event &event)
         return;
     }
 
-    for (auto &tsfn : it->second.listeners) {
+    for (auto &entry : it->second.listeners) {
         // Call the thread-safe function with the event
-        auto status = tsfn.NonBlockingCall([event](Napi::Env env, Napi::Function jsCallback) {
+        auto status = entry.tsfn.NonBlockingCall([event](Napi::Env env, Napi::Function jsCallback) {
             try {
                 jsCallback.Call({ eventToObject(env, event) });
             } catch (...) {

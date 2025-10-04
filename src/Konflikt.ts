@@ -1,10 +1,10 @@
-import { createHash } from "crypto";
-import { hostname, platform } from "os";
 import { Console } from "./Console.js";
-import { createNativeLogger, setLogBroadcaster, verbose } from "./Log";
 import { InstanceRole } from "./Config.js";
 import { KonfliktNative as KonfliktNativeConstructor } from "./native.js";
 import { Server } from "./Server.js";
+import { createHash } from "crypto";
+import { createNativeLogger, setLogBroadcaster, verbose } from "./Log";
+import { hostname, platform } from "os";
 import type { Config } from "./Config.js";
 import type { InputEventData, InputEventMessage, InstanceInfoMessage } from "./messageValidation";
 import type {
@@ -142,6 +142,11 @@ export class Konflikt {
 
         await this.#server.start();
 
+        // Start input event listening for servers
+        if (this.#role === InstanceRole.Server) {
+            this.#startInputEventListening();
+        }
+
         // Send initial instance info and set up periodic broadcasting
         this.#sendInstanceInfo();
         setInterval(() => {
@@ -171,6 +176,43 @@ export class Konflikt {
             verbose("Console disabled by configuration");
         }
         // Remote console mode is handled in index.ts and doesn't reach here
+    }
+
+    #startInputEventListening(): void {
+        verbose("Server starting input event listening...");
+
+        // Start monitoring cursor position to track active instance
+        this.#checkIfShouldBeActive();
+
+        verbose(`Server ${this.#config.instanceId} is now listening for input events (role: server)`);
+        verbose(`Screen bounds: ${JSON.stringify(this.#screenBounds)}`);
+
+        const adjacency = this.#config.adjacency;
+        if (Object.keys(adjacency).length > 0) {
+            verbose(`Screen adjacency configuration: ${JSON.stringify(adjacency, null, 2)}`);
+        }
+    }
+
+    #getTargetClientForPosition(x: number, y: number): string | null {
+        // For servers: determine which connected client should receive input at this position
+        if (this.#role !== InstanceRole.Server) {
+            return null;
+        }
+
+        // If cursor is within server's screen bounds, don't forward to clients
+        if (Konflikt.pointInRect({ x, y }, this.#screenBounds)) {
+            verbose(`Cursor at (${x}, ${y}) is within server screen bounds - not forwarding`);
+            return null;
+        }
+
+        // Check adjacency configuration to find which client's screen area contains this position
+        const adjacency = this.#config.adjacency;
+        verbose(`Checking adjacency for cursor position (${x}, ${y}) adjacency: ${adjacency}`);
+
+        // TODO: Implement logic to determine target client based on screen positioning
+        // This will use the adjacency configuration and connected clients' screen information
+
+        return null; // For now, return null until we have client connection management
     }
 
     // Method to be called by Server when receiving network messages

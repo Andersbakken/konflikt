@@ -139,9 +139,15 @@ private:
     std::unique_ptr<IPlatformHook> mPlatformHook;
 
     // Event listeners storage
+    struct ListenerEntry
+    {
+        Napi::ThreadSafeFunction tsfn;
+        Napi::FunctionReference funcRef;
+    };
+
     struct ListenerList
     {
-        std::vector<Napi::ThreadSafeFunction> listeners;
+        std::vector<ListenerEntry> listeners;
     };
 
     std::unordered_map<EventType, ListenerList> mListeners;

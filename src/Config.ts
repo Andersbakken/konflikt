@@ -139,10 +139,6 @@ export class Config {
     }
 
     // Cluster configuration
-    get topology(): "automatic" | "manual" | "star" | "mesh" {
-        const topology = this.#get("cluster.topology") as "automatic" | "manual" | "star" | "mesh" | null;
-        return topology || "automatic";
-    }
 
     get serverHost(): string | null {
         return this.#string("cluster.server.host");

@@ -17,7 +17,6 @@ const CLI_ARGS = {
     "screen-width": { path: "screen.dimensions.width" },
     "screen-height": { path: "screen.dimensions.height" },
     "screen-edges": { path: "screen.edges" },
-    topology: { path: "cluster.topology", short: "-t" },
     "server-host": { path: "cluster.server.host" },
     "server-port": { path: "cluster.server.port" },
     peers: { path: "cluster.peers" },
@@ -223,17 +222,9 @@ export const configSchema = convict.default({
         }
     },
 
-    // Cluster topology - defines relationships between instances
+    // Cluster configuration - server/client relationships
     cluster: {
-        topology: {
-            doc: "Cluster topology mode",
-            format: ["automatic", "manual", "star", "mesh"],
-            default: "automatic",
-            env: "KONFLIKT_TOPOLOGY",
-            arg: argForPath("cluster.topology")
-        },
-
-        // Server configuration (for star topology)
+        // Server configuration
         server: {
             host: {
                 doc: "Server host to connect to (for client mode)",

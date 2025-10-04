@@ -26,7 +26,6 @@ Options:
   --server-port             Server port to connect to (client mode)
   --discovery               Enable service discovery
   --service-name, -s        Service name for mDNS advertising
-  --topology, -t            Cluster topology (automatic, star, mesh)
   --dev, -d                 Enable development mode
   --mock-input              Mock input events for testing
   --console                 Enable console (default), or connect to remote host[:port]

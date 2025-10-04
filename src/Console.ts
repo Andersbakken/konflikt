@@ -282,7 +282,6 @@ export class Console {
             "screen.width": () => config.screenWidth,
             "screen.height": () => config.screenHeight,
             "screen.edges": () => config.screenEdges,
-            "cluster.topology": () => config.topology,
             "cluster.server.host": () => config.serverHost,
             "cluster.server.port": () => config.serverPort,
             "cluster.peers": () => config.peers,
@@ -382,7 +381,6 @@ export class Console {
         const config = this.#konflikt.config;
         this.#consoleLog("Peers Configuration:");
         this.#consoleLog("===================");
-        this.#consoleLog(`Topology: ${config.topology}`);
         
         if (config.serverHost && config.serverPort) {
             this.#consoleLog(`Server: ${config.serverHost}:${config.serverPort}`);
