@@ -47,7 +47,7 @@ try {
 }
 
 // Set up logging based on config
-const logLevel = config.string("logging.level");
+const logLevel = config.logLevel;
 let verbosityLevel: LogLevel;
 switch (logLevel) {
     case "silent":
@@ -70,21 +70,16 @@ switch (logLevel) {
         verbosityLevel = LogLevel.Verbose;
         break;
 
-    case null:
-        verbosityLevel = LogLevel.Log;
-        break;
-
     default:
-        console.error(`Unknown log level "${logLevel}", defaulting to "log"`);
-        process.exit(1);
+        verbosityLevel = LogLevel.Log;
         break;
 }
 
 setConsoleLevel(verbosityLevel);
 
 // Set log file if configured
-const logFile = config.string("logging.file");
-if (logFile && typeof logFile === "string") {
+const logFile = config.logFile;
+if (logFile) {
     setLogFile(logFile);
 }
 
@@ -100,11 +95,17 @@ async function main(): Promise<void> {
         // Handle graceful shutdown
         process.on("SIGINT", (): void => {
             log("\nShutting down...");
+            if (konflikt.console) {
+                konflikt.console.stop();
+            }
             process.exit(0);
         });
 
         process.on("SIGTERM", (): void => {
             log("\nShutting down...");
+            if (konflikt.console) {
+                konflikt.console.stop();
+            }
             process.exit(0);
         });
     } catch (e: unknown) {

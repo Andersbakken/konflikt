@@ -13,23 +13,23 @@ interface ConvictInstance {
 }
 
 export class Config {
-    private convictConfig: ConvictInstance;
+    #convictConfig: ConvictInstance;
 
     constructor(configPath?: string, cliArgs: string[] = process.argv.slice(2)) {
         // Create a new instance from the schema
-        this.convictConfig = configSchema as ConvictInstance;
-        this.loadConfig(configPath);
-        this.loadCliArgs(cliArgs);
-        this.generateDefaults();
-        this.validate();
+        this.#convictConfig = configSchema as ConvictInstance;
+        this.#loadConfig(configPath);
+        this.#loadCliArgs(cliArgs);
+        this.#generateDefaults();
+        this.#validate();
     }
 
-    get(key: string): unknown {
-        return this.convictConfig.get(key);
+    #get(key: string): unknown {
+        return this.#convictConfig.get(key);
     }
 
-    string(key: string): string | null {
-        const value = this.get(key);
+    #string(key: string): string | null {
+        const value = this.#get(key);
         if (value === null) {
             return null;
         }
@@ -39,8 +39,8 @@ export class Config {
         throw new Error(`Config key '${key}' is not a string`);
     }
 
-    integer(key: string): number | null {
-        const value = this.get(key);
+    #integer(key: string): number | null {
+        const value = this.#get(key);
         if (value === null) {
             return null;
         }
@@ -50,8 +50,8 @@ export class Config {
         throw new Error(`Config key '${key}' is not an integer`);
     }
 
-    number(key: string): number | null {
-        const value = this.get(key);
+    #number(key: string): number | null {
+        const value = this.#get(key);
         if (value === null) {
             return null;
         }
@@ -61,17 +61,152 @@ export class Config {
         throw new Error(`Config key '${key}' is not a number`);
     }
 
-    set(key: string, value: unknown): void {
-        this.convictConfig.set(key, value);
+    #set(key: string, value: unknown): void {
+        this.#convictConfig.set(key, value);
+    }
+
+    // Typed getters for all configuration values with defaults
+
+    // Instance configuration
+    get instanceId(): string {
+        return (this.#get("instance.id") as string) || `konflikt-${process.pid}-${Date.now()}`;
+    }
+
+    get instanceName(): string {
+        return (this.#get("instance.name") as string) || `${hostname()}-${process.pid}`;
+    }
+
+    get role(): "server" | "client" | "peer" {
+        const role = this.#get("instance.role") as "server" | "client" | "peer" | null;
+        return role || "peer";
+    }
+
+    // Network configuration
+    get port(): number {
+        return this.#integer("network.port") || 3000;
+    }
+
+    get host(): string {
+        return this.#string("network.host") || "0.0.0.0";
+    }
+
+    get discoveryEnabled(): boolean {
+        const enabled = this.#get("network.discovery.enabled") as boolean | null;
+        return enabled ?? true;
+    }
+
+    get serviceName(): string {
+        return this.#string("network.discovery.serviceName") || "konflikt";
+    }
+
+    // Screen configuration
+    get screenId(): string {
+        return this.#string("screen.id") || `screen-${this.instanceId}`;
+    }
+
+    get screenX(): number {
+        return this.#number("screen.position.x") || 0;
+    }
+
+    get screenY(): number {
+        return this.#number("screen.position.y") || 0;
+    }
+
+    get screenWidth(): number | null {
+        return this.#integer("screen.dimensions.width");
+    }
+
+    get screenHeight(): number | null {
+        return this.#integer("screen.dimensions.height");
+    }
+
+    get screenEdges(): { top: boolean; right: boolean; bottom: boolean; left: boolean } {
+        const edges = this.#get("screen.edges") as {
+            top: boolean;
+            right: boolean;
+            bottom: boolean;
+            left: boolean;
+        } | null;
+        return edges || { top: true, right: true, bottom: true, left: true };
+    }
+
+    // Cluster configuration
+    get topology(): "automatic" | "manual" | "star" | "mesh" {
+        const topology = this.#get("cluster.topology") as "automatic" | "manual" | "star" | "mesh" | null;
+        return topology || "automatic";
+    }
+
+    get serverHost(): string | null {
+        return this.#string("cluster.server.host");
+    }
+
+    get serverPort(): number | null {
+        return this.#integer("cluster.server.port");
+    }
+
+    get peers(): unknown[] {
+        const peers = this.#get("cluster.peers") as unknown[] | null;
+        return peers || [];
+    }
+
+    get adjacency(): Record<string, unknown> {
+        const adjacency = this.#get("cluster.adjacency") as Record<string, unknown> | null;
+        return adjacency || {};
+    }
+
+    // Input configuration
+    get captureMouse(): boolean {
+        const capture = this.#get("input.capture.mouse") as boolean | null;
+        return capture ?? true;
+    }
+
+    get captureKeyboard(): boolean {
+        const capture = this.#get("input.capture.keyboard") as boolean | null;
+        return capture ?? true;
+    }
+
+    get forwardEvents(): string[] {
+        const events = this.#get("input.forward") as string[] | null;
+        return events || ["mouse_move", "mouse_press", "mouse_release", "key_press", "key_release"];
+    }
+
+    get cursorTransitionEnabled(): boolean {
+        const enabled = this.#get("input.cursorTransition.enabled") as boolean | null;
+        return enabled ?? true;
+    }
+
+    get deadZone(): number {
+        return this.#number("input.cursorTransition.deadZone") || 5;
+    }
+
+    // Logging configuration
+    get logLevel(): "silent" | "error" | "log" | "debug" | "verbose" {
+        const level = this.#get("logging.level") as "silent" | "error" | "log" | "debug" | "verbose" | null;
+        return level || "log";
+    }
+
+    get logFile(): string | null {
+        return this.#string("logging.file");
+    }
+
+    // Development configuration
+    get developmentEnabled(): boolean {
+        const enabled = this.#get("development.enabled") as boolean | null;
+        return enabled ?? false;
+    }
+
+    get mockInput(): boolean {
+        const mock = this.#get("development.mockInput") as boolean | null;
+        return mock ?? false;
     }
 
     getAll(): ConfigType {
-        return this.convictConfig.getProperties();
+        return this.#convictConfig.getProperties();
     }
 
     // Get the raw convict instance for advanced usage
     getConvictInstance(): ConvictInstance {
-        return this.convictConfig;
+        return this.#convictConfig;
     }
 
     // Export current configuration as JSON (useful for debugging)
@@ -130,7 +265,7 @@ export class Config {
         return new Config(undefined, cliArgs);
     }
 
-    private loadConfig(configPath?: string): void {
+    #loadConfig(configPath?: string): void {
         if (!configPath) {
             return;
         }
@@ -148,7 +283,7 @@ export class Config {
 
             if (ext === ".js" || ext === ".mjs") {
                 // Execute JavaScript config in sandbox
-                configData = Config.executeJsConfig(configContent, configPath);
+                configData = Config.#executeJsConfig(configContent, configPath);
             } else if (ext === ".json") {
                 // Parse JSON config
                 configData = JSON.parse(configContent);
@@ -158,7 +293,7 @@ export class Config {
             }
 
             if (configData && typeof configData === "object") {
-                this.convictConfig.load(configData as Record<string, unknown>);
+                this.#convictConfig.load(configData as Record<string, unknown>);
                 debug(`Loaded config from: ${configPath}`);
             } else {
                 error(`Config file must export an object: ${configPath}`);
@@ -169,25 +304,25 @@ export class Config {
         }
     }
 
-    private loadCliArgs(args: string[]): void {
+    #loadCliArgs(args: string[]): void {
         if (args.length === 0) {
             return;
         }
 
         // Expand short options to long options
-        const expandedArgs = Config.expandShortOptions(args);
+        const expandedArgs = Config.#expandShortOptions(args);
 
         // Debug: log what args we're passing to convict
         debug("Loading CLI args:", expandedArgs.join(" "));
 
         // Try convict's built-in CLI parsing first
-        this.convictConfig.load({}, { args: expandedArgs });
+        this.#convictConfig.load({}, { args: expandedArgs });
 
         // Manual override for important args that might not work with convict
-        this.manuallyParseImportantArgs(expandedArgs);
+        this.#manuallyParseImportantArgs(expandedArgs);
     }
 
-    private manuallyParseImportantArgs(args: string[]): void {
+    #manuallyParseImportantArgs(args: string[]): void {
         for (let i = 0; i < args.length - 1; i++) {
             const arg = args[i] as string | undefined;
             const value = args[i + 1];
@@ -200,36 +335,36 @@ export class Config {
             switch (arg) {
                 case "--port":
                     if (value) {
-                        this.convictConfig.set("network.port", parseInt(value, 10));
+                        this.#set("network.port", parseInt(value, 10));
                         debug(`CLI override: port = ${parseInt(value, 10)}`);
                     }
                     break;
                 case "--host":
                     if (value) {
-                        this.convictConfig.set("network.host", value);
+                        this.#set("network.host", value);
                         debug(`CLI override: host = ${value}`);
                     }
                     break;
                 case "--role":
                     if (value) {
-                        this.convictConfig.set("instance.role", value);
+                        this.#set("instance.role", value);
                         debug(`CLI override: role = ${value}`);
                     }
                     break;
                 case "--log-level":
                     if (value) {
-                        this.convictConfig.set("logging.level", value);
+                        this.#set("logging.level", value);
                         debug(`CLI override: log-level = ${value}`);
                     }
                     break;
                 case "--log-file":
                     if (value) {
-                        this.convictConfig.set("logging.file", value);
+                        this.#set("logging.file", value);
                         debug(`CLI override: log-file = ${value}`);
                     }
                     break;
                 case "--dev":
-                    this.convictConfig.set("development.enabled", true);
+                    this.#set("development.enabled", true);
                     debug(`CLI override: dev = true`);
                     break;
                 case undefined:
@@ -240,37 +375,37 @@ export class Config {
         }
     }
 
-    private validate(): void {
+    #validate(): void {
         try {
-            this.convictConfig.validate({ allowed: "strict" });
+            this.#convictConfig.validate({ allowed: "strict" });
         } catch (err) {
             error("Config validation failed:", err);
             throw err;
         }
     }
 
-    private generateDefaults(): void {
+    #generateDefaults(): void {
         // Generate instance ID if not provided
-        const instanceId = this.convictConfig.get("instance.id");
+        const instanceId = this.#get("instance.id");
         if (!instanceId) {
-            this.convictConfig.set("instance.id", `konflikt-${process.pid}-${Date.now()}`);
+            this.#set("instance.id", `konflikt-${process.pid}-${Date.now()}`);
         }
 
         // Generate instance name if not provided
-        const instanceName = this.convictConfig.get("instance.name");
+        const instanceName = this.#get("instance.name");
         if (!instanceName) {
-            this.convictConfig.set("instance.name", `${hostname()}-${process.pid}`);
+            this.#set("instance.name", `${hostname()}-${process.pid}`);
         }
 
         // Generate screen ID if not provided
-        const screenId = this.convictConfig.get("screen.id");
+        const screenId = this.#get("screen.id");
         if (!screenId) {
-            const finalInstanceId = this.convictConfig.get("instance.id");
-            this.convictConfig.set("screen.id", `screen-${finalInstanceId}`);
+            const finalInstanceId = this.#get("instance.id");
+            this.#set("screen.id", `screen-${finalInstanceId}`);
         }
     }
 
-    private static expandShortOptions(args: string[]): string[] {
+    static #expandShortOptions(args: string[]): string[] {
         const expanded: string[] = [];
 
         for (let i = 0; i < args.length; i++) {
@@ -290,7 +425,7 @@ export class Config {
         return expanded;
     }
 
-    private static executeJsConfig(jsCode: string, configPath: string): unknown {
+    static #executeJsConfig(jsCode: string, configPath: string): unknown {
         debug(`Executing JavaScript config in sandbox: ${configPath}`);
 
         // Create a minimal sandbox environment

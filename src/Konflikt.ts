@@ -1,3 +1,4 @@
+import { Console } from "./Console.js";
 import { KonfliktNative as KonfliktNativeConstructor } from "./native.js";
 import { Server } from "./Server.js";
 import { createNativeLogger, verbose } from "./Log";
@@ -15,16 +16,18 @@ export class Konflikt {
     #config: Config;
     #native: KonfliktNative;
     #server: Server;
+    #console: Console | null = null;
 
     constructor(config: Config) {
         this.#config = config;
         this.#native = new KonfliktNativeConstructor(createNativeLogger());
         this.#server = new Server(
-            config.get("network.port") as number,
-            config.get("instance.id") as string,
-            config.get("instance.name") as string
+            config.port,
+            config.instanceId,
+            config.instanceName
         );
 
+        // Console will be created during init if stdin is available
         this.#native.on("keyPress", this.#onKeyPress.bind(this));
         this.#native.on("keyRelease", this.#onKeyRelease.bind(this));
         this.#native.on("mousePress", this.#onMousePress.bind(this));
@@ -44,9 +47,26 @@ export class Konflikt {
         return this.#server;
     }
 
+    get console(): Console | null {
+        return this.#console;
+    }
+
     async init(): Promise<void> {
         verbose("Initializing Konflikt...", this.#config);
         await this.#server.start();
+        
+        // Start console if stdin is interactive TTY
+        try {
+            if (process.stdin.isTTY && process.stdout.isTTY) {
+                this.#console = new Console(this);
+                this.#console.start();
+            } else {
+                verbose("Non-interactive environment detected, console disabled");
+            }
+        } catch (err) {
+            verbose("Console initialization failed:", err);
+            // Continue without console
+        }
     }
 
     // eslint-disable-next-line class-methods-use-this
