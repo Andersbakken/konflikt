@@ -1,5 +1,6 @@
 import { Config } from "./Config.js";
 import { KonfliktNative as KonfliktNativeConstructor } from "./native.js";
+import { Server } from "./Server.js";
 import type {
     KonfliktKeyPressEvent,
     KonfliktKeyReleaseEvent,
@@ -12,10 +13,13 @@ import type { KonfliktNative } from "./KonfliktNative.js";
 export class Konflikt {
     #config: Config;
     #native: KonfliktNative;
+    #server: Server;
 
     constructor(configPath?: string) {
         this.#config = new Config(configPath);
         this.#native = new KonfliktNativeConstructor();
+        this.#server = new Server();
+
         this.#native.on("keyPress", this.#onKeyPress.bind(this));
         this.#native.on("keyRelease", this.#onKeyRelease.bind(this));
         this.#native.on("mousePress", this.#onMousePress.bind(this));
@@ -31,8 +35,13 @@ export class Konflikt {
         return this.#native;
     }
 
-    init(): void {
+    get server(): Server {
+        return this.#server;
+    }
+
+    async init(): Promise<void> {
         console.log("Initializing Konflikt...", this.#config);
+        await this.#server.start();
     }
 
     // eslint-disable-next-line class-methods-use-this

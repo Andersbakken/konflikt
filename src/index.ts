@@ -89,25 +89,32 @@ if (args.silent) {
 setConsoleLevel(verbosityLevel);
 
 let konflikt: Konflikt;
-try {
-    konflikt = new Konflikt(configPath);
-    konflikt.init();
+async function main(): Promise<void> {
+    try {
+        konflikt = new Konflikt(configPath);
+        await konflikt.init();
 
-    // Keep the process running
-    console.log("Konflikt is running. Press Ctrl+C to exit.");
+        // Keep the process running
+        console.log("Konflikt is running. Press Ctrl+C to exit.");
 
-    // Handle graceful shutdown
-    process.on("SIGINT", (): void => {
-        console.log("\nShutting down...");
-        process.exit(0);
-    });
+        // Handle graceful shutdown
+        process.on("SIGINT", (): void => {
+            console.log("\nShutting down...");
+            process.exit(0);
+        });
 
-    process.on("SIGTERM", (): void => {
-        console.log("\nShutting down...");
-        process.exit(0);
-    });
-} catch (e: unknown) {
-    console.error(usage);
-    console.error("Error initializing Konflikt:", e);
-    process.exit(1);
+        process.on("SIGTERM", (): void => {
+            console.log("\nShutting down...");
+            process.exit(0);
+        });
+    } catch (e: unknown) {
+        console.error(usage);
+        console.error("Error initializing Konflikt:", e);
+        process.exit(1);
+    }
 }
+
+main().catch((e: unknown) => {
+    console.error("Fatal error:", e);
+    process.exit(1);
+});

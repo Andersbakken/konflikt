@@ -1,5 +1,8 @@
+import { ServiceDiscovery } from "./ServiceDiscovery";
+import { log } from "./Log";
 import Fastify from "fastify";
 import WebSocket from "ws";
+import type { DiscoveredService } from "./ServiceDiscovery";
 import type { FastifyInstance, FastifyListenOptions } from "fastify";
 import type { IncomingMessage } from "http";
 
@@ -7,14 +10,22 @@ export class Server {
     #fastify: FastifyInstance;
     #wss: WebSocket.WebSocketServer;
     #heartbeatInterval: ReturnType<typeof setInterval> | undefined = undefined;
+    #serviceDiscovery: ServiceDiscovery;
 
     constructor(readonly port: number = 3000) {
         this.#fastify = Fastify({ logger: true });
         this.#wss = new WebSocket.WebSocketServer({ noServer: true });
+        this.#serviceDiscovery = new ServiceDiscovery();
 
         // this.#registerRoutes();
         this.#setupWebSocket();
+        this.#setupServiceDiscovery();
         // this.#setupUpgradeHandling();
+    }
+
+    /** Get service discovery instance for external access */
+    get serviceDiscovery(): ServiceDiscovery {
+        return this.#serviceDiscovery;
     }
 
     /** Start server */
@@ -25,6 +36,10 @@ export class Server {
         try {
             const addr = await this.#fastify.listen(opts);
             this.#fastify.log.info(`HTTP listening at ${addr}, WS at ws://localhost:${this.port}/ws`);
+
+            // Start service discovery after server is running
+            this.#serviceDiscovery.advertise(this.port);
+            this.#serviceDiscovery.startDiscovery();
         } catch (err: unknown) {
             this.#fastify.log.error(err);
             console.error("Failed to start server:", err);
@@ -46,6 +61,9 @@ export class Server {
             this.#heartbeatInterval = undefined;
         }
 
+        // Stop service discovery
+        await this.#serviceDiscovery.stop();
+
         this.#wss.clients.forEach((c: WebSocket.WebSocket): void => {
             c.terminate();
         });
@@ -66,6 +84,19 @@ export class Server {
     //         return { echoed: request.body };
     //     });
     // }
+
+    /** Setup service discovery event handlers */
+    #setupServiceDiscovery(): void {
+        this.#serviceDiscovery.on("serviceUp", (service: DiscoveredService) => {
+            log(`New Konflikt instance discovered: ${service.name} at ${service.host}:${service.port}`);
+            // You can add logic here to establish connections with discovered services
+        });
+
+        this.#serviceDiscovery.on("serviceDown", (service: DiscoveredService) => {
+            log(`Konflikt instance went offline: ${service.name}`);
+            // You can add cleanup logic here
+        });
+    }
 
     // /** Setup WebSocket server events */
     #setupWebSocket(): void {
