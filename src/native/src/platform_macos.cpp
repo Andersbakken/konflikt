@@ -14,11 +14,12 @@ public:
     MacOSHook() = default;
     ~MacOSHook() override = default;
 
-    bool initialize() override {
-        event_tap_ = nullptr;
-        run_loop_source_ = nullptr;
-        event_loop_ = nullptr;
-        is_running_ = false;
+    bool initialize(const Logger& logger) override {
+        mLogger = logger;
+        mEventTap = nullptr;
+        mRunLoopSource = nullptr;
+        mEventLoop = nullptr;
+        mIsRunning = false;
         return true;
     }
 
@@ -147,42 +148,42 @@ public:
     }
 
     void start_listening() override {
-        if (is_running_) {
+        if (mIsRunning) {
             return;
         }
 
-        is_running_ = true;
+        mIsRunning = true;
 
         // Start event tap in a separate thread
-        listener_thread_ = std::thread([this]() {
+        mListenerThread = std::thread([this]() {
             RunEventLoop();
         });
     }
 
     void stop_listening() override {
-        if (!is_running_) {
+        if (!mIsRunning) {
             return;
         }
 
-        is_running_ = false;
+        mIsRunning = false;
 
-        if (event_loop_) {
-            CFRunLoopStop(event_loop_);
+        if (mEventLoop) {
+            CFRunLoopStop(mEventLoop);
         }
 
-        if (listener_thread_.joinable()) {
-            listener_thread_.join();
+        if (mListenerThread.joinable()) {
+            mListenerThread.join();
         }
 
-        if (event_tap_) {
-            CGEventTapEnable(event_tap_, false);
-            CFRelease(event_tap_);
-            event_tap_ = nullptr;
+        if (mEventTap) {
+            CGEventTapEnable(mEventTap, false);
+            CFRelease(mEventTap);
+            mEventTap = nullptr;
         }
 
-        if (run_loop_source_) {
-            CFRelease(run_loop_source_);
-            run_loop_source_ = nullptr;
+        if (mRunLoopSource) {
+            CFRelease(mRunLoopSource);
+            mRunLoopSource = nullptr;
         }
     }
 
@@ -309,7 +310,7 @@ private:
             CGEventMaskBit(kCGEventKeyDown) |
             CGEventMaskBit(kCGEventKeyUp);
 
-        event_tap_ = CGEventTapCreate(
+        mEventTap = CGEventTapCreate(
             kCGSessionEventTap,
             kCGHeadInsertEventTap,
             kCGEventTapOptionListenOnly,
@@ -318,24 +319,25 @@ private:
             this
         );
 
-        if (!event_tap_) {
-            is_running_ = false;
+        if (!mEventTap) {
+            mIsRunning = false;
             return;
         }
 
-        run_loop_source_ = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, event_tap_, 0);
-        event_loop_ = CFRunLoopGetCurrent();
-        CFRunLoopAddSource(event_loop_, run_loop_source_, kCFRunLoopCommonModes);
-        CGEventTapEnable(event_tap_, true);
+        mRunLoopSource = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, mEventTap, 0);
+        mEventLoop = CFRunLoopGetCurrent();
+        CFRunLoopAddSource(mEventLoop, mRunLoopSource, kCFRunLoopCommonModes);
+        CGEventTapEnable(mEventTap, true);
 
         CFRunLoopRun();
     }
 
-    CFMachPortRef event_tap_;
-    CFRunLoopSourceRef run_loop_source_;
-    CFRunLoopRef event_loop_;
-    std::thread listener_thread_;
-    std::atomic<bool> is_running_;
+    CFMachPortRef mEventTap;
+    CFRunLoopSourceRef mRunLoopSource;
+    CFRunLoopRef mEventLoop;
+    std::thread mListenerThread;
+    std::atomic<bool> mIsRunning;
+    Logger mLogger;
 };
 
 std::unique_ptr<IPlatformHook> CreatePlatformHook() {

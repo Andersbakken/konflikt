@@ -1,6 +1,7 @@
 import { Config } from "./Config.js";
 import { KonfliktNative as KonfliktNativeConstructor } from "./native.js";
 import { Server } from "./Server.js";
+import { createNativeLogger, verbose } from "./Log";
 import type {
     KonfliktKeyPressEvent,
     KonfliktKeyReleaseEvent,
@@ -17,7 +18,7 @@ export class Konflikt {
 
     constructor(configPath?: string) {
         this.#config = new Config(configPath);
-        this.#native = new KonfliktNativeConstructor();
+        this.#native = new KonfliktNativeConstructor(createNativeLogger());
         this.#server = new Server();
 
         this.#native.on("keyPress", this.#onKeyPress.bind(this));
@@ -40,32 +41,32 @@ export class Konflikt {
     }
 
     async init(): Promise<void> {
-        console.log("Initializing Konflikt...", this.#config);
+        verbose("Initializing Konflikt...", this.#config);
         await this.#server.start();
     }
 
     // eslint-disable-next-line class-methods-use-this
     #onKeyPress(event: KonfliktKeyPressEvent): void {
-        console.log("Key pressed:", event);
+        verbose("Key pressed:", event);
     }
 
     // eslint-disable-next-line class-methods-use-this
     #onKeyRelease(event: KonfliktKeyReleaseEvent): void {
-        console.log("Key released:", event);
+        verbose("Key released:", event);
     }
 
     // eslint-disable-next-line class-methods-use-this
     #onMousePress(event: KonfliktMouseButtonPressEvent): void {
-        console.log("Mouse button pressed:", event);
+        verbose("Mouse button pressed:", event);
     }
 
     // eslint-disable-next-line class-methods-use-this
     #onMouseRelease(event: KonfliktMouseButtonReleaseEvent): void {
-        console.log("Mouse button released:", event);
+        verbose("Mouse button released:", event);
     }
 
     // eslint-disable-next-line class-methods-use-this
     #onMouseMove(event: KonfliktMouseMoveEvent): void {
-        console.log("Mouse moved:", event);
+        verbose("Mouse moved:", event);
     }
 }

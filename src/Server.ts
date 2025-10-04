@@ -1,8 +1,8 @@
 import { ServiceDiscovery } from "./ServiceDiscovery";
-import { log } from "./Log";
+import { debug, error, log, verbose } from "./Log";
 import Fastify from "fastify";
 import WebSocket from "ws";
-import type { DiscoveredService } from "./ServiceDiscovery";
+import type { DiscoveredService } from "./DiscoveredService";
 import type { FastifyInstance, FastifyListenOptions } from "fastify";
 import type { IncomingMessage } from "http";
 
@@ -13,7 +13,47 @@ export class Server {
     #serviceDiscovery: ServiceDiscovery;
 
     constructor(readonly port: number = 3000) {
-        this.#fastify = Fastify({ logger: true });
+        // Create a custom logger that integrates with our logging system
+        const customLogger = {
+            level: 'debug',
+            stream: {
+                write: (msg: string): void => {
+                    // Fastify logs are JSON, try to parse and format them nicely
+                    try {
+                        const logEntry = JSON.parse(msg.trim());
+                        const level = logEntry.level;
+                        const message = logEntry.msg || '';
+                        const method = logEntry.reqId ? logEntry.method : undefined;
+                        const url = logEntry.reqId ? logEntry.url : undefined;
+                        const statusCode = logEntry.res ? logEntry.res.statusCode : undefined;
+                        
+                        let logMessage = message;
+                        if (method && url) {
+                            logMessage = `${method} ${url}`;
+                            if (statusCode) {
+                                logMessage += ` - ${statusCode}`;
+                            }
+                        }
+                        
+                        // Map Pino levels to our log levels
+                        if (level <= 20) { // trace/debug
+                            verbose(`[Fastify] ${logMessage}`);
+                        } else if (level <= 30) { // info
+                            debug(`[Fastify] ${logMessage}`);
+                        } else if (level <= 40) { // warn
+                            log(`[Fastify] ${logMessage}`);
+                        } else { // error/fatal
+                            error(`[Fastify] ${logMessage}`);
+                        }
+                    } catch {
+                        // If JSON parsing fails, just log the raw message
+                        debug(`[Fastify] ${msg.trim()}`);
+                    }
+                }
+            }
+        };
+
+        this.#fastify = Fastify({ logger: customLogger });
         this.#wss = new WebSocket.WebSocketServer({ noServer: true });
         this.#serviceDiscovery = new ServiceDiscovery();
 
@@ -35,14 +75,13 @@ export class Server {
         const opts: FastifyListenOptions = { port: this.port, host: "0.0.0.0" };
         try {
             const addr = await this.#fastify.listen(opts);
-            this.#fastify.log.info(`HTTP listening at ${addr}, WS at ws://localhost:${this.port}/ws`);
+            log(`HTTP listening at ${addr}, WS at ws://localhost:${this.port}/ws`);
 
             // Start service discovery after server is running
             this.#serviceDiscovery.advertise(this.port);
             this.#serviceDiscovery.startDiscovery();
         } catch (err: unknown) {
-            this.#fastify.log.error(err);
-            console.error("Failed to start server:", err);
+            error("Failed to start server:", err);
             process.exit(1);
         }
 
@@ -70,7 +109,7 @@ export class Server {
         this.#wss.close();
 
         await this.#fastify.close();
-        this.#fastify.log.info("Server shut down");
+        log("Server shut down");
         process.exit(0);
     }
 
@@ -101,7 +140,7 @@ export class Server {
     // /** Setup WebSocket server events */
     #setupWebSocket(): void {
         this.#wss.on("connection", (socket: WebSocket, req: IncomingMessage) => {
-            this.#fastify.log.info({ url: req.url }, "WebSocket connection opened");
+            debug(`WebSocket connection opened from ${req.socket.remoteAddress} to ${req.url}`);
 
             socket.on("message", (_raw: WebSocket.RawData) => {
                 // let text: string;

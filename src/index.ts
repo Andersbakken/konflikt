@@ -1,5 +1,6 @@
+#!/usr/bin/env node
 import { Konflikt } from "./Konflikt";
-import { LogLevel, setConsoleLevel, setLogFile } from "./Log";
+import { LogLevel, debug, error, log, setConsoleLevel, setLogFile } from "./Log";
 import { homedir } from "os";
 import fs from "fs";
 import minimist from "minimist";
@@ -16,8 +17,8 @@ Options:
 `;
 
 const args = minimist(process.argv.slice(2), {
-    string: ["config", "log-file"],
-    boolean: ["help", "version", "verbose", "silent"],
+    string: ["config", "log-file", "verbose"],
+    boolean: ["help", "version", "silent"],
     alias: {
         h: "help",
         c: "config",
@@ -25,6 +26,8 @@ const args = minimist(process.argv.slice(2), {
     },
     unknown: (arg: string) => {
         if (arg.startsWith("-")) {
+            // We can't check verbosityLevel here yet since it's set after parsing
+            // So we temporarily store the error and handle it later
             console.error(usage);
             console.error(`Unknown argument: ${arg}`);
             process.exit(1);
@@ -33,22 +36,46 @@ const args = minimist(process.argv.slice(2), {
     }
 });
 
+// Count verbose flags - minimist gives us array of empty strings for repeated flags
+const verboseCount = Array.isArray(args.verbose) ? args.verbose.length : args.verbose === "" ? 1 : 0;
+
+// Handle verbosity first, before any output
+let verbosityLevel: LogLevel = LogLevel.Log;
+
+if (args.silent) {
+    verbosityLevel = LogLevel.Silent;
+} else {
+    if (verboseCount === 1) {
+        verbosityLevel = LogLevel.Debug;
+    } else if (verboseCount >= 2) {
+        verbosityLevel = LogLevel.Verbose;
+    }
+}
+
+setConsoleLevel(verbosityLevel);
+
 // Handle help
 if (args.help) {
-    console.log(usage);
+    if (verbosityLevel !== LogLevel.Silent) {
+        console.log(usage);
+    }
     process.exit(0);
 }
 
 // Handle version
 if (args.version) {
-    console.log("Konflikt version 0.1.0");
+    if (verbosityLevel !== LogLevel.Silent) {
+        console.log("Konflikt version 0.1.0");
+    }
     process.exit(0);
 }
 
 // Reject non-option arguments
 if (args._.length > 0) {
-    console.error(usage);
-    console.error(`Unexpected arguments: ${args._.join(" ")}`);
+    if (verbosityLevel !== LogLevel.Silent) {
+        console.error(usage);
+        console.error(`Unexpected arguments: ${args._.join(" ")}`);
+    }
     process.exit(1);
 }
 
@@ -60,8 +87,10 @@ if (!configPath) {
         configPath = undefined;
     }
 } else if (!fs.existsSync(configPath)) {
-    console.error(usage);
-    console.error(`Config file not found: ${configPath}`);
+    if (verbosityLevel !== LogLevel.Silent) {
+        console.error(usage);
+        console.error(`Config file not found: ${configPath}`);
+    }
     process.exit(1);
 }
 
@@ -70,23 +99,6 @@ if (args["log-file"]) {
     setLogFile(args["log-file"]);
 }
 
-// Handle verbosity
-let verbosityLevel: LogLevel = LogLevel.Log;
-
-if (args.silent) {
-    verbosityLevel = LogLevel.Silent;
-} else {
-    // Count how many times -v/--verbose was passed
-    const verboseCount = Array.isArray(args.verbose) ? args.verbose.filter(Boolean).length : args.verbose ? 1 : 0;
-
-    if (verboseCount === 1) {
-        verbosityLevel = LogLevel.Debug;
-    } else if (verboseCount >= 2) {
-        verbosityLevel = LogLevel.Verbose;
-    }
-}
-
-setConsoleLevel(verbosityLevel);
 
 let konflikt: Konflikt;
 async function main(): Promise<void> {
@@ -95,21 +107,21 @@ async function main(): Promise<void> {
         await konflikt.init();
 
         // Keep the process running
-        console.log("Konflikt is running. Press Ctrl+C to exit.");
+        debug("Konflikt is running. Press Ctrl+C to exit.");
 
         // Handle graceful shutdown
         process.on("SIGINT", (): void => {
-            console.log("\nShutting down...");
+            log("\nShutting down...");
             process.exit(0);
         });
 
         process.on("SIGTERM", (): void => {
-            console.log("\nShutting down...");
+            log("\nShutting down...");
             process.exit(0);
         });
     } catch (e: unknown) {
-        console.error(usage);
-        console.error("Error initializing Konflikt:", e);
+        error(usage);
+        error("Error initializing Konflikt:", e);
         process.exit(1);
     }
 }

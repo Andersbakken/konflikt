@@ -25,7 +25,7 @@ npm run rebuild:native  # Clean rebuild
 npm run build          # Build native + TypeScript
 ```
 
-The compiled module is output to: `build/Release/konflikt_native.node`
+The compiled module is output to: `dist/build/Release/konflikt_native.node`
 
 ## Usage
 
@@ -64,7 +64,7 @@ k.native.sendMouseEvent({
 ### JavaScript (Direct)
 
 ```javascript
-const { KonfliktNative } = require("./build/Release/konflikt_native.node");
+const { KonfliktNative } = require("./dist/build/Release/konflikt_native.node");
 const native = new KonfliktNative();
 
 console.log(native.desktop);

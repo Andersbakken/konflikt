@@ -10,6 +10,14 @@
 
 namespace konflikt {
 
+// Logger callback interface for C++ native code
+struct Logger {
+    std::function<void(const std::string&)> verbose;
+    std::function<void(const std::string&)> debug;
+    std::function<void(const std::string&)> log;
+    std::function<void(const std::string&)> error;
+};
+
 enum class MouseButton : uint32_t {
     None = 0x0,
     Left = 0x1,
@@ -71,7 +79,7 @@ class IPlatformHook {
 public:
     virtual ~IPlatformHook() = default;
 
-    virtual bool initialize() = 0;
+    virtual bool initialize(const Logger& logger) = 0;
     virtual void shutdown() = 0;
 
     virtual State get_state() const = 0;
@@ -124,6 +132,9 @@ private:
 
     // Thread-safe function for dispatching events from native thread
     Napi::ThreadSafeFunction event_dispatcher_;
+
+    // Logger for native code
+    Logger logger_;
 };
 
 // Factory function for creating platform-specific hooks

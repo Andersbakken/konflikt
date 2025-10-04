@@ -70,7 +70,16 @@ export interface KonfliktDesktopEvent {
     desktop: KonfliktDesktop;
 }
 
+export interface NativeLoggerCallbacks {
+    verbose(message: string): void;
+    debug(message: string): void;
+    log(message: string): void;
+    error(message: string): void;
+}
+
 export declare class KonfliktNative {
+    constructor(logger: NativeLoggerCallbacks);
+
     get desktop(): KonfliktDesktop;
     get state(): KonfliktState;
 

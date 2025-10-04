@@ -139,14 +139,51 @@ Napi::Object KonfliktNative::Init(Napi::Env env, Napi::Object exports) {
 KonfliktNative::KonfliktNative(const Napi::CallbackInfo& info)
     : Napi::ObjectWrap<KonfliktNative>(info) {
 
+    // Parse logger callbacks if provided
+    if (info.Length() > 0 && info[0].IsObject()) {
+        Napi::Object loggerObj = info[0].As<Napi::Object>();
+        
+        // Create thread-safe functions for each log level
+        if (loggerObj.Has("verbose") && loggerObj.Get("verbose").IsFunction()) {
+            auto verboseFunc = loggerObj.Get("verbose").As<Napi::Function>();
+            logger_.verbose = [verboseFunc, env = info.Env()](const std::string& message) {
+                verboseFunc.Call({Napi::String::New(env, message)});
+            };
+        }
+        if (loggerObj.Has("debug") && loggerObj.Get("debug").IsFunction()) {
+            auto debugFunc = loggerObj.Get("debug").As<Napi::Function>();
+            logger_.debug = [debugFunc, env = info.Env()](const std::string& message) {
+                debugFunc.Call({Napi::String::New(env, message)});
+            };
+        }
+        if (loggerObj.Has("log") && loggerObj.Get("log").IsFunction()) {
+            auto logFunc = loggerObj.Get("log").As<Napi::Function>();
+            logger_.log = [logFunc, env = info.Env()](const std::string& message) {
+                logFunc.Call({Napi::String::New(env, message)});
+            };
+        }
+        if (loggerObj.Has("error") && loggerObj.Get("error").IsFunction()) {
+            auto errorFunc = loggerObj.Get("error").As<Napi::Function>();
+            logger_.error = [errorFunc, env = info.Env()](const std::string& message) {
+                errorFunc.Call({Napi::String::New(env, message)});
+            };
+        }
+    }
+
     platform_hook_ = CreatePlatformHook();
 
     if (!platform_hook_) {
+        if (logger_.error) {
+            logger_.error("Failed to create platform hook");
+        }
         Napi::Error::New(info.Env(), "Failed to create platform hook").ThrowAsJavaScriptException();
         return;
     }
 
-    if (!platform_hook_->initialize()) {
+    if (!platform_hook_->initialize(logger_)) {
+        if (logger_.error) {
+            logger_.error("Failed to initialize platform hook");
+        }
         Napi::Error::New(info.Env(), "Failed to initialize platform hook").ThrowAsJavaScriptException();
         return;
     }

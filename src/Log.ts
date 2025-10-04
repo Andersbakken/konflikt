@@ -1,3 +1,4 @@
+import { format } from "util";
 import { homedir } from "os";
 import fs from "fs";
 import path from "path";
@@ -42,27 +43,7 @@ export function setLogFile(filePath: string): void {
 
 function formatMessage(level: string, args: unknown[]): string {
     const timestamp = new Date().toISOString();
-    const message = args
-        .map((arg: unknown): string => {
-            if (arg === null) {
-                return "null";
-            }
-            if (arg === undefined) {
-                return "undefined";
-            }
-            if (typeof arg === "string") {
-                return arg;
-            }
-            if (typeof arg === "number" || typeof arg === "boolean" || typeof arg === "bigint") {
-                return String(arg);
-            }
-            if (typeof arg === "symbol") {
-                return arg.toString();
-            }
-            // Must be object or function
-            return JSON.stringify(arg);
-        })
-        .join(" ");
+    const message = format(...args);
     return `[${timestamp}] [${level}] ${message}`;
 }
 
@@ -105,4 +86,30 @@ export function closeLogger(): void {
     if (logFile) {
         logFile.end();
     }
+}
+
+// Native logging interface - provides callbacks for C++ code
+export interface NativeLogger {
+    verbose(message: string): void;
+    debug(message: string): void;
+    log(message: string): void;
+    error(message: string): void;
+}
+
+// Create logger instance for native code
+export function createNativeLogger(): NativeLogger {
+    return {
+        verbose: (message: string): void => {
+            verbose(message);
+        },
+        debug: (message: string): void => {
+            debug(message);
+        },
+        log: (message: string): void => {
+            log(message);
+        },
+        error: (message: string): void => {
+            error(message);
+        }
+    };
 }
