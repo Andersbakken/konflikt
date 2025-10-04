@@ -15,6 +15,7 @@ export const enum LogLevel {
 let logFile: fs.WriteStream | undefined;
 let consoleLevel: LogLevel = LogLevel.Log;
 let consolePromptHandler: (() => void) | undefined;
+let logBroadcaster: ((level: "verbose" | "debug" | "log" | "error", message: string) => void) | undefined;
 
 // Initialize default log file
 const logDir = path.join(homedir(), ".config", "Konflikt");
@@ -46,6 +47,10 @@ export function setConsolePromptHandler(handler: (() => void) | undefined): void
     consolePromptHandler = handler;
 }
 
+export function setLogBroadcaster(broadcaster: ((level: "verbose" | "debug" | "log" | "error", message: string) => void) | undefined): void {
+    logBroadcaster = broadcaster;
+}
+
 function formatMessage(level: string, args: unknown[]): string {
     const timestamp = new Date().toISOString();
     const message = format(...args);
@@ -75,6 +80,13 @@ function doLog(
         } else {
             consoleMethod(...args);
         }
+    }
+
+    // Broadcast to remote console connections
+    if (logBroadcaster) {
+        const formatted = formatMessage(levelName, args);
+        const broadcastLevel = levelName.toLowerCase() as "verbose" | "debug" | "log" | "error";
+        logBroadcaster(broadcastLevel, formatted);
     }
 }
 

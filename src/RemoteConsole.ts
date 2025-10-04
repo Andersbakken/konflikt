@@ -1,7 +1,7 @@
-import { type ConsoleMessage, isConsoleMessage } from "./types";
 import { createInterface } from "readline";
-import { debug, error } from "./Log";
 import WebSocket from "ws";
+import { LogLevel, debug, error } from "./Log";
+import { type ConsoleMessage, isConsoleMessage } from "./messageValidation";
 
 export class RemoteConsole {
     #readline: ReturnType<typeof createInterface>;
@@ -9,10 +9,12 @@ export class RemoteConsole {
     #host: string;
     #port: number;
     #connected: boolean = false;
+    #logLevel: LogLevel;
 
-    constructor(host: string, port: number = 3000) {
+    constructor(host: string, port: number = 3000, logLevel: LogLevel = LogLevel.Log) {
         this.#host = host;
         this.#port = port;
+        this.#logLevel = logLevel;
 
         // Check if stdin is available and connected to a TTY
         if (!process.stdin.readable || !process.stdin.isTTY) {
@@ -220,9 +222,41 @@ export class RemoteConsole {
                 this.#readline.prompt();
                 break;
 
+            case "console_log":
+                this.#handleLogMessage(message);
+                break;
+
             default:
                 debug("Unknown message type:", message);
                 this.#readline.prompt();
+        }
+    }
+
+    #handleLogMessage(message: { type: "console_log"; level: string; message: string; timestamp?: number }): void {
+        // Map log level strings to LogLevel enum values
+        let messageLogLevel: LogLevel;
+        switch (message.level) {
+            case "verbose":
+                messageLogLevel = LogLevel.Verbose;
+                break;
+            case "debug":
+                messageLogLevel = LogLevel.Debug;
+                break;
+            case "log":
+                messageLogLevel = LogLevel.Log;
+                break;
+            case "error":
+                messageLogLevel = LogLevel.Error;
+                break;
+            default:
+                messageLogLevel = LogLevel.Log;
+        }
+
+        // Only display messages at or above our configured log level
+        if (messageLogLevel >= this.#logLevel) {
+            const timestamp = message.timestamp ? new Date(message.timestamp).toISOString() : new Date().toISOString();
+            const prefix = `[${timestamp}] [${message.level.toUpperCase()}]`;
+            this.#consoleLog(`${prefix} ${message.message}`);
         }
     }
 }

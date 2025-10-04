@@ -1,8 +1,8 @@
-import { type ConsoleCommandMessage, isConsoleCommandMessage } from "./types";
+import { type ConsoleCommandMessage, isConsoleCommandMessage } from "./messageValidation";
 import { debug, error } from "./Log";
 import type { Config } from "./Config";
 import type { IncomingMessage } from "http";
-import type WebSocket from "ws";
+import WebSocket from "ws";
 
 export class ServerConsole {
     #config: Config | undefined;
@@ -11,6 +11,7 @@ export class ServerConsole {
     #version: string;
     #capabilities: string[];
     #port: number;
+    #consoleSockets: Set<WebSocket> = new Set();
 
     constructor(
         port: number,
@@ -32,6 +33,9 @@ export class ServerConsole {
 
     handleConsoleConnection(socket: WebSocket, req: IncomingMessage, wss: WebSocket.WebSocketServer): void {
         debug(`Console WebSocket connection from ${req.socket.remoteAddress}`);
+
+        // Add socket to our tracking set
+        this.#consoleSockets.add(socket);
 
         socket.on("message", (text: WebSocket.RawData) => {
             if (typeof text !== "string") {
@@ -55,10 +59,14 @@ export class ServerConsole {
 
         socket.on("close", () => {
             debug("Console WebSocket connection closed");
+            // Remove socket from tracking set
+            this.#consoleSockets.delete(socket);
         });
 
         socket.on("error", (err: Error) => {
             error("Console WebSocket error:", err);
+            // Remove socket from tracking set on error
+            this.#consoleSockets.delete(socket);
         });
 
         // Send welcome message
@@ -263,6 +271,29 @@ Service Name: ${config?.serviceName || "konflikt"}
 Advertising on port: ${this.#port}
 
 Note: Discovered services info requires ServiceDiscovery API exposure`;
+    }
+
+    broadcastLogMessage(level: "verbose" | "debug" | "log" | "error", message: string): void {
+        const logMessage = {
+            type: "console_log",
+            level,
+            message,
+            timestamp: Date.now()
+        };
+
+        const messageString = JSON.stringify(logMessage);
+
+        // Send to all connected console sockets
+        this.#consoleSockets.forEach((socket: WebSocket) => {
+            try {
+                if (socket.readyState === WebSocket.OPEN) {
+                    socket.send(messageString);
+                }
+            } catch {
+                // Remove broken sockets
+                this.#consoleSockets.delete(socket);
+            }
+        });
     }
 
     static #sendConsoleResponse(socket: WebSocket, output: string): void {

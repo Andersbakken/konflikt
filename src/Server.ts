@@ -101,6 +101,11 @@ export class Server {
         this.#console.setConfig(config);
     }
 
+    /** Get console instance for log broadcasting */
+    get console(): ServerConsole {
+        return this.#console;
+    }
+
     /** Start server */
     async start(): Promise<void> {
         // this.#startHeartbeat();

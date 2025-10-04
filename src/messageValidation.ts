@@ -1,11 +1,3 @@
-// Type declarations for modules without type definitions
-
-declare module "convict-format-with-validator" {
-    import type { Config } from "convict";
-
-    export function addFormats(convict: typeof Config): void;
-}
-
 // Console message types with validation
 export interface ConsoleCommandMessage {
     type: "console_command";
@@ -29,7 +21,14 @@ export interface ConsolePongMessage {
     timestamp?: number;
 }
 
-export type ConsoleMessage = ConsoleResponseMessage | ConsoleErrorMessage | ConsolePongMessage;
+export interface ConsoleLogMessage {
+    type: "console_log";
+    level: "verbose" | "debug" | "log" | "error";
+    message: string;
+    timestamp?: number;
+}
+
+export type ConsoleMessage = ConsoleResponseMessage | ConsoleErrorMessage | ConsolePongMessage | ConsoleLogMessage;
 
 // Validation functions
 export function isConsoleCommandMessage(obj: unknown): obj is ConsoleCommandMessage {
@@ -43,7 +42,7 @@ export function isConsoleCommandMessage(obj: unknown): obj is ConsoleCommandMess
         "args" in obj &&
         Array.isArray(obj.args) &&
         obj.args.every((arg: unknown) => typeof arg === "string") &&
-        (!"timestamp" in obj || typeof obj.timestamp === "number")
+        (!("timestamp" in obj) || typeof obj.timestamp === "number")
     );
 }
 
@@ -58,7 +57,14 @@ export function isConsoleMessage(obj: unknown): obj is ConsoleMessage {
         case "console_error":
             return "error" in obj && typeof obj.error === "string";
         case "pong":
-            return !("timestamp" in obj) || typeof obj.timestamp === "number";
+            return !("timestamp" in obj) || typeof (obj as { timestamp: unknown }).timestamp === "number";
+        case "console_log":
+            return "level" in obj && 
+                   typeof obj.level === "string" && 
+                   ["verbose", "debug", "log", "error"].includes(obj.level) &&
+                   "message" in obj && 
+                   typeof obj.message === "string" &&
+                   (!("timestamp" in obj) || typeof (obj as { timestamp: unknown }).timestamp === "number");
         default:
             return false;
     }

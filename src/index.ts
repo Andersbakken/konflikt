@@ -52,18 +52,7 @@ try {
 // Determine console mode
 const consoleConfig = config.console;
 
-// Check if we're in remote console mode
-if (typeof consoleConfig === "string" && consoleConfig !== "true") {
-    startRemoteConsole(consoleConfig).catch((e: unknown) => {
-        console.error("Fatal error starting remote console:", e);
-        process.exit(1);
-    });
-
-    // Exit here - don't start the full Konflikt server
-    process.exit(0);
-}
-
-// Set up logging based on config
+// Set up logging based on config first so we can pass it to remote console
 const logLevel = config.logLevel;
 let verbosityLevel: LogLevel;
 switch (logLevel) {
@@ -93,6 +82,16 @@ switch (logLevel) {
 }
 
 setConsoleLevel(verbosityLevel);
+
+// Check if we're in remote console mode
+if (typeof consoleConfig === "string" && consoleConfig !== "true") {
+    startRemoteConsole(consoleConfig, verbosityLevel).catch((e: unknown) => {
+        console.error("Fatal error starting remote console:", e);
+        process.exit(1);
+    });
+    // Don't continue with normal server startup - use process.exit here is fine since remote console will keep the process running
+} else {
+    // Continue with normal server startup
 
 // Set log file if configured
 const logFile = config.logFile;
@@ -135,3 +134,5 @@ main().catch((e: unknown) => {
     console.error("Fatal error:", e);
     process.exit(1);
 });
+
+}

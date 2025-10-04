@@ -1,7 +1,7 @@
 import { Console } from "./Console.js";
 import { KonfliktNative as KonfliktNativeConstructor } from "./native.js";
 import { Server } from "./Server.js";
-import { createNativeLogger, verbose } from "./Log";
+import { createNativeLogger, setLogBroadcaster, verbose } from "./Log";
 import type { Config } from "./Config.js";
 import type {
     KonfliktKeyPressEvent,
@@ -58,6 +58,11 @@ export class Konflikt {
         this.#server.setConfig(this.#config);
         
         await this.#server.start();
+        
+        // Set up log broadcasting to remote consoles
+        setLogBroadcaster((level: "verbose" | "debug" | "log" | "error", message: string) => {
+            this.#server.console.broadcastLogMessage(level, message);
+        });
         
         // Start console based on configuration
         const consoleConfig = this.#config.console;
