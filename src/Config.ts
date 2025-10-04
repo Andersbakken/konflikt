@@ -1,4 +1,4 @@
-import { type ConfigType, configSchema } from "./ConfigSchema";
+import { type ConfigType, SHORT_OPTIONS, configSchema } from "./ConfigSchema";
 import { debug, error } from "./Log";
 import { existsSync, readFileSync } from "fs";
 import { homedir, hostname } from "os";
@@ -143,7 +143,7 @@ export class Config {
         }
 
         // Expand short options to long options
-        const expandedArgs = this.expandShortOptions(args);
+        const expandedArgs = Config.expandShortOptions(args);
 
         // Debug: log what args we're passing to convict
         debug("Loading CLI args:", expandedArgs.join(" "));
@@ -157,68 +157,55 @@ export class Config {
 
     private manuallyParseImportantArgs(args: string[]): void {
         for (let i = 0; i < args.length - 1; i++) {
-            const arg = args[i];
+            const arg = args[i] as string | undefined;
             const value = args[i + 1];
 
             // Skip if the next arg looks like another option
-            if (value.startsWith("-")) {
+            if (value?.startsWith("-")) {
                 continue;
             }
 
             switch (arg) {
                 case "--port":
-                    this.convictConfig.set("network.port", parseInt(value, 10));
-                    debug(`CLI override: port = ${parseInt(value, 10)}`);
+                    if (value) {
+                        this.convictConfig.set("network.port", parseInt(value, 10));
+                        debug(`CLI override: port = ${parseInt(value, 10)}`);
+                    }
                     break;
                 case "--host":
-                    this.convictConfig.set("network.host", value);
-                    debug(`CLI override: host = ${value}`);
+                    if (value) {
+                        this.convictConfig.set("network.host", value);
+                        debug(`CLI override: host = ${value}`);
+                    }
                     break;
                 case "--role":
-                    this.convictConfig.set("instance.role", value);
-                    debug(`CLI override: role = ${value}`);
+                    if (value) {
+                        this.convictConfig.set("instance.role", value);
+                        debug(`CLI override: role = ${value}`);
+                    }
                     break;
                 case "--log-level":
-                    this.convictConfig.set("logging.level", value);
-                    debug(`CLI override: log-level = ${value}`);
+                    if (value) {
+                        this.convictConfig.set("logging.level", value);
+                        debug(`CLI override: log-level = ${value}`);
+                    }
                     break;
                 case "--log-file":
-                    this.convictConfig.set("logging.file", value);
-                    debug(`CLI override: log-file = ${value}`);
+                    if (value) {
+                        this.convictConfig.set("logging.file", value);
+                        debug(`CLI override: log-file = ${value}`);
+                    }
                     break;
                 case "--dev":
                     this.convictConfig.set("development.enabled", true);
                     debug(`CLI override: dev = true`);
                     break;
+                case undefined:
+                default:
+                    // Ignore unknown arguments
+                    break;
             }
         }
-    }
-
-    private expandShortOptions(args: string[]): string[] {
-        const shortToLong: Record<string, string> = {
-            "-p": "--port",
-            "-H": "--host", // Use capital H to avoid conflict with --help
-            "-r": "--role",
-            "-l": "--log-level",
-            "-f": "--log-file",
-            "-d": "--dev",
-            "-s": "--service-name",
-            "-t": "--topology"
-        };
-
-        const expanded: string[] = [];
-
-        for (let i = 0; i < args.length; i++) {
-            const arg = args[i];
-
-            if (shortToLong[arg]) {
-                expanded.push(shortToLong[arg]);
-            } else {
-                expanded.push(arg);
-            }
-        }
-
-        return expanded;
     }
 
     private validate(): void {
@@ -249,6 +236,26 @@ export class Config {
             const finalInstanceId = this.convictConfig.get("instance.id");
             this.convictConfig.set("screen.id", `screen-${finalInstanceId}`);
         }
+    }
+
+    private static expandShortOptions(args: string[]): string[] {
+        const expanded: string[] = [];
+
+        for (let i = 0; i < args.length; i++) {
+            const arg = args[i];
+            if (!arg) {
+                continue;
+            }
+
+            const shortOption = SHORT_OPTIONS[arg];
+            if (shortOption) {
+                expanded.push(shortOption);
+            } else {
+                expanded.push(arg);
+            }
+        }
+
+        return expanded;
     }
 
     private static executeJsConfig(jsCode: string, configPath: string): unknown {
