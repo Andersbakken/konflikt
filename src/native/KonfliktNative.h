@@ -99,6 +99,10 @@ public:
     virtual void startListening() = 0;
     virtual void stopListening()  = 0;
 
+    virtual void showCursor()            = 0;
+    virtual void hideCursor()            = 0;
+    virtual bool isCursorVisible() const = 0;
+
     std::function<void(const Event &)> eventCallback;
 };
 
@@ -121,6 +125,11 @@ private:
     // Event sending methods
     void SendMouseEvent(const Napi::CallbackInfo &info);
     void SendKeyEvent(const Napi::CallbackInfo &info);
+
+    // Cursor control methods
+    void showCursor(const Napi::CallbackInfo &info);
+    void hideCursor(const Napi::CallbackInfo &info);
+    Napi::Value isCursorVisible(const Napi::CallbackInfo &info);
 
     // Internal event handling
     void dispatchEvent(const Event &event);

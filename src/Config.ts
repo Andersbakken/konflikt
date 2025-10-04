@@ -6,8 +6,12 @@ import { runInNewContext } from "vm";
 import path from "path";
 
 // Type unions for configuration values
-export type InstanceMode = "source" | "target" | "auto";
-export type InstanceRole = "server" | "client" | "peer";
+export const enum InstanceRole {
+    Server = 0,
+    Client = 1
+}
+
+export type InstanceRoleType = InstanceRole;
 interface ConvictInstance {
     get(key: string): unknown;
     set(key: string, value: unknown): void;
@@ -81,13 +85,8 @@ export class Config {
     }
 
     get role(): InstanceRole {
-        const role = this.#get("instance.role") as InstanceRole | null;
-        return role || "peer";
-    }
-
-    get mode(): InstanceMode {
-        const mode = this.#get("instance.mode") as InstanceMode | null;
-        return mode || "auto";
+        const role = this.#string("instance.role") || "client";
+        return role === "server" ? InstanceRole.Server : InstanceRole.Client;
     }
 
     // Network configuration
@@ -391,12 +390,6 @@ export class Config {
                 if (value) {
                     this.#set("instance.role", value);
                     debug(`CLI override: role = ${value}`);
-                }
-                break;
-            case "--mode":
-                if (value) {
-                    this.#set("instance.mode", value);
-                    debug(`CLI override: mode = ${value}`);
                 }
                 break;
             case "--log-level":

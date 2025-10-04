@@ -19,10 +19,10 @@ namespace konflikt {
 class XCBHook : public IPlatformHook
 {
 public:
-    XCBHook()           = default;
-    ~XCBHook() override = default;
+    XCBHook()                   = default;
+    virtual ~XCBHook() override = default;
 
-    bool initialize(const Logger &logger) override
+    virtual bool initialize(const Logger &logger) override
     {
         mLogger     = logger;
         // Connect to X server
@@ -114,13 +114,20 @@ public:
             return false;
         }
 
-        mIsRunning = false;
+        mIsRunning     = false;
+        mCursorVisible = true;
+        mBlankCursor   = XCB_NONE;
         return true;
     }
 
-    void shutdown() override
+    virtual void shutdown() override
     {
         stopListening();
+
+        if (mBlankCursor != XCB_NONE) {
+            xcb_free_cursor(mConnection, mBlankCursor);
+            mBlankCursor = XCB_NONE;
+        }
 
         if (mXkbState) {
             xkb_state_unref(mXkbState);
@@ -143,7 +150,7 @@ public:
         }
     }
 
-    State getState() const override
+    virtual State getState() const override
     {
         State state {};
 
@@ -196,7 +203,7 @@ public:
         return state;
     }
 
-    Desktop getDesktop() const override
+    virtual Desktop getDesktop() const override
     {
         Desktop desktop {};
 
@@ -210,7 +217,7 @@ public:
         return desktop;
     }
 
-    void sendMouseEvent(const Event &event) override
+    virtual void sendMouseEvent(const Event &event) override
     {
         if (!mConnection) {
             return;
@@ -240,7 +247,7 @@ public:
         xcb_flush(mConnection);
     }
 
-    void sendKeyEvent(const Event &event) override
+    virtual void sendKeyEvent(const Event &event) override
     {
         if (!mConnection) {
             return;
@@ -251,7 +258,7 @@ public:
         xcb_flush(mConnection);
     }
 
-    void startListening() override
+    virtual void startListening() override
     {
         if (mIsRunning) {
             return;
@@ -264,7 +271,7 @@ public:
         });
     }
 
-    void stopListening() override
+    virtual void stopListening() override
     {
         if (!mIsRunning) {
             return;
@@ -276,6 +283,40 @@ public:
         if (mListenerThread.joinable()) {
             mListenerThread.join();
         }
+    }
+
+    virtual void showCursor() override
+    {
+        if (!mConnection || !mScreen || mCursorVisible) {
+            return;
+        }
+
+        xcb_change_window_attributes(mConnection, mScreen->root, XCB_CW_CURSOR, nullptr);
+        xcb_flush(mConnection);
+        mCursorVisible = true;
+    }
+
+    virtual void hideCursor() override
+    {
+        if (!mConnection || !mScreen || !mCursorVisible) {
+            return;
+        }
+
+        if (mBlankCursor == XCB_NONE) {
+            mBlankCursor = createBlankCursor();
+        }
+
+        if (mBlankCursor != XCB_NONE) {
+            uint32_t values[] = { mBlankCursor };
+            xcb_change_window_attributes(mConnection, mScreen->root, XCB_CW_CURSOR, values);
+            xcb_flush(mConnection);
+            mCursorVisible = false;
+        }
+    }
+
+    virtual bool isCursorVisible() const override
+    {
+        return mCursorVisible;
     }
 
 private:
@@ -475,6 +516,23 @@ private:
         }
     }
 
+    xcb_cursor_t createBlankCursor()
+    {
+        if (!mConnection || !mScreen) {
+            return XCB_NONE;
+        }
+
+        xcb_pixmap_t pixmap = xcb_generate_id(mConnection);
+        xcb_cursor_t cursor = xcb_generate_id(mConnection);
+
+        xcb_create_pixmap(mConnection, 1, pixmap, mScreen->root, 1, 1);
+
+        xcb_create_cursor(mConnection, cursor, pixmap, pixmap, 0, 0, 0, 0, 0, 0, 0, 0);
+
+        xcb_free_pixmap(mConnection, pixmap);
+        return cursor;
+    }
+
     xcb_connection_t *mConnection { nullptr };
     xcb_screen_t *mScreen { nullptr };
     int mScreenNumber { 0 };
@@ -488,6 +546,9 @@ private:
 
     std::thread mListenerThread;
     std::atomic<bool> mIsRunning { false };
+
+    bool mCursorVisible { true };
+    xcb_cursor_t mBlankCursor { XCB_NONE };
 };
 
 std::unique_ptr<IPlatformHook> createPlatformHook()

@@ -16,22 +16,23 @@ public:
     MacOSHook()           = default;
     ~MacOSHook() override = default;
 
-    bool initialize(const Logger &logger) override
+    virtual bool initialize(const Logger &logger) override
     {
         mLogger        = logger;
         mEventTap      = nullptr;
         mRunLoopSource = nullptr;
         mEventLoop     = nullptr;
         mIsRunning     = false;
+        mCursorVisible = true;
         return true;
     }
 
-    void shutdown() override
+    virtual void shutdown() override
     {
         stopListening();
     }
 
-    State getState() const override
+    virtual State getState() const override
     {
         State state {};
 
@@ -77,7 +78,7 @@ public:
         return state;
     }
 
-    Desktop getDesktop() const override
+    virtual Desktop getDesktop() const override
     {
         Desktop desktop {};
         CGDirectDisplayID display = CGMainDisplayID();
@@ -86,7 +87,7 @@ public:
         return desktop;
     }
 
-    void sendMouseEvent(const Event &event) override
+    virtual void sendMouseEvent(const Event &event) override
     {
         CGPoint pos             = CGPointMake(event.state.x, event.state.y);
         CGEventSourceRef source = CGEventSourceCreate(kCGEventSourceStateHIDSystemState);
@@ -140,7 +141,7 @@ public:
         CFRelease(source);
     }
 
-    void sendKeyEvent(const Event &event) override
+    virtual void sendKeyEvent(const Event &event) override
     {
         CGEventSourceRef source = CGEventSourceCreate(kCGEventSourceStateHIDSystemState);
 
@@ -155,7 +156,7 @@ public:
         CFRelease(source);
     }
 
-    void startListening() override
+    virtual void startListening() override
     {
         if (mIsRunning) {
             return;
@@ -169,7 +170,7 @@ public:
         });
     }
 
-    void stopListening() override
+    virtual void stopListening() override
     {
         if (!mIsRunning) {
             return;
@@ -195,6 +196,31 @@ public:
             CFRelease(mRunLoopSource);
             mRunLoopSource = nullptr;
         }
+    }
+
+    virtual void showCursor() override
+    {
+        if (mCursorVisible) {
+            return;
+        }
+
+        CGDisplayShowCursor(kCGDirectMainDisplay);
+        mCursorVisible = true;
+    }
+
+    virtual void hideCursor() override
+    {
+        if (!mCursorVisible) {
+            return;
+        }
+
+        CGDisplayHideCursor(kCGDirectMainDisplay);
+        mCursorVisible = false;
+    }
+
+    virtual bool isCursorVisible() const override
+    {
+        return mCursorVisible;
     }
 
 private:
@@ -348,6 +374,7 @@ private:
     std::thread mListenerThread;
     std::atomic<bool> mIsRunning;
     Logger mLogger;
+    bool mCursorVisible { true };
 };
 
 std::unique_ptr<IPlatformHook> createPlatformHook()

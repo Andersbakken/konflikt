@@ -131,7 +131,7 @@ Event eventFromObject(const Napi::Object &obj)
 // KonfliktNative implementation
 Napi::Object KonfliktNative::Init(Napi::Env env, Napi::Object exports)
 {
-    Napi::Function func = DefineClass(env, "KonfliktNative", { InstanceAccessor<&KonfliktNative::GetDesktop>("desktop"), InstanceAccessor<&KonfliktNative::GetState>("state"), InstanceMethod<&KonfliktNative::On>("on"), InstanceMethod<&KonfliktNative::Off>("off"), InstanceMethod<&KonfliktNative::SendMouseEvent>("sendMouseEvent"), InstanceMethod<&KonfliktNative::SendKeyEvent>("sendKeyEvent") });
+    Napi::Function func = DefineClass(env, "KonfliktNative", { InstanceAccessor<&KonfliktNative::GetDesktop>("desktop"), InstanceAccessor<&KonfliktNative::GetState>("state"), InstanceMethod<&KonfliktNative::On>("on"), InstanceMethod<&KonfliktNative::Off>("off"), InstanceMethod<&KonfliktNative::SendMouseEvent>("sendMouseEvent"), InstanceMethod<&KonfliktNative::SendKeyEvent>("sendKeyEvent"), InstanceMethod<&KonfliktNative::showCursor>("showCursor"), InstanceMethod<&KonfliktNative::hideCursor>("hideCursor"), InstanceAccessor<&KonfliktNative::isCursorVisible>("isCursorVisible") });
 
     Napi::FunctionReference *constructor = new Napi::FunctionReference();
     *constructor                         = Napi::Persistent(func);
@@ -400,6 +400,31 @@ void KonfliktNative::SendKeyEvent(const Napi::CallbackInfo &info)
 
     Event event = eventFromObject(info[0].As<Napi::Object>());
     mPlatformHook->sendKeyEvent(event);
+}
+
+void KonfliktNative::showCursor(const Napi::CallbackInfo &info)
+{
+    if (mPlatformHook) {
+        mPlatformHook->showCursor();
+    }
+}
+
+void KonfliktNative::hideCursor(const Napi::CallbackInfo &info)
+{
+    if (mPlatformHook) {
+        mPlatformHook->hideCursor();
+    }
+}
+
+Napi::Value KonfliktNative::isCursorVisible(const Napi::CallbackInfo &info)
+{
+    Napi::Env env = info.Env();
+
+    if (mPlatformHook) {
+        return Napi::Boolean::New(env, mPlatformHook->isCursorVisible());
+    }
+
+    return Napi::Boolean::New(env, true);
 }
 
 void KonfliktNative::handlePlatformEvent(const Event &event)

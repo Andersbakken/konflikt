@@ -7,7 +7,6 @@ const CLI_ARGS = {
     "instance-id": { path: "instance.id" },
     "instance-name": { path: "instance.name" },
     role: { path: "instance.role", short: "-r" },
-    mode: { path: "instance.mode", short: "-m" },
     port: { path: "network.port", short: "-p" },
     host: { path: "network.host", short: "-H" },
     discovery: { path: "network.discovery.enabled" },
@@ -127,18 +126,11 @@ export const configSchema = convict.default({
             arg: argForPath("instance.name")
         },
         role: {
-            doc: "Instance role in the cluster",
-            format: ["server", "client", "peer"],
-            default: "peer",
+            doc: "Instance role - client connects to servers and sends input, server receives input from clients",
+            format: ["server", "client"],
+            default: "client",
             env: "KONFLIKT_ROLE",
             arg: argForPath("instance.role")
-        },
-        mode: {
-            doc: "Instance mode - source captures input, target receives input",
-            format: ["source", "target", "auto"],
-            default: "auto",
-            env: "KONFLIKT_MODE",
-            arg: argForPath("instance.mode")
         }
     },
 

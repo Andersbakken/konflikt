@@ -1,9 +1,10 @@
+import { createHash } from "crypto";
+import { hostname, platform } from "os";
 import { Console } from "./Console.js";
+import { createNativeLogger, setLogBroadcaster, verbose } from "./Log";
+import { InstanceRole } from "./Config.js";
 import { KonfliktNative as KonfliktNativeConstructor } from "./native.js";
 import { Server } from "./Server.js";
-import { createHash } from "crypto";
-import { createNativeLogger, setLogBroadcaster, verbose } from "./Log";
-import { hostname, platform } from "os";
 import type { Config } from "./Config.js";
 import type { InputEventData, InputEventMessage, InstanceInfoMessage } from "./messageValidation";
 import type {
@@ -40,8 +41,8 @@ export class Konflikt {
     #server: Server;
     #console: Console | undefined;
 
-    // Active instance management
-    #currentMode: "source" | "target" | "auto";
+    // Role-based behavior
+    #role: InstanceRole;
     #isActiveInstance: boolean = false;
     #lastCursorPosition: CursorPosition = { x: 0, y: 0 };
     #screenBounds: Rect;
@@ -56,7 +57,7 @@ export class Konflikt {
         this.#native = new KonfliktNativeConstructor(createNativeLogger());
         this.#server = new Server(config.port, config.instanceId, config.instanceName);
 
-        this.#currentMode = config.mode;
+        this.#role = config.role;
 
         // Generate machine identifier
         this.#machineId = Konflikt.#generateMachineId();
@@ -98,8 +99,8 @@ export class Konflikt {
         return this.#console;
     }
 
-    get currentMode(): "source" | "target" | "auto" {
-        return this.#currentMode;
+    get role(): InstanceRole {
+        return this.#role;
     }
 
     get isActiveInstance(): boolean {
@@ -199,22 +200,19 @@ export class Konflikt {
     #checkIfShouldBeActive(): void {
         const wasPreviouslyActive = this.#isActiveInstance;
 
-        if (this.#currentMode === "source") {
+        if (this.#role === InstanceRole.Server) {
+            // Servers capture input events and send them to the current client
             this.#isActiveInstance = true;
-        } else if (this.#currentMode === "target") {
-            this.#isActiveInstance = false;
-            // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-        } else if (this.#currentMode !== "auto") {
-            throw new Error(`Unexpected mode: ${this.#currentMode}`);
         } else {
-            // Check if cursor is within this instance's screen bounds
-            this.#isActiveInstance = this.#isCursorInScreenBounds(this.#lastCursorPosition);
+            // Clients receive input events from server and execute them locally
+            // The server determines which client should receive input
+            this.#isActiveInstance = false;
         }
 
         // Log state changes
         if (wasPreviouslyActive !== this.#isActiveInstance) {
             verbose(
-                `Instance ${this.#config.instanceId} ${this.#isActiveInstance ? "became ACTIVE" : "became INACTIVE"} (mode: ${this.#currentMode}, cursor: ${this.#lastCursorPosition.x}, ${this.#lastCursorPosition.y})`
+                `Instance ${this.#config.instanceId} ${this.#isActiveInstance ? "became ACTIVE" : "became INACTIVE"} (role: ${this.#role === InstanceRole.Server ? "server" : "client"})`
             );
         }
     }
@@ -260,27 +258,20 @@ export class Konflikt {
         return false;
     }
 
-    #shouldPreventEventLoop(): boolean {
-        // Prevent processing events if we're in auto mode and there's another instance on the same display
-        const shouldPrevent = this.#currentMode === "auto" && this.#hasSameDisplayInstance();
-
-        if (shouldPrevent) {
-            verbose(
-                `Event loop prevention: Instance ${this.#config.instanceId} detected same-display instance, suppressing input`
-            );
-        }
-
-        return shouldPrevent;
+    static #shouldPreventEventLoop(): boolean {
+        // With server/client model, we don't need same-display detection
+        // Each role has a clear responsibility
+        return false;
     }
 
     #shouldProcessInputEvent(): boolean {
         // Prevent event loops first
-        if (this.#shouldPreventEventLoop()) {
+        if (Konflikt.#shouldPreventEventLoop()) {
             return false;
         }
 
         // Only process input events if this instance should be the active source
-        return this.#isActiveInstance || this.#currentMode === "source";
+        return this.#isActiveInstance;
     }
 
     // Input event broadcasting methods for source/target architecture
@@ -304,9 +295,9 @@ export class Konflikt {
     }
 
     #handleInputEvent(message: InputEventMessage): void {
-        // Only handle input events if we're in target mode or auto mode and not the active instance
-        if (this.#currentMode === "source") {
-            return; // Source instances don't execute received input events
+        // Only handle input events if we're a client (servers don't execute received input events)
+        if (this.#role === InstanceRole.Server) {
+            return; // Servers don't execute received input events
         }
 
         // Update connected instance info for same-display detection
