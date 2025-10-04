@@ -20,8 +20,8 @@ export class Config {
         this.convictConfig = configSchema as ConvictInstance;
         this.loadConfig(configPath);
         this.loadCliArgs(cliArgs);
-        this.validate();
         this.generateDefaults();
+        this.validate();
     }
 
     // Convict accessor methods with support for dot notation
@@ -66,6 +66,25 @@ export class Config {
 
     // Find and load the first available config file
     static findAndLoadConfig(cliArgs?: string[]): Config {
+        // First check if --config was specified in CLI args
+        if (cliArgs) {
+            const configIndex = cliArgs.indexOf("--config");
+            const configIndexShort = cliArgs.indexOf("-c");
+
+            if (configIndex >= 0 && configIndex + 1 < cliArgs.length) {
+                const configPath = cliArgs[configIndex + 1];
+                debug(`Using config file from CLI: ${configPath}`);
+                return new Config(configPath, cliArgs);
+            }
+
+            if (configIndexShort >= 0 && configIndexShort + 1 < cliArgs.length) {
+                const configPath = cliArgs[configIndexShort + 1];
+                debug(`Using config file from CLI: ${configPath}`);
+                return new Config(configPath, cliArgs);
+            }
+        }
+
+        // Fall back to searching default paths
         const configPaths = Config.getDefaultConfigPaths();
 
         for (const configPath of configPaths) {
@@ -119,10 +138,87 @@ export class Config {
     }
 
     private loadCliArgs(args: string[]): void {
-        // Convict automatically handles CLI args based on the 'arg' property in schema
-        if (args.length > 0) {
-            this.convictConfig.load({}, { args });
+        if (args.length === 0) {
+            return;
         }
+
+        // Expand short options to long options
+        const expandedArgs = this.expandShortOptions(args);
+
+        // Debug: log what args we're passing to convict
+        debug("Loading CLI args:", expandedArgs.join(" "));
+
+        // Try convict's built-in CLI parsing first
+        this.convictConfig.load({}, { args: expandedArgs });
+
+        // Manual override for important args that might not work with convict
+        this.manuallyParseImportantArgs(expandedArgs);
+    }
+
+    private manuallyParseImportantArgs(args: string[]): void {
+        for (let i = 0; i < args.length - 1; i++) {
+            const arg = args[i];
+            const value = args[i + 1];
+
+            // Skip if the next arg looks like another option
+            if (value.startsWith("-")) {
+                continue;
+            }
+
+            switch (arg) {
+                case "--port":
+                    this.convictConfig.set("network.port", parseInt(value, 10));
+                    debug(`CLI override: port = ${parseInt(value, 10)}`);
+                    break;
+                case "--host":
+                    this.convictConfig.set("network.host", value);
+                    debug(`CLI override: host = ${value}`);
+                    break;
+                case "--role":
+                    this.convictConfig.set("instance.role", value);
+                    debug(`CLI override: role = ${value}`);
+                    break;
+                case "--log-level":
+                    this.convictConfig.set("logging.level", value);
+                    debug(`CLI override: log-level = ${value}`);
+                    break;
+                case "--log-file":
+                    this.convictConfig.set("logging.file", value);
+                    debug(`CLI override: log-file = ${value}`);
+                    break;
+                case "--dev":
+                    this.convictConfig.set("development.enabled", true);
+                    debug(`CLI override: dev = true`);
+                    break;
+            }
+        }
+    }
+
+    private expandShortOptions(args: string[]): string[] {
+        const shortToLong: Record<string, string> = {
+            "-p": "--port",
+            "-H": "--host", // Use capital H to avoid conflict with --help
+            "-r": "--role",
+            "-l": "--log-level",
+            "-f": "--log-file",
+            "-d": "--dev",
+            "-s": "--service-name",
+            "-t": "--topology"
+        };
+
+        const expanded: string[] = [];
+
+        for (let i = 0; i < args.length; i++) {
+            const arg = args[i];
+
+            if (shortToLong[arg]) {
+                expanded.push(shortToLong[arg]);
+            } else {
+                expanded.push(arg);
+            }
+        }
+
+        return expanded;
     }
 
     private validate(): void {

@@ -6,6 +6,6 @@ import { z } from "zod";
 export const MousePressEventSchema = BaseMessageSchema.extend({
     type: z.literal("mouse_press"),
     button: MouseButtonSchema,
-    state: StateSchema,
+    state: StateSchema
 });
 export type MousePressEvent = z.infer<typeof MousePressEventSchema>;

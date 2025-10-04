@@ -42,7 +42,7 @@ export const MessageSchema = z.discriminatedUnion("type", [
     MousePressEventSchema,
     MouseReleaseEventSchema,
     KeyPressEventSchema,
-    KeyReleaseEventSchema,
+    KeyReleaseEventSchema
 ]);
 
 export type Message = z.infer<typeof MessageSchema>;
@@ -52,7 +52,7 @@ export function createBaseMessage(source: string): BaseMessage {
     return {
         id: crypto.randomUUID(),
         timestamp: Date.now(),
-        source,
+        source
     };
 }
 
@@ -70,6 +70,6 @@ export function createErrorMessage(source: string, code: string, message: string
         type: "error",
         code,
         message,
-        details,
+        details
     };
 }

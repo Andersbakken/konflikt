@@ -11,6 +11,6 @@ export const KeyboardModifierSchema = z.object({
     rightSuper: z.boolean().default(false),
     capsLock: z.boolean().default(false),
     numLock: z.boolean().default(false),
-    scrollLock: z.boolean().default(false),
+    scrollLock: z.boolean().default(false)
 });
 export type KeyboardModifier = z.infer<typeof KeyboardModifierSchema>;

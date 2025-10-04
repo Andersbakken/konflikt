@@ -4,6 +4,6 @@ import { z } from "zod";
 
 export const MouseMoveEventSchema = BaseMessageSchema.extend({
     type: z.literal("mouse_move"),
-    state: StateSchema,
+    state: StateSchema
 });
 export type MouseMoveEvent = z.infer<typeof MouseMoveEventSchema>;

@@ -6,6 +6,6 @@ export const HandshakeRequestSchema = BaseMessageSchema.extend({
     instanceId: z.string(),
     instanceName: z.string(),
     version: z.string(),
-    capabilities: z.array(z.string()),
+    capabilities: z.array(z.string())
 });
 export type HandshakeRequest = z.infer<typeof HandshakeRequestSchema>;

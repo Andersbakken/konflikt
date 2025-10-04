@@ -6,6 +6,6 @@ import { z } from "zod";
 export const MouseReleaseEventSchema = BaseMessageSchema.extend({
     type: z.literal("mouse_release"),
     button: MouseButtonSchema,
-    state: StateSchema,
+    state: StateSchema
 });
 export type MouseReleaseEvent = z.infer<typeof MouseReleaseEventSchema>;

@@ -6,6 +6,6 @@ export const KeyPressEventSchema = BaseMessageSchema.extend({
     type: z.literal("key_press"),
     keycode: z.number(),
     text: z.string().optional(),
-    state: StateSchema,
+    state: StateSchema
 });
 export type KeyPressEvent = z.infer<typeof KeyPressEventSchema>;

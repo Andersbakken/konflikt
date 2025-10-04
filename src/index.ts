@@ -10,11 +10,11 @@ Options:
   --help, -h                Show this help message
   --version                 Show version number
   --config, -c              Path to config file
-  --log-level               Log level (silent, error, log, debug, verbose)
-  --log-file                Path to log file
-  --port                    WebSocket server port
-  --host                    Host to bind server to
-  --role                    Instance role (server, client, peer)
+  --log-level, -l           Log level (silent, error, log, debug, verbose)
+  --log-file, -f            Path to log file
+  --port, -p                WebSocket server port
+  --host, -H                Host to bind server to
+  --role, -r                Instance role (server, client, peer)
   --instance-id             Unique instance identifier
   --instance-name           Human-readable instance name
   --screen-x                Screen X position
@@ -24,8 +24,9 @@ Options:
   --server-host             Server host to connect to (client mode)
   --server-port             Server port to connect to (client mode)
   --discovery               Enable service discovery
-  --service-name            Service name for mDNS advertising
-  --dev                     Enable development mode
+  --service-name, -s        Service name for mDNS advertising
+  --topology, -t            Cluster topology (automatic, star, mesh)
+  --dev, -d                 Enable development mode
   --mock-input              Mock input events for testing
 `);
     process.exit(0);
@@ -75,7 +76,6 @@ const logFile = config.get("logging.file");
 if (logFile && typeof logFile === "string") {
     setLogFile(logFile);
 }
-
 
 let konflikt: Konflikt;
 async function main(): Promise<void> {

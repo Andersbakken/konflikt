@@ -8,7 +8,7 @@ export const StateSchema = z.object({
     mouseButtons: z.object({
         left: z.boolean().default(false),
         right: z.boolean().default(false),
-        middle: z.boolean().default(false),
-    }),
+        middle: z.boolean().default(false)
+    })
 });
 export type State = z.infer<typeof StateSchema>;

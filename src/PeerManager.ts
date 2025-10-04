@@ -10,13 +10,16 @@ import type {
     Message,
     MouseMoveEvent,
     MousePressEvent,
-    MouseReleaseEvent,
+    MouseReleaseEvent
 } from "./messages";
 
 export interface PeerManagerEvents {
     peer_connected: [service: DiscoveredService, capabilities: string[]];
     peer_disconnected: [service: DiscoveredService, reason?: string];
-    input_event: [event: MouseMoveEvent | MousePressEvent | MouseReleaseEvent | KeyPressEvent | KeyReleaseEvent, from: DiscoveredService];
+    input_event: [
+        event: MouseMoveEvent | MousePressEvent | MouseReleaseEvent | KeyPressEvent | KeyReleaseEvent,
+        from: DiscoveredService
+    ];
     error: [error: Error, service?: DiscoveredService];
 }
 
@@ -45,7 +48,7 @@ export class PeerManager extends EventEmitter<PeerManagerEvents> {
      */
     async connectToPeer(service: DiscoveredService): Promise<void> {
         const serviceKey = `${service.host}:${service.port}`;
-        
+
         // Don't connect to ourselves
         if (service.pid === process.pid) {
             debug(`Skipping connection to self: ${service.name}`);
@@ -99,7 +102,7 @@ export class PeerManager extends EventEmitter<PeerManagerEvents> {
         });
 
         this.clients.set(serviceKey, client);
-        
+
         try {
             await client.connect();
         } catch (err) {
@@ -115,7 +118,7 @@ export class PeerManager extends EventEmitter<PeerManagerEvents> {
     disconnectFromPeer(service: DiscoveredService, reason?: string): void {
         const serviceKey = `${service.host}:${service.port}`;
         const client = this.clients.get(serviceKey);
-        
+
         if (client) {
             client.disconnect(reason);
             this.clients.delete(serviceKey);
@@ -136,10 +139,12 @@ export class PeerManager extends EventEmitter<PeerManagerEvents> {
     /**
      * Broadcast an input event to all connected peers
      */
-    broadcastInputEvent(event: MouseMoveEvent | MousePressEvent | MouseReleaseEvent | KeyPressEvent | KeyReleaseEvent): void {
+    broadcastInputEvent(
+        event: MouseMoveEvent | MousePressEvent | MouseReleaseEvent | KeyPressEvent | KeyReleaseEvent
+    ): void {
         const eventWithMetadata = {
             ...event,
-            ...createBaseMessage(this.instanceId),
+            ...createBaseMessage(this.instanceId)
         };
 
         let sentCount = 0;
@@ -160,11 +165,11 @@ export class PeerManager extends EventEmitter<PeerManagerEvents> {
     sendToPeer(service: DiscoveredService, message: Message): boolean {
         const serviceKey = `${service.host}:${service.port}`;
         const client = this.clients.get(serviceKey);
-        
+
         if (client && client.isConnected && client.isHandshakeComplete) {
             return client.send(message);
         }
-        
+
         return false;
     }
 
@@ -189,7 +194,7 @@ export class PeerManager extends EventEmitter<PeerManagerEvents> {
         return {
             totalConnections: this.clients.size,
             activeConnections: connectedPeers.length,
-            connectedPeers: connectedPeers.map((peer: DiscoveredService) => peer.name),
+            connectedPeers: connectedPeers.map((peer: DiscoveredService) => peer.name)
         };
     }
 
@@ -200,13 +205,18 @@ export class PeerManager extends EventEmitter<PeerManagerEvents> {
         verbose(`Received message from ${from.name}:`, message.type);
 
         // Handle input event messages
-        if (message.type === "mouse_move" || 
-            message.type === "mouse_press" || 
+        if (
+            message.type === "mouse_move" ||
+            message.type === "mouse_press" ||
             message.type === "mouse_release" ||
-            message.type === "key_press" || 
-            message.type === "key_release") {
-            
-            this.emit("input_event", message as MouseMoveEvent | MousePressEvent | MouseReleaseEvent | KeyPressEvent | KeyReleaseEvent, from);
+            message.type === "key_press" ||
+            message.type === "key_release"
+        ) {
+            this.emit(
+                "input_event",
+                message as MouseMoveEvent | MousePressEvent | MouseReleaseEvent | KeyPressEvent | KeyReleaseEvent,
+                from
+            );
             return;
         }
 
@@ -215,24 +225,23 @@ export class PeerManager extends EventEmitter<PeerManagerEvents> {
             case "heartbeat":
                 // Heartbeats are handled automatically by WebSocketClient
                 break;
-                
+
             case "disconnect":
                 debug(`Peer ${from.name} is disconnecting: ${message.reason || "No reason given"}`);
                 break;
-                
+
             case "error":
                 error(`Error message from peer ${from.name}:`, message.message);
                 break;
-                
+
             case "handshake_request":
             case "handshake_response":
                 // These are handled by WebSocketClient
                 break;
-                
+
             default:
                 // Treat unknown message types as errors
                 error(`Unknown message type from ${from.name}:`, JSON.stringify(message, null, 4));
         }
     }
-
 }

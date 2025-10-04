@@ -1,13 +1,25 @@
 {
-  "instance": {
-    "name": "test-instance",
-    "role": "server"
-  },
-  "network": {
-    "port": 3001,
-    "host": "127.0.0.1"
-  },
-  "logging": {
-    "level": "debug"
-  }
+    "instance": {
+        "name": "test-instance",
+        "role": "server"
+    },
+    "network": {
+        "port": 3001,
+        "host": "127.0.0.1"
+    },
+    "screen": {
+        "dimensions": {
+            "width": 1920,
+            "height": 1080
+        }
+    },
+    "cluster": {
+        "server": {
+            "host": "192.168.1.100",
+            "port": 3000
+        }
+    },
+    "logging": {
+        "level": "debug"
+    }
 }

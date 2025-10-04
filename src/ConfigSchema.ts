@@ -1,8 +1,63 @@
-import convict from "convict";
+import * as convict from "convict";
 // Note: convict-format-with-validator has issues with ES modules, using basic convict for now
 
+// Add custom formats for nullable numbers
+convict.addFormat({
+    name: "nullable-port",
+    validate: (val: unknown) => {
+        if (val === null) {
+            return;
+        }
+        if (typeof val !== "number" || val < 0 || val > 65535 || !Number.isInteger(val)) {
+            throw new Error("must be null or a port number (0-65535)");
+        }
+    },
+    coerce: (val: unknown) => {
+        if (val === null) {
+            return null;
+        }
+        return Number(val);
+    }
+});
+
+convict.addFormat({
+    name: "nullable-nat",
+    validate: (val: unknown) => {
+        if (val === null) {
+            return;
+        }
+        if (typeof val !== "number" || val < 0 || !Number.isInteger(val)) {
+            throw new Error("must be null or a positive integer");
+        }
+    },
+    coerce: (val: unknown) => {
+        if (val === null) {
+            return null;
+        }
+        return Number(val);
+    }
+});
+
+convict.addFormat({
+    name: "nullable-string",
+    validate: (val: unknown) => {
+        if (val === null) {
+            return;
+        }
+        if (typeof val !== "string") {
+            throw new Error("must be null or a string");
+        }
+    },
+    coerce: (val: unknown) => {
+        if (val === null) {
+            return null;
+        }
+        return String(val);
+    }
+});
+
 // Define the configuration schema
-export const configSchema = convict({
+export const configSchema = convict.default({
     // Instance identity
     instance: {
         id: {
@@ -16,7 +71,7 @@ export const configSchema = convict({
             doc: "Human-readable instance name",
             format: String,
             default: null,
-            env: "KONFLIKT_INSTANCE_NAME", 
+            env: "KONFLIKT_INSTANCE_NAME",
             arg: "instance-name"
         },
         role: {
@@ -80,7 +135,7 @@ export const configSchema = convict({
                 arg: "screen-x"
             },
             y: {
-                doc: "Screen Y position in virtual coordinate space", 
+                doc: "Screen Y position in virtual coordinate space",
                 format: Number,
                 default: 0,
                 env: "KONFLIKT_SCREEN_Y",
@@ -90,14 +145,14 @@ export const configSchema = convict({
         dimensions: {
             width: {
                 doc: "Screen width in pixels (auto-detected if not set)",
-                format: "nat",
+                format: "nullable-nat",
                 default: null,
                 env: "KONFLIKT_SCREEN_WIDTH",
                 arg: "screen-width"
             },
             height: {
                 doc: "Screen height in pixels (auto-detected if not set)",
-                format: "nat", 
+                format: "nullable-nat",
                 default: null,
                 env: "KONFLIKT_SCREEN_HEIGHT",
                 arg: "screen-height"
@@ -126,21 +181,21 @@ export const configSchema = convict({
             env: "KONFLIKT_TOPOLOGY",
             arg: "topology"
         },
-        
+
         // Server configuration (for star topology)
         server: {
             host: {
                 doc: "Server host to connect to (for client mode)",
-                format: String,
+                format: "nullable-string",
                 default: null,
                 env: "KONFLIKT_SERVER_HOST",
                 arg: "server-host"
             },
             port: {
                 doc: "Server port to connect to (for client mode)",
-                format: "port",
+                format: "nullable-port",
                 default: null,
-                env: "KONFLIKT_SERVER_PORT", 
+                env: "KONFLIKT_SERVER_PORT",
                 arg: "server-port"
             }
         },
@@ -178,7 +233,7 @@ export const configSchema = convict({
                 doc: "Capture keyboard events",
                 format: Boolean,
                 default: true,
-                env: "KONFLIKT_CAPTURE_KEYBOARD", 
+                env: "KONFLIKT_CAPTURE_KEYBOARD",
                 arg: "capture-keyboard"
             }
         },
@@ -218,7 +273,7 @@ export const configSchema = convict({
         },
         file: {
             doc: "Log file path",
-            format: String,
+            format: "nullable-string",
             default: null,
             env: "KONFLIKT_LOG_FILE",
             arg: "log-file"
