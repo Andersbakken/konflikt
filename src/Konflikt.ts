@@ -58,9 +58,8 @@ export class Konflikt {
 
         this.#currentMode = config.mode;
 
-        // Generate machine and display identifiers for loop detection
+        // Generate machine identifier
         this.#machineId = Konflikt.#generateMachineId();
-        this.#displayId = this.#generateDisplayId();
 
         // Calculate screen bounds from config
         const desktop = this.#native.desktop;
@@ -70,6 +69,9 @@ export class Konflikt {
             width: config.screenWidth ?? desktop.width,
             height: config.screenHeight ?? desktop.height
         };
+
+        // Generate display identifier after screen bounds are set
+        this.#displayId = this.#generateDisplayId();
 
         // Console will be created during init if stdin is available
         this.#native.on("keyPress", this.#onKeyPress.bind(this));

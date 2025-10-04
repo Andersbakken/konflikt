@@ -100,12 +100,8 @@ if (typeof consoleConfig === "string" && consoleConfig !== "true") {
         setLogFile(logFile);
     }
 
-    main(config)
-        .then(() => {
-            process.exit();
-        })
-        .catch((e: unknown) => {
-            console.error("Fatal error:", e);
-            process.exit(1);
-        });
+    main(config).catch((e: unknown) => {
+        console.error("Fatal error:", e);
+        process.exit(1);
+    });
 }
