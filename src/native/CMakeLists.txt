@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.15)
 cmake_policy(SET CMP0091 NEW)
 cmake_policy(SET CMP0042 NEW)
 
-project(konflikt_native)
+project(KonfliktNative)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -15,18 +15,16 @@ include_directories(${CMAKE_JS_INC})
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
 
 # Source files
-set(SOURCE_FILES
-    src/konflikt_native.cpp
-)
+set(SOURCE_FILES KonfliktNative.cpp)
 
 # Platform-specific sources and libraries
 if(APPLE)
-    list(APPEND SOURCE_FILES src/platform_macos.cpp)
+    list(APPEND SOURCE_FILES KonfliktNativeMac.cpp)
     find_library(APPLICATION_SERVICES ApplicationServices)
     find_library(CARBON Carbon)
     set(PLATFORM_LIBS ${APPLICATION_SERVICES} ${CARBON})
 elseif(UNIX)
-    list(APPEND SOURCE_FILES src/platform_x11.cpp)
+    list(APPEND SOURCE_FILES KonfliktNativeX11.cpp)
     find_package(PkgConfig REQUIRED)
     pkg_check_modules(XCB REQUIRED xcb xcb-xinput xcb-xtest xcb-xkb xkbcommon xkbcommon-x11)
     set(PLATFORM_LIBS ${XCB_LIBRARIES})
@@ -71,5 +69,5 @@ endif()
 
 # Build output directory based on build type
 set_target_properties(${PROJECT_NAME} PROPERTIES
-    LIBRARY_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/../../dist/build/${CMAKE_BUILD_TYPE}
+    LIBRARY_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/../../dist/native/${CMAKE_BUILD_TYPE}
 )

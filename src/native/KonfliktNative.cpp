@@ -1,4 +1,5 @@
-#include "konflikt_native.h"
+#include "KonfliktNative.h"
+
 #include <chrono>
 
 namespace konflikt {
@@ -111,7 +112,7 @@ Event eventFromObject(const Napi::Object &obj)
     // Parse button for mouse events
     if (obj.Has("button")) {
         uint32_t buttonVal = obj.Get("button").As<Napi::Number>().Uint32Value();
-        event.button        = static_cast<MouseButton>(buttonVal);
+        event.button       = static_cast<MouseButton>(buttonVal);
     }
 
     // Parse keycode and text for key events
@@ -150,18 +151,17 @@ KonfliktNative::KonfliktNative(const Napi::CallbackInfo &info)
         // Create thread-safe functions for each log level
         if (loggerObj.Has("verbose") && loggerObj.Get("verbose").IsFunction()) {
             auto verboseFunc = loggerObj.Get("verbose").As<Napi::Function>();
-            mVerboseTsfn = Napi::ThreadSafeFunction::New(
+            mVerboseTsfn     = Napi::ThreadSafeFunction::New(
                 info.Env(),
                 verboseFunc,
                 "VerboseLogger",
                 0,
                 1,
-                [this](Napi::Env) { /* Finalizer */ }
-            );
+                [this](Napi::Env) { /* Finalizer */ });
             mLogger.verbose = [this](const std::string &message) {
                 if (mVerboseTsfn) {
-                    mVerboseTsfn.BlockingCall(new std::string(message), [](Napi::Env env, Napi::Function jsCallback, std::string* data) {
-                        jsCallback.Call({Napi::String::New(env, *data)});
+                    mVerboseTsfn.BlockingCall(new std::string(message), [](Napi::Env env, Napi::Function jsCallback, std::string *data) {
+                        jsCallback.Call({ Napi::String::New(env, *data) });
                         delete data;
                     });
                 }
@@ -169,18 +169,17 @@ KonfliktNative::KonfliktNative(const Napi::CallbackInfo &info)
         }
         if (loggerObj.Has("debug") && loggerObj.Get("debug").IsFunction()) {
             auto debugFunc = loggerObj.Get("debug").As<Napi::Function>();
-            mDebugTsfn = Napi::ThreadSafeFunction::New(
+            mDebugTsfn     = Napi::ThreadSafeFunction::New(
                 info.Env(),
                 debugFunc,
                 "DebugLogger",
                 0,
                 1,
-                [this](Napi::Env) { /* Finalizer */ }
-            );
+                [this](Napi::Env) { /* Finalizer */ });
             mLogger.debug = [this](const std::string &message) {
                 if (mDebugTsfn) {
-                    mDebugTsfn.BlockingCall(new std::string(message), [](Napi::Env env, Napi::Function jsCallback, std::string* data) {
-                        jsCallback.Call({Napi::String::New(env, *data)});
+                    mDebugTsfn.BlockingCall(new std::string(message), [](Napi::Env env, Napi::Function jsCallback, std::string *data) {
+                        jsCallback.Call({ Napi::String::New(env, *data) });
                         delete data;
                     });
                 }
@@ -188,18 +187,17 @@ KonfliktNative::KonfliktNative(const Napi::CallbackInfo &info)
         }
         if (loggerObj.Has("log") && loggerObj.Get("log").IsFunction()) {
             auto logFunc = loggerObj.Get("log").As<Napi::Function>();
-            mLogTsfn = Napi::ThreadSafeFunction::New(
+            mLogTsfn     = Napi::ThreadSafeFunction::New(
                 info.Env(),
                 logFunc,
                 "LogLogger",
                 0,
                 1,
-                [this](Napi::Env) { /* Finalizer */ }
-            );
+                [this](Napi::Env) { /* Finalizer */ });
             mLogger.log = [this](const std::string &message) {
                 if (mLogTsfn) {
-                    mLogTsfn.BlockingCall(new std::string(message), [](Napi::Env env, Napi::Function jsCallback, std::string* data) {
-                        jsCallback.Call({Napi::String::New(env, *data)});
+                    mLogTsfn.BlockingCall(new std::string(message), [](Napi::Env env, Napi::Function jsCallback, std::string *data) {
+                        jsCallback.Call({ Napi::String::New(env, *data) });
                         delete data;
                     });
                 }
@@ -207,18 +205,17 @@ KonfliktNative::KonfliktNative(const Napi::CallbackInfo &info)
         }
         if (loggerObj.Has("error") && loggerObj.Get("error").IsFunction()) {
             auto errorFunc = loggerObj.Get("error").As<Napi::Function>();
-            mErrorTsfn = Napi::ThreadSafeFunction::New(
+            mErrorTsfn     = Napi::ThreadSafeFunction::New(
                 info.Env(),
                 errorFunc,
                 "ErrorLogger",
                 0,
                 1,
-                [this](Napi::Env) { /* Finalizer */ }
-            );
+                [this](Napi::Env) { /* Finalizer */ });
             mLogger.error = [this](const std::string &message) {
                 if (mErrorTsfn) {
-                    mErrorTsfn.BlockingCall(new std::string(message), [](Napi::Env env, Napi::Function jsCallback, std::string* data) {
-                        jsCallback.Call({Napi::String::New(env, *data)});
+                    mErrorTsfn.BlockingCall(new std::string(message), [](Napi::Env env, Napi::Function jsCallback, std::string *data) {
+                        jsCallback.Call({ Napi::String::New(env, *data) });
                         delete data;
                     });
                 }
@@ -262,12 +259,16 @@ KonfliktNative::~KonfliktNative()
         pair.second.listeners.clear();
     }
     mListeners.clear();
-    
+
     // Release logger thread-safe functions
-    if (mVerboseTsfn) mVerboseTsfn.Release();
-    if (mDebugTsfn) mDebugTsfn.Release();
-    if (mLogTsfn) mLogTsfn.Release();
-    if (mErrorTsfn) mErrorTsfn.Release();
+    if (mVerboseTsfn)
+        mVerboseTsfn.Release();
+    if (mDebugTsfn)
+        mDebugTsfn.Release();
+    if (mLogTsfn)
+        mLogTsfn.Release();
+    if (mErrorTsfn)
+        mErrorTsfn.Release();
 
     // Then stop the platform hook
     if (mPlatformHook) {
@@ -299,7 +300,7 @@ void KonfliktNative::On(const Napi::CallbackInfo &info)
         return;
     }
 
-    std::string typeStr    = info[0].As<Napi::String>().Utf8Value();
+    std::string typeStr     = info[0].As<Napi::String>().Utf8Value();
     Napi::Function listener = info[1].As<Napi::Function>();
 
     // Convert type string to EventType
@@ -436,4 +437,4 @@ Napi::Object InitModule(Napi::Env env, Napi::Object exports)
     return konflikt::KonfliktNative::Init(env, exports);
 }
 
-NODE_API_MODULE(konflikt_native, InitModule)
+NODE_API_MODULE(KonfliktNative, InitModule)

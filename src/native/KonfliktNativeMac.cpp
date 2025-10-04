@@ -1,6 +1,7 @@
 #ifdef __APPLE__
 
-#include "konflikt_native.h"
+#include "KonfliktNative.h"
+
 #include <ApplicationServices/ApplicationServices.h>
 #include <Carbon/Carbon.h>
 #include <atomic>

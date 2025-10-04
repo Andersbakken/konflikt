@@ -1,6 +1,7 @@
 #ifdef __linux__
 
-#include "konflikt_native.h"
+#include "KonfliktNative.h"
+
 #include <xcb/xcb.h>
 #include <xcb/xinput.h>
 #include <xcb/xtest.h>
@@ -389,8 +390,8 @@ private:
         switch (ge->event_type) {
             case XCB_INPUT_RAW_KEY_PRESS: {
                 auto *keyEvent = reinterpret_cast<xcb_input_raw_key_press_event_t *>(ge);
-                event.type      = EventType::KeyPress;
-                event.keycode   = keyEvent->detail;
+                event.type     = EventType::KeyPress;
+                event.keycode  = keyEvent->detail;
 
                 // Get text representation using xkbcommon
                 if (mXkbState) {
@@ -412,8 +413,8 @@ private:
 
             case XCB_INPUT_RAW_KEY_RELEASE: {
                 auto *keyEvent = reinterpret_cast<xcb_input_raw_key_release_event_t *>(ge);
-                event.type      = EventType::KeyRelease;
-                event.keycode   = keyEvent->detail;
+                event.type     = EventType::KeyRelease;
+                event.keycode  = keyEvent->detail;
 
                 // Get text representation using xkbcommon
                 if (mXkbState) {
@@ -435,12 +436,12 @@ private:
 
             case XCB_INPUT_RAW_BUTTON_PRESS: {
                 auto *buttonEvent = reinterpret_cast<xcb_input_raw_button_press_event_t *>(ge);
-                uint32_t button    = buttonEvent->detail;
+                uint32_t button   = buttonEvent->detail;
 
                 // Filter out scroll wheel events (buttons 4-7)
                 if (button >= XCB_BUTTON_INDEX_1 && button <= XCB_BUTTON_INDEX_3) {
-                    event.type      = EventType::MousePress;
-                    event.button    = mouseButtonFromButton(button);
+                    event.type     = EventType::MousePress;
+                    event.button   = mouseButtonFromButton(button);
                     shouldDispatch = true;
                 }
                 break;
@@ -448,19 +449,19 @@ private:
 
             case XCB_INPUT_RAW_BUTTON_RELEASE: {
                 auto *buttonEvent = reinterpret_cast<xcb_input_raw_button_release_event_t *>(ge);
-                uint32_t button    = buttonEvent->detail;
+                uint32_t button   = buttonEvent->detail;
 
                 // Filter out scroll wheel events (buttons 4-7)
                 if (button >= XCB_BUTTON_INDEX_1 && button <= XCB_BUTTON_INDEX_3) {
-                    event.type      = EventType::MouseRelease;
-                    event.button    = mouseButtonFromButton(button);
+                    event.type     = EventType::MouseRelease;
+                    event.button   = mouseButtonFromButton(button);
                     shouldDispatch = true;
                 }
                 break;
             }
 
             case XCB_INPUT_RAW_MOTION: {
-                event.type      = EventType::MouseMove;
+                event.type     = EventType::MouseMove;
                 shouldDispatch = true;
                 break;
             }

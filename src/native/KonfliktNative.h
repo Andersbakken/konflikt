@@ -145,7 +145,7 @@ private:
 
     // Logger for native code
     Logger mLogger;
-    
+
     // Thread-safe functions for logger callbacks
     Napi::ThreadSafeFunction mVerboseTsfn;
     Napi::ThreadSafeFunction mDebugTsfn;
