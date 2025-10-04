@@ -71,15 +71,26 @@ export class Konflikt {
             height: config.screenHeight ?? desktop.height
         };
 
+        console.log(
+            "Using screen bounds:",
+            this.#screenBounds,
+            this.#role === InstanceRole.Server ? "(server)" : "(client)"
+        );
+
         // Generate display identifier after screen bounds are set
         this.#displayId = this.#generateDisplayId();
 
-        // Console will be created during init if stdin is available
-        this.#native.on("keyPress", this.#onKeyPress.bind(this));
-        this.#native.on("keyRelease", this.#onKeyRelease.bind(this));
-        this.#native.on("mousePress", this.#onMousePress.bind(this));
-        this.#native.on("mouseRelease", this.#onMouseRelease.bind(this));
-        this.#native.on("mouseMove", this.#onMouseMove.bind(this));
+        // Only servers listen for input events
+        if (this.#role === InstanceRole.Server) {
+            verbose("Setting up input event listeners for server");
+            this.#native.on("keyPress", this.#onKeyPress.bind(this));
+            this.#native.on("keyRelease", this.#onKeyRelease.bind(this));
+            this.#native.on("mousePress", this.#onMousePress.bind(this));
+            this.#native.on("mouseRelease", this.#onMouseRelease.bind(this));
+            this.#native.on("mouseMove", this.#onMouseMove.bind(this));
+        }
+
+        // Desktop changes are relevant for both servers and clients
         this.#native.on("desktopChanged", this.#onDesktopChanged.bind(this));
     }
 
@@ -142,9 +153,15 @@ export class Konflikt {
 
         await this.#server.start();
 
-        // Start input event listening for servers
+        // Log server startup info
         if (this.#role === InstanceRole.Server) {
-            this.#startInputEventListening();
+            verbose(`Server ${this.#config.instanceId} is now ready to capture input events`);
+            verbose(`Screen bounds: ${JSON.stringify(this.#screenBounds)}`);
+
+            const adjacency = this.#config.adjacency;
+            if (Object.keys(adjacency).length > 0) {
+                verbose(`Screen adjacency configuration: ${JSON.stringify(adjacency, null, 2)}`);
+            }
         }
 
         // Send initial instance info and set up periodic broadcasting
@@ -178,21 +195,6 @@ export class Konflikt {
         // Remote console mode is handled in index.ts and doesn't reach here
     }
 
-    #startInputEventListening(): void {
-        verbose("Server starting input event listening...");
-
-        // Start monitoring cursor position to track active instance
-        this.#checkIfShouldBeActive();
-
-        verbose(`Server ${this.#config.instanceId} is now listening for input events (role: server)`);
-        verbose(`Screen bounds: ${JSON.stringify(this.#screenBounds)}`);
-
-        const adjacency = this.#config.adjacency;
-        if (Object.keys(adjacency).length > 0) {
-            verbose(`Screen adjacency configuration: ${JSON.stringify(adjacency, null, 2)}`);
-        }
-    }
-
     #getTargetClientForPosition(x: number, y: number): string | null {
         // For servers: determine which connected client should receive input at this position
         if (this.#role !== InstanceRole.Server) {
@@ -207,7 +209,7 @@ export class Konflikt {
 
         // Check adjacency configuration to find which client's screen area contains this position
         const adjacency = this.#config.adjacency;
-        verbose(`Checking adjacency for cursor position (${x}, ${y}) adjacency: ${adjacency}`);
+        verbose(`Checking adjacency for cursor position (${x}, ${y}) adjacency: ${JSON.stringify(adjacency)}`);
 
         // TODO: Implement logic to determine target client based on screen positioning
         // This will use the adjacency configuration and connected clients' screen information
@@ -241,14 +243,19 @@ export class Konflikt {
 
     #checkIfShouldBeActive(): void {
         const wasPreviouslyActive = this.#isActiveInstance;
+        verbose(
+            `checkIfShouldBeActive: role=${this.#role === InstanceRole.Server ? "server" : "client"}, wasPreviouslyActive=${wasPreviouslyActive}`
+        );
 
         if (this.#role === InstanceRole.Server) {
             // Servers capture input events and send them to the current client
             this.#isActiveInstance = true;
+            verbose(`Server set to active: ${this.#isActiveInstance}`);
         } else {
             // Clients receive input events from server and execute them locally
             // The server determines which client should receive input
             this.#isActiveInstance = false;
+            verbose(`Client set to inactive: ${this.#isActiveInstance}`);
         }
 
         // Log state changes
@@ -300,20 +307,13 @@ export class Konflikt {
         return false;
     }
 
-    static #shouldPreventEventLoop(): boolean {
-        // With server/client model, we don't need same-display detection
-        // Each role has a clear responsibility
-        return false;
-    }
-
     #shouldProcessInputEvent(): boolean {
-        // Prevent event loops first
-        if (Konflikt.#shouldPreventEventLoop()) {
-            return false;
-        }
-
         // Only process input events if this instance should be the active source
-        return this.#isActiveInstance;
+        const shouldProcess = this.#isActiveInstance;
+        verbose(
+            `shouldProcessInputEvent: isActiveInstance=${this.#isActiveInstance}, role=${this.#role === InstanceRole.Server ? "server" : "client"}`
+        );
+        return shouldProcess;
     }
 
     // Input event broadcasting methods for source/target architecture

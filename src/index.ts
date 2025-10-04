@@ -12,6 +12,7 @@ Options:
   --version                 Show version number
   --config, -c              Path to config file
   --log-level, -l           Log level (silent, error, log, debug, verbose)
+  --verbose, -v             Enable verbose logging
   --log-file, -f            Path to log file
   --port, -p                WebSocket server port
   --host, -H                Host to bind server to

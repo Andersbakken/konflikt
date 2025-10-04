@@ -339,10 +339,18 @@ export class Config {
     }
 
     #manuallyParseImportantArgs(args: string[]): void {
+        let verboseCount = 0;
+
         for (let i = 0; i < args.length; i++) {
             const arg = args[i] as string | undefined;
 
             if (!arg) {
+                continue;
+            }
+
+            // Count verbose flags first
+            if (arg === "-v" || arg === "--verbose") {
+                verboseCount++;
                 continue;
             }
 
@@ -365,6 +373,12 @@ export class Config {
             if (!Config.#isFlagArgument(arg) && value) {
                 ++i; // Skip next value since we consumed it
             }
+        }
+
+        // Apply verbose count after processing all args
+        if (verboseCount > 0) {
+            this.#set("logging.level", "verbose");
+            debug(`CLI override: ${verboseCount} verbose flag${verboseCount > 1 ? "s" : ""} - log-level = verbose`);
         }
     }
 
@@ -454,7 +468,7 @@ export class Config {
     }
 
     static #isFlagArgument(arg: string): boolean {
-        return ["--dev", "--no-console"].includes(arg);
+        return ["--dev", "--no-console", "-v", "--verbose"].includes(arg);
     }
 
     static #expandShortOptions(args: string[]): string[] {

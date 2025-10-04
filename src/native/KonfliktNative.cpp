@@ -84,16 +84,17 @@ Event eventFromObject(const Napi::Object &obj)
 
     // Parse type
     std::string typeStr = obj.Get("type").As<Napi::String>().Utf8Value();
-    if (typeStr == "mouseMove")
+    if (typeStr == "mouseMove") {
         event.type = EventType::MouseMove;
-    else if (typeStr == "mousePress")
+    } else if (typeStr == "mousePress") {
         event.type = EventType::MousePress;
-    else if (typeStr == "mouseRelease")
+    } else if (typeStr == "mouseRelease") {
         event.type = EventType::MouseRelease;
-    else if (typeStr == "keyPress")
+    } else if (typeStr == "keyPress") {
         event.type = EventType::KeyPress;
-    else if (typeStr == "keyRelease")
+    } else if (typeStr == "keyRelease") {
         event.type = EventType::KeyRelease;
+    }
 
     // Parse state
     if (obj.Has("keyboardModifiers")) {
@@ -262,14 +263,18 @@ KonfliktNative::~KonfliktNative()
     mListeners.clear();
 
     // Release logger thread-safe functions
-    if (mVerboseTsfn)
+    if (mVerboseTsfn) {
         mVerboseTsfn.Release();
-    if (mDebugTsfn)
+    }
+    if (mDebugTsfn) {
         mDebugTsfn.Release();
-    if (mLogTsfn)
+    }
+    if (mLogTsfn) {
         mLogTsfn.Release();
-    if (mErrorTsfn)
+    }
+    if (mErrorTsfn) {
         mErrorTsfn.Release();
+    }
 
     // Then stop the platform hook
     if (mPlatformHook) {
@@ -306,20 +311,22 @@ void KonfliktNative::On(const Napi::CallbackInfo &info)
 
     // Convert type string to EventType
     EventType type;
-    if (typeStr == "mouseMove")
+    if (typeStr == "mouseMove") {
         type = EventType::MouseMove;
-    else if (typeStr == "mousePress")
+    } else if (typeStr == "mousePress") {
         type = EventType::MousePress;
-    else if (typeStr == "mouseRelease")
+    } else if (typeStr == "mouseRelease") {
         type = EventType::MouseRelease;
-    else if (typeStr == "keyPress")
+    } else if (typeStr == "keyPress") {
         type = EventType::KeyPress;
-    else if (typeStr == "keyRelease")
+    } else if (typeStr == "keyRelease") {
         type = EventType::KeyRelease;
-    else if (typeStr == "desktopChanged")
+    } else if (typeStr == "desktopChanged") {
         type = EventType::DesktopChanged;
+    }
     else {
-        Napi::TypeError::New(env, "Unknown event type").ThrowAsJavaScriptException();
+        std::string validTypes = "Valid event types are: 'mouseMove', 'mousePress', 'mouseRelease', 'keyPress', 'keyRelease', 'desktopChanged'";
+        Napi::TypeError::New(env, "Unknown event type '" + typeStr + "'. " + validTypes).ThrowAsJavaScriptException();
         return;
     }
 
@@ -362,18 +369,19 @@ void KonfliktNative::Off(const Napi::CallbackInfo &info)
 
     // Convert type string to EventType
     EventType type;
-    if (typeStr == "mouseMove")
+    if (typeStr == "mouseMove") {
         type = EventType::MouseMove;
-    else if (typeStr == "mousePress")
+    } else if (typeStr == "mousePress") {
         type = EventType::MousePress;
-    else if (typeStr == "mouseRelease")
+    } else if (typeStr == "mouseRelease") {
         type = EventType::MouseRelease;
-    else if (typeStr == "keyPress")
+    } else if (typeStr == "keyPress") {
         type = EventType::KeyPress;
-    else if (typeStr == "keyRelease")
+    } else if (typeStr == "keyRelease") {
         type = EventType::KeyRelease;
-    else if (typeStr == "desktopChanged")
+    } else if (typeStr == "desktopChanged") {
         type = EventType::DesktopChanged;
+    }
     else {
         return;
     }
