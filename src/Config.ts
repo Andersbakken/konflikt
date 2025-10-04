@@ -4,6 +4,10 @@ import { existsSync, readFileSync } from "fs";
 import { homedir, hostname } from "os";
 import { runInNewContext } from "vm";
 import path from "path";
+
+// Type unions for configuration values
+export type InstanceMode = "source" | "target" | "auto";
+export type InstanceRole = "server" | "client" | "peer";
 interface ConvictInstance {
     get(key: string): unknown;
     set(key: string, value: unknown): void;
@@ -76,9 +80,14 @@ export class Config {
         return (this.#get("instance.name") as string) || `${hostname()}-${process.pid}`;
     }
 
-    get role(): "server" | "client" | "peer" {
-        const role = this.#get("instance.role") as "server" | "client" | "peer" | null;
+    get role(): InstanceRole {
+        const role = this.#get("instance.role") as InstanceRole | null;
         return role || "peer";
+    }
+
+    get mode(): InstanceMode {
+        const mode = this.#get("instance.mode") as InstanceMode | null;
+        return mode || "auto";
     }
 
     // Network configuration
@@ -382,6 +391,12 @@ export class Config {
                 if (value) {
                     this.#set("instance.role", value);
                     debug(`CLI override: role = ${value}`);
+                }
+                break;
+            case "--mode":
+                if (value) {
+                    this.#set("instance.mode", value);
+                    debug(`CLI override: mode = ${value}`);
                 }
                 break;
             case "--log-level":

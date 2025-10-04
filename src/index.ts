@@ -16,6 +16,7 @@ Options:
   --port, -p                WebSocket server port
   --host, -H                Host to bind server to
   --role, -r                Instance role (server, client, peer)
+  --mode, -m                Instance mode (source, target, auto)
   --instance-id             Unique instance identifier
   --instance-name           Human-readable instance name
   --screen-x                Screen X position

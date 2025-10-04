@@ -62,12 +62,9 @@ export class RemoteConsole {
                     process.exit(0);
                 });
 
-                this.#ws.on("message", (text: WebSocket.RawData) => {
-                    if (typeof text !== "string") {
-                        error("Received non-string message from server");
-                        return;
-                    }
+                this.#ws.on("message", (data: WebSocket.RawData) => {
                     try {
+                        const text = data.toString("utf8");
                         const parsed = JSON.parse(text);
                         if (!isConsoleMessage(parsed)) {
                             error("Invalid console message format from server");

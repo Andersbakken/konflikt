@@ -30,6 +30,36 @@ export interface ConsoleLogMessage {
 
 export type ConsoleMessage = ConsoleResponseMessage | ConsoleErrorMessage | ConsolePongMessage | ConsoleLogMessage;
 
+// Input event message types for source/target architecture
+export interface InputEventMessage {
+    type: "input_event";
+    sourceInstanceId: string;
+    sourceDisplayId: string;
+    sourceMachineId: string;
+    eventType: "keyPress" | "keyRelease" | "mousePress" | "mouseRelease" | "mouseMove";
+    eventData: {
+        x: number;
+        y: number;
+        timestamp: number;
+        keyboardModifiers: number;
+        mouseButtons: number;
+        // Additional fields for specific event types
+        keycode?: number;
+        text?: string;
+        button?: number;
+    };
+}
+
+export interface InstanceInfoMessage {
+    type: "instance_info";
+    instanceId: string;
+    displayId: string;
+    machineId: string;
+    timestamp: number;
+}
+
+export type NetworkMessage = ConsoleMessage | InputEventMessage | InstanceInfoMessage;
+
 // Validation functions
 export function isConsoleCommandMessage(obj: unknown): obj is ConsoleCommandMessage {
     return (
@@ -68,4 +98,44 @@ export function isConsoleMessage(obj: unknown): obj is ConsoleMessage {
         default:
             return false;
     }
+}
+
+export function isInputEventMessage(obj: unknown): obj is InputEventMessage {
+    if (typeof obj !== "object" || obj === null || !("type" in obj) || obj.type !== "input_event") {
+        return false;
+    }
+    
+    const msg = obj as Record<string, unknown>;
+    return (
+        typeof msg.sourceInstanceId === "string" &&
+        typeof msg.sourceDisplayId === "string" &&
+        typeof msg.sourceMachineId === "string" &&
+        typeof msg.eventType === "string" &&
+        ["keyPress", "keyRelease", "mousePress", "mouseRelease", "mouseMove"].includes(msg.eventType) &&
+        typeof msg.eventData === "object" &&
+        msg.eventData !== null &&
+        typeof (msg.eventData as Record<string, unknown>).x === "number" &&
+        typeof (msg.eventData as Record<string, unknown>).y === "number" &&
+        typeof (msg.eventData as Record<string, unknown>).timestamp === "number" &&
+        typeof (msg.eventData as Record<string, unknown>).keyboardModifiers === "number" &&
+        typeof (msg.eventData as Record<string, unknown>).mouseButtons === "number"
+    );
+}
+
+export function isInstanceInfoMessage(obj: unknown): obj is InstanceInfoMessage {
+    if (typeof obj !== "object" || obj === null || !("type" in obj) || obj.type !== "instance_info") {
+        return false;
+    }
+    
+    const msg = obj as Record<string, unknown>;
+    return (
+        typeof msg.instanceId === "string" &&
+        typeof msg.displayId === "string" &&
+        typeof msg.machineId === "string" &&
+        typeof msg.timestamp === "number"
+    );
+}
+
+export function isNetworkMessage(obj: unknown): obj is NetworkMessage {
+    return isConsoleMessage(obj) || isInputEventMessage(obj) || isInstanceInfoMessage(obj);
 }

@@ -8,6 +8,8 @@ import type { DiscoveredService } from "./DiscoveredService";
 import type { Duplex } from "stream";
 import type { FastifyInstance, FastifyListenOptions } from "fastify";
 import type { IncomingMessage } from "http";
+import type { InputEventMessage, InstanceInfoMessage } from "./messageValidation";
+import { isInputEventMessage, isInstanceInfoMessage } from "./messageValidation";
 
 export class Server {
     #fastify: FastifyInstance;
@@ -19,6 +21,12 @@ export class Server {
     #version: string;
     #capabilities: string[];
     #console: ServerConsole;
+    
+    // Regular WebSocket connections (non-console)
+    #regularConnections: Set<WebSocket> = new Set();
+    
+    // Message handler callback for input events
+    #messageHandler?: (message: InputEventMessage | InstanceInfoMessage) => void;
 
     constructor(
         readonly port: number = 3000,
@@ -104,6 +112,24 @@ export class Server {
     /** Get console instance for log broadcasting */
     get console(): ServerConsole {
         return this.#console;
+    }
+
+    /** Set message handler for input events and instance info */
+    setMessageHandler(handler: (message: InputEventMessage | InstanceInfoMessage) => void): void {
+        this.#messageHandler = handler;
+    }
+
+    /** Broadcast message to all regular WebSocket connections (excludes console connections) */
+    broadcastToClients(message: string): void {
+        for (const client of this.#regularConnections) {
+            if (client.readyState === WebSocket.OPEN) {
+                try {
+                    client.send(message);
+                } catch (err) {
+                    verbose("Failed to send message to client:", err);
+                }
+            }
+        }
     }
 
     /** Start server */
@@ -192,17 +218,39 @@ export class Server {
     }
 
     #handleRegularConnection(socket: WebSocket, req: IncomingMessage): void {
-        verbose(`Handling regular WS connection from ${req.socket.remoteAddress}`, typeof this);
-        socket.on("message", (_raw: WebSocket.RawData) => {
-            // TODO: Add message handling logic when needed
+        verbose(`Handling regular WS connection from ${req.socket.remoteAddress}`);
+        
+        // Add to regular connections set
+        this.#regularConnections.add(socket);
+
+        socket.on("message", (raw: WebSocket.RawData) => {
+            try {
+                const text = raw.toString("utf8");
+                const parsed = JSON.parse(text);
+                
+                // Handle input event messages
+                if (isInputEventMessage(parsed) || isInstanceInfoMessage(parsed)) {
+                    if (this.#messageHandler) {
+                        this.#messageHandler(parsed);
+                    } else {
+                        verbose("Received message but no message handler set:", parsed.type);
+                    }
+                } else {
+                    verbose("Received unknown message type:", parsed);
+                }
+            } catch (err) {
+                verbose("Failed to parse WebSocket message:", err);
+            }
         });
 
         socket.on("close", () => {
-            // TODO: Handle connection close
+            verbose(`Regular WS connection closed from ${req.socket.remoteAddress}`);
+            this.#regularConnections.delete(socket);
         });
 
-        socket.on("error", (_err: Error) => {
-            // TODO: Handle connection error
+        socket.on("error", (err: Error) => {
+            verbose(`Regular WS connection error from ${req.socket.remoteAddress}:`, err);
+            this.#regularConnections.delete(socket);
         });
     }
 
