@@ -2,6 +2,7 @@ import { ServerConsole } from "./ServerConsole";
 import { ServiceDiscovery } from "./ServiceDiscovery";
 import { debug, error, log, verbose } from "./Log";
 import { isInputEventMessage, isInstanceInfoMessage } from "./messageValidation";
+import { textFromWebSocketMessage } from "./textFromWebSocketMessage";
 import Fastify from "fastify";
 import WebSocket from "ws";
 import type { Config } from "./Config";
@@ -223,11 +224,8 @@ export class Server {
         // Add to regular connections set
         this.#regularConnections.add(socket);
 
-        socket.on("message", (text: WebSocket.RawData) => {
-            if (typeof text !== "string") {
-                verbose("Received non-text message from client, ignoring");
-                return;
-            }
+        socket.on("message", (data: WebSocket.RawData) => {
+            const text = textFromWebSocketMessage(data);
 
             try {
                 const parsed = JSON.parse(text);

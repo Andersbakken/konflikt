@@ -1,5 +1,6 @@
 import { type ConsoleCommandMessage, isConsoleCommandMessage } from "./messageValidation";
 import { debug, error } from "./Log";
+import { textFromWebSocketMessage } from "./textFromWebSocketMessage";
 import WebSocket from "ws";
 import type { Config } from "./Config";
 import type { IncomingMessage } from "http";
@@ -37,11 +38,8 @@ export class ServerConsole {
         // Add socket to our tracking set
         this.#consoleSockets.add(socket);
 
-        socket.on("message", (text: WebSocket.RawData) => {
-            if (typeof text !== "string") {
-                ServerConsole.#sendConsoleError(socket, "Invalid message format: expected text");
-                return;
-            }
+        socket.on("message", (data: WebSocket.RawData) => {
+            const text = textFromWebSocketMessage(data);
 
             try {
                 const parsed = JSON.parse(text);
@@ -57,13 +55,13 @@ export class ServerConsole {
             }
         });
 
-        socket.on("close", () => {
+        socket.on("close", (): void => {
             debug("Console WebSocket connection closed");
             // Remove socket from tracking set
             this.#consoleSockets.delete(socket);
         });
 
-        socket.on("error", (err: Error) => {
+        socket.on("error", (err: Error): void => {
             error("Console WebSocket error:", err);
             // Remove socket from tracking set on error
             this.#consoleSockets.delete(socket);
@@ -287,6 +285,9 @@ Note: Discovered services info requires ServiceDiscovery API exposure`;
         this.#consoleSockets.forEach((socket: WebSocket) => {
             try {
                 if (socket.readyState === WebSocket.OPEN) {
+                    console.log(
+                        `[ServerConsole] Sending ${messageString.length} chars: ${messageString.substring(0, 50)}...`
+                    );
                     socket.send(messageString);
                 }
             } catch {
