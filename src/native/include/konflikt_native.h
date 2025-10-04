@@ -45,8 +45,8 @@ enum class KeyboardModifier : uint32_t
 
 struct State
 {
-    uint32_t keyboard_modifiers { 0 };
-    uint32_t mouse_buttons { 0 };
+    uint32_t keyboardModifiers { 0 };
+    uint32_t mouseButtons { 0 };
     int32_t x { 0 };
     int32_t y { 0 };
 };
@@ -90,16 +90,16 @@ public:
     virtual bool initialize(const Logger &logger) = 0;
     virtual void shutdown()                       = 0;
 
-    virtual State get_state() const     = 0;
-    virtual Desktop get_desktop() const = 0;
+    virtual State getState() const     = 0;
+    virtual Desktop getDesktop() const = 0;
 
-    virtual void send_mouse_event(const Event &event) = 0;
-    virtual void send_key_event(const Event &event)   = 0;
+    virtual void sendMouseEvent(const Event &event) = 0;
+    virtual void sendKeyEvent(const Event &event)   = 0;
 
-    virtual void start_listening() = 0;
-    virtual void stop_listening()  = 0;
+    virtual void startListening() = 0;
+    virtual void stopListening()  = 0;
 
-    std::function<void(const Event &)> event_callback;
+    std::function<void(const Event &)> eventCallback;
 };
 
 class KonfliktNative : public Napi::ObjectWrap<KonfliktNative>
@@ -123,11 +123,11 @@ private:
     void SendKeyEvent(const Napi::CallbackInfo &info);
 
     // Internal event handling
-    void DispatchEvent(const Event &event);
-    void HandlePlatformEvent(const Event &event);
+    void dispatchEvent(const Event &event);
+    void handlePlatformEvent(const Event &event);
 
     // Platform-specific implementation
-    std::unique_ptr<IPlatformHook> platform_hook_;
+    std::unique_ptr<IPlatformHook> mPlatformHook;
 
     // Event listeners storage
     struct ListenerList
@@ -135,30 +135,36 @@ private:
         std::vector<Napi::ThreadSafeFunction> listeners;
     };
 
-    std::unordered_map<EventType, ListenerList> listeners_;
+    std::unordered_map<EventType, ListenerList> mListeners;
 
     // Track if listening has started
-    bool is_listening_ { false };
+    bool mIsListening { false };
 
     // Thread-safe function for dispatching events from native thread
-    Napi::ThreadSafeFunction event_dispatcher_;
+    Napi::ThreadSafeFunction mEventDispatcher;
 
     // Logger for native code
-    Logger logger_;
+    Logger mLogger;
+    
+    // Thread-safe functions for logger callbacks
+    Napi::ThreadSafeFunction mVerboseTsfn;
+    Napi::ThreadSafeFunction mDebugTsfn;
+    Napi::ThreadSafeFunction mLogTsfn;
+    Napi::ThreadSafeFunction mErrorTsfn;
 };
 
 // Factory function for creating platform-specific hooks
-std::unique_ptr<IPlatformHook> CreatePlatformHook();
+std::unique_ptr<IPlatformHook> createPlatformHook();
 
 // Helper functions
-uint64_t GetTimestamp();
+uint64_t timestamp();
 
-inline uint32_t ToUInt32(MouseButton button)
+inline uint32_t toUInt32(MouseButton button)
 {
     return static_cast<uint32_t>(button);
 }
 
-inline uint32_t ToUInt32(KeyboardModifier modifier)
+inline uint32_t toUInt32(KeyboardModifier modifier)
 {
     return static_cast<uint32_t>(modifier);
 }

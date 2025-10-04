@@ -1,109 +1,86 @@
 #!/usr/bin/env node
+import { Config } from "./Config";
 import { Konflikt } from "./Konflikt";
 import { LogLevel, debug, error, log, setConsoleLevel, setLogFile } from "./Log";
-import { homedir } from "os";
-import fs from "fs";
-import minimist from "minimist";
-import path from "path";
 
-const usage = `Usage: konflikt [options]
+// Handle help and version before config loading
+if (process.argv.includes("--help") || process.argv.includes("-h")) {
+    console.log(`Usage: konflikt [options]
 Options:
-  --help, -h       Show this help message
-  --version        Show version number
-  --config, -c     Path to config file (default: ~/.config/Konflikt/config.json)
-  --verbose, -v    Increase verbosity (use -v for debug, -vv for verbose)
-  --silent         Suppress all console output
-  --log-file       Path to log file
-`;
+  --help, -h                Show this help message
+  --version                 Show version number
+  --config, -c              Path to config file
+  --log-level               Log level (silent, error, log, debug, verbose)
+  --log-file                Path to log file
+  --port                    WebSocket server port
+  --host                    Host to bind server to
+  --role                    Instance role (server, client, peer)
+  --instance-id             Unique instance identifier
+  --instance-name           Human-readable instance name
+  --screen-x                Screen X position
+  --screen-y                Screen Y position
+  --screen-width            Screen width in pixels
+  --screen-height           Screen height in pixels
+  --server-host             Server host to connect to (client mode)
+  --server-port             Server port to connect to (client mode)
+  --discovery               Enable service discovery
+  --service-name            Service name for mDNS advertising
+  --dev                     Enable development mode
+  --mock-input              Mock input events for testing
+`);
+    process.exit(0);
+}
 
-const args = minimist(process.argv.slice(2), {
-    string: ["config", "log-file", "verbose"],
-    boolean: ["help", "version", "silent"],
-    alias: {
-        h: "help",
-        c: "config",
-        v: "verbose"
-    },
-    unknown: (arg: string) => {
-        if (arg.startsWith("-")) {
-            // We can't check verbosityLevel here yet since it's set after parsing
-            // So we temporarily store the error and handle it later
-            console.error(usage);
-            console.error(`Unknown argument: ${arg}`);
-            process.exit(1);
-        }
-        return true;
-    }
-});
+if (process.argv.includes("--version")) {
+    console.log("Konflikt version 0.1.0");
+    process.exit(0);
+}
 
-// Count verbose flags - minimist gives us array of empty strings for repeated flags
-const verboseCount = Array.isArray(args.verbose) ? args.verbose.length : args.verbose === "" ? 1 : 0;
+// Load configuration with CLI argument overrides
+let config: Config;
+try {
+    config = Config.findAndLoadConfig();
+} catch (err) {
+    console.error("Failed to load configuration:", err);
+    process.exit(1);
+}
 
-// Handle verbosity first, before any output
-let verbosityLevel: LogLevel = LogLevel.Log;
-
-if (args.silent) {
-    verbosityLevel = LogLevel.Silent;
-} else {
-    if (verboseCount === 1) {
+// Set up logging based on config
+const logLevel = config.get("logging.level");
+let verbosityLevel: LogLevel;
+switch (logLevel) {
+    case "silent":
+        verbosityLevel = LogLevel.Silent;
+        break;
+    case "error":
+        verbosityLevel = LogLevel.Error;
+        break;
+    case "log":
+        verbosityLevel = LogLevel.Log;
+        break;
+    case "debug":
         verbosityLevel = LogLevel.Debug;
-    } else if (verboseCount >= 2) {
+        break;
+    case "verbose":
         verbosityLevel = LogLevel.Verbose;
-    }
+        break;
+    default:
+        verbosityLevel = LogLevel.Log;
 }
 
 setConsoleLevel(verbosityLevel);
 
-// Handle help
-if (args.help) {
-    if (verbosityLevel !== LogLevel.Silent) {
-        console.log(usage);
-    }
-    process.exit(0);
-}
-
-// Handle version
-if (args.version) {
-    if (verbosityLevel !== LogLevel.Silent) {
-        console.log("Konflikt version 0.1.0");
-    }
-    process.exit(0);
-}
-
-// Reject non-option arguments
-if (args._.length > 0) {
-    if (verbosityLevel !== LogLevel.Silent) {
-        console.error(usage);
-        console.error(`Unexpected arguments: ${args._.join(" ")}`);
-    }
-    process.exit(1);
-}
-
-// Handle config path
-let configPath: string | undefined = args.config;
-if (!configPath) {
-    configPath = path.join(homedir(), ".config", "Konflikt", "config.json");
-    if (!fs.existsSync(configPath)) {
-        configPath = undefined;
-    }
-} else if (!fs.existsSync(configPath)) {
-    if (verbosityLevel !== LogLevel.Silent) {
-        console.error(usage);
-        console.error(`Config file not found: ${configPath}`);
-    }
-    process.exit(1);
-}
-
-// Handle log file
-if (args["log-file"]) {
-    setLogFile(args["log-file"]);
+// Set log file if configured
+const logFile = config.get("logging.file");
+if (logFile && typeof logFile === "string") {
+    setLogFile(logFile);
 }
 
 
 let konflikt: Konflikt;
 async function main(): Promise<void> {
     try {
-        konflikt = new Konflikt(configPath);
+        konflikt = new Konflikt(config);
         await konflikt.init();
 
         // Keep the process running
@@ -120,7 +97,6 @@ async function main(): Promise<void> {
             process.exit(0);
         });
     } catch (e: unknown) {
-        error(usage);
         error("Error initializing Konflikt:", e);
         process.exit(1);
     }

@@ -119,7 +119,7 @@ public:
 
     void shutdown() override
     {
-        stop_listening();
+        stopListening();
 
         if (mXkbState) {
             xkb_state_unref(mXkbState);
@@ -142,7 +142,7 @@ public:
         }
     }
 
-    State get_state() const override
+    State getState() const override
     {
         State state {};
 
@@ -160,33 +160,33 @@ public:
 
             // Parse button mask
             if (reply->mask & XCB_BUTTON_MASK_1) {
-                state.mouse_buttons |= ToUInt32(MouseButton::Left);
+                state.mouseButtons |= toUInt32(MouseButton::Left);
             }
             if (reply->mask & XCB_BUTTON_MASK_3) {
-                state.mouse_buttons |= ToUInt32(MouseButton::Right);
+                state.mouseButtons |= toUInt32(MouseButton::Right);
             }
             if (reply->mask & XCB_BUTTON_MASK_2) {
-                state.mouse_buttons |= ToUInt32(MouseButton::Middle);
+                state.mouseButtons |= toUInt32(MouseButton::Middle);
             }
 
             // Parse modifier mask
             if (reply->mask & XCB_MOD_MASK_SHIFT) {
-                state.keyboard_modifiers |= ToUInt32(KeyboardModifier::LeftShift);
+                state.keyboardModifiers |= toUInt32(KeyboardModifier::LeftShift);
             }
             if (reply->mask & XCB_MOD_MASK_CONTROL) {
-                state.keyboard_modifiers |= ToUInt32(KeyboardModifier::LeftControl);
+                state.keyboardModifiers |= toUInt32(KeyboardModifier::LeftControl);
             }
             if (reply->mask & XCB_MOD_MASK_1) { // Alt
-                state.keyboard_modifiers |= ToUInt32(KeyboardModifier::LeftAlt);
+                state.keyboardModifiers |= toUInt32(KeyboardModifier::LeftAlt);
             }
             if (reply->mask & XCB_MOD_MASK_4) { // Super
-                state.keyboard_modifiers |= ToUInt32(KeyboardModifier::LeftSuper);
+                state.keyboardModifiers |= toUInt32(KeyboardModifier::LeftSuper);
             }
             if (reply->mask & XCB_MOD_MASK_LOCK) { // Caps Lock
-                state.keyboard_modifiers |= ToUInt32(KeyboardModifier::CapsLock);
+                state.keyboardModifiers |= toUInt32(KeyboardModifier::CapsLock);
             }
             if (reply->mask & XCB_MOD_MASK_2) { // Num Lock
-                state.keyboard_modifiers |= ToUInt32(KeyboardModifier::NumLock);
+                state.keyboardModifiers |= toUInt32(KeyboardModifier::NumLock);
             }
 
             free(reply);
@@ -195,7 +195,7 @@ public:
         return state;
     }
 
-    Desktop get_desktop() const override
+    Desktop getDesktop() const override
     {
         Desktop desktop {};
 
@@ -209,7 +209,7 @@ public:
         return desktop;
     }
 
-    void send_mouse_event(const Event &event) override
+    void sendMouseEvent(const Event &event) override
     {
         if (!mConnection) {
             return;
@@ -221,13 +221,13 @@ public:
                 break;
 
             case EventType::MousePress: {
-                uint8_t button = ButtonFromMouseButton(event.button);
+                uint8_t button = buttonFromMouseButton(event.button);
                 xcb_test_fake_input(mConnection, XCB_BUTTON_PRESS, button, XCB_CURRENT_TIME, XCB_NONE, 0, 0, 0);
                 break;
             }
 
             case EventType::MouseRelease: {
-                uint8_t button = ButtonFromMouseButton(event.button);
+                uint8_t button = buttonFromMouseButton(event.button);
                 xcb_test_fake_input(mConnection, XCB_BUTTON_RELEASE, button, XCB_CURRENT_TIME, XCB_NONE, 0, 0, 0);
                 break;
             }
@@ -239,7 +239,7 @@ public:
         xcb_flush(mConnection);
     }
 
-    void send_key_event(const Event &event) override
+    void sendKeyEvent(const Event &event) override
     {
         if (!mConnection) {
             return;
@@ -250,7 +250,7 @@ public:
         xcb_flush(mConnection);
     }
 
-    void start_listening() override
+    void startListening() override
     {
         if (mIsRunning) {
             return;
@@ -259,11 +259,11 @@ public:
         mIsRunning = true;
 
         mListenerThread = std::thread([this]() {
-            RunEventLoop();
+            runEventLoop();
         });
     }
 
-    void stop_listening() override
+    void stopListening() override
     {
         if (!mIsRunning) {
             return;
@@ -278,7 +278,7 @@ public:
     }
 
 private:
-    static uint8_t ButtonFromMouseButton(MouseButton button)
+    static uint8_t buttonFromMouseButton(MouseButton button)
     {
         switch (button) {
             case MouseButton::Left: return XCB_BUTTON_INDEX_1;
@@ -288,7 +288,7 @@ private:
         }
     }
 
-    static MouseButton MouseButtonFromButton(uint32_t button)
+    static MouseButton mouseButtonFromButton(uint32_t button)
     {
         switch (button) {
             case XCB_BUTTON_INDEX_1: return MouseButton::Left;
@@ -298,7 +298,7 @@ private:
         }
     }
 
-    void RunEventLoop()
+    void runEventLoop()
     {
         if (!mConnection) {
             mLogger.error("No connection in event loop");
@@ -312,11 +312,11 @@ private:
         {
             xcb_input_event_mask_t header;
             uint32_t mask;
-        } event_mask;
+        } eventMask;
 
-        event_mask.header.deviceid = XCB_INPUT_DEVICE_ALL_MASTER;
-        event_mask.header.mask_len = 1;
-        event_mask.mask            = XCB_INPUT_XI_EVENT_MASK_RAW_KEY_PRESS |
+        eventMask.header.deviceid = XCB_INPUT_DEVICE_ALL_MASTER;
+        eventMask.header.mask_len = 1;
+        eventMask.mask            = XCB_INPUT_XI_EVENT_MASK_RAW_KEY_PRESS |
             XCB_INPUT_XI_EVENT_MASK_RAW_KEY_RELEASE |
             XCB_INPUT_XI_EVENT_MASK_RAW_BUTTON_PRESS |
             XCB_INPUT_XI_EVENT_MASK_RAW_BUTTON_RELEASE |
@@ -326,7 +326,7 @@ private:
             mConnection,
             mScreen->root,
             1,
-            &event_mask.header);
+            &eventMask.header);
 
         xcb_generic_error_t *error = xcb_request_check(mConnection, cookie);
         if (error) {
@@ -363,7 +363,7 @@ private:
                 xcb_ge_generic_event_t *ge = reinterpret_cast<xcb_ge_generic_event_t *>(event);
 
                 if (ge->extension == mXinputOpcode) {
-                    ProcessXInputEvent(ge);
+                    processXInputEvent(ge);
                 }
             }
 
@@ -374,23 +374,23 @@ private:
         mIsRunning = false;
     }
 
-    void ProcessXInputEvent(xcb_ge_generic_event_t *ge)
+    void processXInputEvent(xcb_ge_generic_event_t *ge)
     {
-        if (!event_callback) {
+        if (!eventCallback) {
             return;
         }
 
         Event event {};
-        event.timestamp = GetTimestamp();
-        event.state     = get_state();
+        event.timestamp = timestamp();
+        event.state     = getState();
 
-        bool should_dispatch = false;
+        bool shouldDispatch = false;
 
         switch (ge->event_type) {
             case XCB_INPUT_RAW_KEY_PRESS: {
-                auto *key_event = reinterpret_cast<xcb_input_raw_key_press_event_t *>(ge);
+                auto *keyEvent = reinterpret_cast<xcb_input_raw_key_press_event_t *>(ge);
                 event.type      = EventType::KeyPress;
-                event.keycode   = key_event->detail;
+                event.keycode   = keyEvent->detail;
 
                 // Get text representation using xkbcommon
                 if (mXkbState) {
@@ -406,14 +406,14 @@ private:
                     xkb_state_update_key(mXkbState, event.keycode, XKB_KEY_DOWN);
                 }
 
-                should_dispatch = true;
+                shouldDispatch = true;
                 break;
             }
 
             case XCB_INPUT_RAW_KEY_RELEASE: {
-                auto *key_event = reinterpret_cast<xcb_input_raw_key_release_event_t *>(ge);
+                auto *keyEvent = reinterpret_cast<xcb_input_raw_key_release_event_t *>(ge);
                 event.type      = EventType::KeyRelease;
-                event.keycode   = key_event->detail;
+                event.keycode   = keyEvent->detail;
 
                 // Get text representation using xkbcommon
                 if (mXkbState) {
@@ -429,39 +429,39 @@ private:
                     xkb_state_update_key(mXkbState, event.keycode, XKB_KEY_UP);
                 }
 
-                should_dispatch = true;
+                shouldDispatch = true;
                 break;
             }
 
             case XCB_INPUT_RAW_BUTTON_PRESS: {
-                auto *button_event = reinterpret_cast<xcb_input_raw_button_press_event_t *>(ge);
-                uint32_t button    = button_event->detail;
+                auto *buttonEvent = reinterpret_cast<xcb_input_raw_button_press_event_t *>(ge);
+                uint32_t button    = buttonEvent->detail;
 
                 // Filter out scroll wheel events (buttons 4-7)
                 if (button >= XCB_BUTTON_INDEX_1 && button <= XCB_BUTTON_INDEX_3) {
                     event.type      = EventType::MousePress;
-                    event.button    = MouseButtonFromButton(button);
-                    should_dispatch = true;
+                    event.button    = mouseButtonFromButton(button);
+                    shouldDispatch = true;
                 }
                 break;
             }
 
             case XCB_INPUT_RAW_BUTTON_RELEASE: {
-                auto *button_event = reinterpret_cast<xcb_input_raw_button_release_event_t *>(ge);
-                uint32_t button    = button_event->detail;
+                auto *buttonEvent = reinterpret_cast<xcb_input_raw_button_release_event_t *>(ge);
+                uint32_t button    = buttonEvent->detail;
 
                 // Filter out scroll wheel events (buttons 4-7)
                 if (button >= XCB_BUTTON_INDEX_1 && button <= XCB_BUTTON_INDEX_3) {
                     event.type      = EventType::MouseRelease;
-                    event.button    = MouseButtonFromButton(button);
-                    should_dispatch = true;
+                    event.button    = mouseButtonFromButton(button);
+                    shouldDispatch = true;
                 }
                 break;
             }
 
             case XCB_INPUT_RAW_MOTION: {
                 event.type      = EventType::MouseMove;
-                should_dispatch = true;
+                shouldDispatch = true;
                 break;
             }
 
@@ -469,8 +469,8 @@ private:
                 break;
         }
 
-        if (should_dispatch) {
-            event_callback(event);
+        if (shouldDispatch) {
+            eventCallback(event);
         }
     }
 
@@ -489,7 +489,7 @@ private:
     std::atomic<bool> mIsRunning { false };
 };
 
-std::unique_ptr<IPlatformHook> CreatePlatformHook()
+std::unique_ptr<IPlatformHook> createPlatformHook()
 {
     return std::make_unique<XCBHook>();
 }

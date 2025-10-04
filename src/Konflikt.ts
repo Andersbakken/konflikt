@@ -1,7 +1,7 @@
-import { Config } from "./Config.js";
 import { KonfliktNative as KonfliktNativeConstructor } from "./native.js";
 import { Server } from "./Server.js";
 import { createNativeLogger, verbose } from "./Log";
+import type { Config } from "./Config.js";
 import type {
     KonfliktKeyPressEvent,
     KonfliktKeyReleaseEvent,
@@ -16,8 +16,8 @@ export class Konflikt {
     #native: KonfliktNative;
     #server: Server;
 
-    constructor(configPath?: string) {
-        this.#config = new Config(configPath);
+    constructor(config: Config) {
+        this.#config = config;
         this.#native = new KonfliktNativeConstructor(createNativeLogger());
         this.#server = new Server();
 

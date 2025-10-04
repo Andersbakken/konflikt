@@ -1,0 +1,13 @@
+{
+  "instance": {
+    "name": "test-instance",
+    "role": "server"
+  },
+  "network": {
+    "port": 3001,
+    "host": "127.0.0.1"
+  },
+  "logging": {
+    "level": "debug"
+  }
+}

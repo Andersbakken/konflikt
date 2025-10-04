@@ -6,8 +6,8 @@ const buildType =
 
 // Load the native module
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const nativeModule = require(`build/${buildType}/konflikt_native.node`) as {
-    KonfliktNative: new (logger?: NativeLoggerCallbacks) => IKonfliktNative;
+const nativeModule = require(`./build/${buildType}/konflikt_native.node`) as {
+    KonfliktNative: new (logger: NativeLoggerCallbacks) => IKonfliktNative;
 };
 
 export const { KonfliktNative } = nativeModule;
