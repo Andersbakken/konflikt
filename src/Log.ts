@@ -14,6 +14,7 @@ export const enum LogLevel {
 // Global logger state
 let logFile: fs.WriteStream | undefined;
 let consoleLevel: LogLevel = LogLevel.Log;
+let consolePromptHandler: (() => void) | undefined;
 
 // Initialize default log file
 const logDir = path.join(homedir(), ".config", "Konflikt");
@@ -41,6 +42,10 @@ export function setLogFile(filePath: string): void {
     }
 }
 
+export function setConsolePromptHandler(handler: (() => void) | undefined): void {
+    consolePromptHandler = handler;
+}
+
 function formatMessage(level: string, args: unknown[]): string {
     const timestamp = new Date().toISOString();
     const message = format(...args);
@@ -61,7 +66,15 @@ function doLog(
 
     // Write to console if level is sufficient
     if (level >= consoleLevel) {
-        consoleMethod(...args);
+        if (consolePromptHandler) {
+            // Clear prompt, log message, restore prompt
+            process.stdout.clearLine(0);
+            process.stdout.cursorTo(0);
+            consoleMethod(...args);
+            consolePromptHandler();
+        } else {
+            consoleMethod(...args);
+        }
     }
 }
 

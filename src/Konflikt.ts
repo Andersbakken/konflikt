@@ -16,7 +16,7 @@ export class Konflikt {
     #config: Config;
     #native: KonfliktNative;
     #server: Server;
-    #console: Console | null = null;
+    #console: Console | undefined;
 
     constructor(config: Config) {
         this.#config = config;
@@ -47,26 +47,36 @@ export class Konflikt {
         return this.#server;
     }
 
-    get console(): Console | null {
+    get console(): Console | undefined {
         return this.#console;
     }
 
     async init(): Promise<void> {
         verbose("Initializing Konflikt...", this.#config);
+        
+        // Pass config to server for console commands
+        this.#server.setConfig(this.#config);
+        
         await this.#server.start();
         
-        // Start console if stdin is interactive TTY
-        try {
-            if (process.stdin.isTTY && process.stdout.isTTY) {
-                this.#console = new Console(this);
-                this.#console.start();
-            } else {
-                verbose("Non-interactive environment detected, console disabled");
+        // Start console based on configuration
+        const consoleConfig = this.#config.console;
+        if (consoleConfig === true) {
+            try {
+                if (process.stdin.isTTY && process.stdout.isTTY) {
+                    this.#console = new Console(this);
+                    this.#console.start();
+                } else {
+                    verbose("Non-interactive environment detected, console disabled");
+                }
+            } catch (err) {
+                verbose("Console initialization failed:", err);
+                // Continue without console
             }
-        } catch (err) {
-            verbose("Console initialization failed:", err);
-            // Continue without console
+        } else if (consoleConfig === false) {
+            verbose("Console disabled by configuration");
         }
+        // Remote console mode is handled in index.ts and doesn't reach here
     }
 
     // eslint-disable-next-line class-methods-use-this

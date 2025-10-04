@@ -1,8 +1,11 @@
+import { ServerConsole } from "./ServerConsole";
 import { ServiceDiscovery } from "./ServiceDiscovery";
 import { debug, error, log, verbose } from "./Log";
 import Fastify from "fastify";
 import WebSocket from "ws";
+import type { Config } from "./Config";
 import type { DiscoveredService } from "./DiscoveredService";
+import type { Duplex } from "stream";
 import type { FastifyInstance, FastifyListenOptions } from "fastify";
 import type { IncomingMessage } from "http";
 
@@ -15,6 +18,7 @@ export class Server {
     #instanceName: string;
     #version: string;
     #capabilities: string[];
+    #console: ServerConsole;
 
     constructor(
         readonly port: number = 3000,
@@ -74,14 +78,27 @@ export class Server {
         this.#fastify = Fastify({ logger: customLogger });
         this.#wss = new WebSocket.WebSocketServer({ noServer: true });
         this.#serviceDiscovery = new ServiceDiscovery();
+        this.#console = new ServerConsole(
+            this.port,
+            this.#instanceId,
+            this.#instanceName,
+            this.#version,
+            this.#capabilities
+        );
 
         this.#setupWebSocket();
         this.#setupServiceDiscovery();
+        this.#setupUpgradeHandling();
     }
 
     /** Get service discovery instance for external access */
     get serviceDiscovery(): ServiceDiscovery {
         return this.#serviceDiscovery;
+    }
+
+    /** Set config for console commands */
+    setConfig(config: Config): void {
+        this.#console.setConfig(config);
     }
 
     /** Start server */
@@ -153,71 +170,50 @@ export class Server {
         });
     }
 
-    // /** Setup WebSocket server events */
+    /** Setup WebSocket server events */
     #setupWebSocket(): void {
         this.#wss.on("connection", (socket: WebSocket, req: IncomingMessage) => {
             debug(`WebSocket connection opened from ${req.socket.remoteAddress} to ${req.url}`);
 
-            socket.on("message", (_raw: WebSocket.RawData) => {
-                // let text: string;
-                // if (raw instanceof Buffer) {
-                //     text = raw.toString("utf-8");
-                // } else if (raw instanceof ArrayBuffer) {
-                //     text = Buffer.from(raw).toString("utf-8");
-                // } else {
-                //     assert(Array.isArray(raw));
-                //     text = Buffer.concat(...raw).toString("utf-8");
-                // }
-                // this.#fastify.log.info({ msg: text }, "Received WS message");
-                // // Try JSON echo
-                // try {
-                //     const parsed: unknown = JSON.parse(text);
-                //     if (typeof parsed === "object" && parsed && "type" in parsed && parsed.type === "echo") {
-                //         socket.send(JSON.stringify({ type: "echo", data: ("data" in parsed ? parsed.data : undefined }));
-                //         return;
-                //     }
-                // } catch {
-                //     // ignore parse error, just broadcast text
-                // }
-                // // Broadcast to all clients
-                // this.wss.clients.forEach((client) => {
-                //     const c = client as HeartbeatWebSocket;
-                //     if (c.readyState === WebSocket.OPEN) {
-                //         c.send(
-                //             JSON.stringify({
-                //                 from: req.socket.remoteAddress,
-                //                 message: text
-                //             })
-                //         );
-                //     }
-                // });
-            });
+            // Check if this is a console connection
+            const isConsoleConnection = req.url?.startsWith("/console");
 
-            socket.on("close", () => {
-                // this.#fastify.log.info("WebSocket connection closed");
-            });
-
-            socket.on("error", (_err: Error) => {
-                // this.#fastify.log.error(err, "WebSocket error");
-            });
-
-            // Welcome message
-            // socket.send(JSON.stringify({ type: "welcome", message: "connected to /ws" }));
+            if (isConsoleConnection) {
+                this.#console.handleConsoleConnection(socket, req, this.#wss);
+            } else {
+                this.#handleRegularConnection(socket, req);
+            }
         });
     }
 
-    // #setupUpgradeHandling(): void {
-    //     this.#fastify.server.on("upgrade", (request, socket, head) => {
-    //         if (request.url?.startsWith("/ws")) {
-    //             this.wss.handleUpgrade(request, socket, head, (ws) => {
-    //                 this.wss.emit("connection", ws, request);
-    //             });
-    //         } else {
-    //             socket.write("HTTP/1.1 400 Bad Request\r\n\r\n");
-    //             socket.destroy();
-    //         }
-    //     });
-    // }
+    #handleRegularConnection(socket: WebSocket, req: IncomingMessage): void {
+        verbose(`Handling regular WS connection from ${req.socket.remoteAddress}`, typeof this);
+        socket.on("message", (_raw: WebSocket.RawData) => {
+            // TODO: Add message handling logic when needed
+        });
+
+        socket.on("close", () => {
+            // TODO: Handle connection close
+        });
+
+        socket.on("error", (_err: Error) => {
+            // TODO: Handle connection error
+        });
+    }
+
+    #setupUpgradeHandling(): void {
+        this.#fastify.server.on("upgrade", (request: IncomingMessage, socket: Duplex, head: Buffer): void => {
+            const url = request.url || "";
+            if (url.startsWith("/ws") || url.startsWith("/console")) {
+                this.#wss.handleUpgrade(request, socket, head, (ws: WebSocket): void => {
+                    this.#wss.emit("connection", ws, request);
+                });
+            } else {
+                socket.write("HTTP/1.1 400 Bad Request\\r\\n\\r\\n");
+                socket.destroy();
+            }
+        });
+    }
 
     // #startHeartbeat(): void {
     //     const intervalMs = 30_000;

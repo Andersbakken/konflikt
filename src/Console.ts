@@ -1,4 +1,5 @@
 import { createInterface } from "readline";
+import { setConsolePromptHandler } from "./Log";
 import type { Config } from "./Config";
 import type { Konflikt } from "./Konflikt";
 
@@ -27,12 +28,19 @@ export class Console {
     }
 
     start(): void {
+        // Register this console's prompt handler with the logger
+        setConsolePromptHandler(() => {
+            this.#readline.prompt(true);
+        });
+        
         // Clear any existing output and show console startup message
         process.stdout.write('\n');
         this.#consoleLog("Interactive console started. Type 'help' for available commands.");
     }
 
     stop(): void {
+        // Unregister the prompt handler
+        setConsolePromptHandler(undefined);
         this.#readline.close();
     }
 

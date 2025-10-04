@@ -200,6 +200,18 @@ export class Config {
         return mock ?? false;
     }
 
+    // Console configuration
+    get console(): boolean | string {
+        const value = this.#string("console.enabled");
+        if (value === "false") {
+            return false;
+        }
+        if (value === "true" || value === null) {
+            return true;
+        }
+        return value; // host:port string
+    }
+
     getAll(): ConfigType {
         return this.#convictConfig.getProperties();
     }
@@ -323,55 +335,87 @@ export class Config {
     }
 
     #manuallyParseImportantArgs(args: string[]): void {
-        for (let i = 0; i < args.length - 1; i++) {
+        for (let i = 0; i < args.length; i++) {
             const arg = args[i] as string | undefined;
-            const value = args[i + 1];
 
-            // Skip if the next arg looks like another option
-            if (value?.startsWith("-")) {
+            if (!arg) {
                 continue;
             }
 
-            switch (arg) {
-                case "--port":
-                    if (value) {
-                        this.#set("network.port", parseInt(value, 10));
-                        debug(`CLI override: port = ${parseInt(value, 10)}`);
-                    }
-                    break;
-                case "--host":
-                    if (value) {
-                        this.#set("network.host", value);
-                        debug(`CLI override: host = ${value}`);
-                    }
-                    break;
-                case "--role":
-                    if (value) {
-                        this.#set("instance.role", value);
-                        debug(`CLI override: role = ${value}`);
-                    }
-                    break;
-                case "--log-level":
-                    if (value) {
-                        this.#set("logging.level", value);
-                        debug(`CLI override: log-level = ${value}`);
-                    }
-                    break;
-                case "--log-file":
-                    if (value) {
-                        this.#set("logging.file", value);
-                        debug(`CLI override: log-file = ${value}`);
-                    }
-                    break;
-                case "--dev":
-                    this.#set("development.enabled", true);
-                    debug(`CLI override: dev = true`);
-                    break;
-                case undefined:
-                default:
-                    // Ignore unknown arguments
-                    break;
+            // Handle --arg=value syntax
+            if (arg.includes("=")) {
+                const [argName, argValue] = arg.split("=", 2);
+                this.#handleArgument(argName as string, argValue as string);
+                continue;
             }
+
+            // Handle --arg value syntax
+            const value = args[i + 1];
+
+            // Skip if the next arg looks like another option (except for flags)
+            if (value?.startsWith("-") && !Config.#isFlagArgument(arg)) {
+                continue;
+            }
+
+            this.#handleArgument(arg, value);
+            if (!Config.#isFlagArgument(arg) && value) {
+                ++i; // Skip next value since we consumed it
+            }
+        }
+    }
+
+    #handleArgument(arg: string, value?: string): void {
+        switch (arg) {
+            case "--port":
+                if (value) {
+                    this.#set("network.port", parseInt(value, 10));
+                    debug(`CLI override: port = ${parseInt(value, 10)}`);
+                }
+                break;
+            case "--host":
+                if (value) {
+                    this.#set("network.host", value);
+                    debug(`CLI override: host = ${value}`);
+                }
+                break;
+            case "--role":
+                if (value) {
+                    this.#set("instance.role", value);
+                    debug(`CLI override: role = ${value}`);
+                }
+                break;
+            case "--log-level":
+                if (value) {
+                    this.#set("logging.level", value);
+                    debug(`CLI override: log-level = ${value}`);
+                }
+                break;
+            case "--log-file":
+                if (value) {
+                    this.#set("logging.file", value);
+                    debug(`CLI override: log-file = ${value}`);
+                }
+                break;
+            case "--dev":
+                this.#set("development.enabled", true);
+                debug(`CLI override: dev = true`);
+                break;
+            case "--console":
+                if (value && value !== "true") {
+                    this.#set("console.enabled", value);
+                    debug(`CLI override: console = ${value}`);
+                } else {
+                    this.#set("console.enabled", "true");
+                    debug(`CLI override: console = true`);
+                }
+                break;
+            case "--no-console":
+                this.#set("console.enabled", "false");
+                debug(`CLI override: no-console = true`);
+                break;
+            default:
+                // Ignore unknown arguments
+                break;
         }
     }
 
@@ -403,6 +447,10 @@ export class Config {
             const finalInstanceId = this.#get("instance.id");
             this.#set("screen.id", `screen-${finalInstanceId}`);
         }
+    }
+
+    static #isFlagArgument(arg: string): boolean {
+        return ["--dev", "--no-console"].includes(arg);
     }
 
     static #expandShortOptions(args: string[]): string[] {

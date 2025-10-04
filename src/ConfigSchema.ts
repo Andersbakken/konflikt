@@ -30,7 +30,8 @@ const CLI_ARGS = {
     "log-level": { path: "logging.level", short: "-l" },
     "log-file": { path: "logging.file", short: "-f" },
     dev: { path: "development.enabled", short: "-d" },
-    "mock-input": { path: "development.mockInput" }
+    "mock-input": { path: "development.mockInput" },
+    "console": { path: "console.enabled" }
 } as const;
 
 // Generate short option mappings from CLI_ARGS
@@ -345,6 +346,17 @@ export const configSchema = convict.default({
             default: false,
             env: "KONFLIKT_MOCK_INPUT",
             arg: argForPath("development.mockInput")
+        }
+    },
+
+    // Console configuration
+    console: {
+        enabled: {
+            doc: "Console mode: true=enabled, false=disabled, or host[:port] for remote console",
+            format: "nullable-string",
+            default: "true",
+            env: "KONFLIKT_CONSOLE",
+            arg: argForPath("console.enabled")
         }
     }
 });

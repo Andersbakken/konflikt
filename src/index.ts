@@ -2,6 +2,7 @@
 import { Config } from "./Config";
 import { Konflikt } from "./Konflikt";
 import { LogLevel, debug, error, log, setConsoleLevel, setLogFile } from "./Log";
+import { startRemoteConsole } from "./startRemoteConsole";
 
 // Handle help and version before config loading
 if (process.argv.includes("--help") || process.argv.includes("-h")) {
@@ -28,6 +29,8 @@ Options:
   --topology, -t            Cluster topology (automatic, star, mesh)
   --dev, -d                 Enable development mode
   --mock-input              Mock input events for testing
+  --console                 Enable console (default), or connect to remote host[:port]
+  --no-console              Disable console interface
 `);
     process.exit(0);
 }
@@ -44,6 +47,20 @@ try {
 } catch (err) {
     console.error("Failed to load configuration:", err);
     process.exit(1);
+}
+
+// Determine console mode
+const consoleConfig = config.console;
+
+// Check if we're in remote console mode
+if (typeof consoleConfig === "string" && consoleConfig !== "true") {
+    startRemoteConsole(consoleConfig).catch((e: unknown) => {
+        console.error("Fatal error starting remote console:", e);
+        process.exit(1);
+    });
+
+    // Exit here - don't start the full Konflikt server
+    process.exit(0);
 }
 
 // Set up logging based on config
