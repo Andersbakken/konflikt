@@ -19,7 +19,11 @@ export class Konflikt {
     constructor(config: Config) {
         this.#config = config;
         this.#native = new KonfliktNativeConstructor(createNativeLogger());
-        this.#server = new Server();
+        this.#server = new Server(
+            config.get("network.port") as number,
+            config.get("instance.id") as string,
+            config.get("instance.name") as string
+        );
 
         this.#native.on("keyPress", this.#onKeyPress.bind(this));
         this.#native.on("keyRelease", this.#onKeyRelease.bind(this));

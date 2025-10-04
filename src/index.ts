@@ -47,32 +47,43 @@ try {
 }
 
 // Set up logging based on config
-const logLevel = config.get("logging.level");
+const logLevel = config.string("logging.level");
 let verbosityLevel: LogLevel;
 switch (logLevel) {
     case "silent":
         verbosityLevel = LogLevel.Silent;
         break;
+
     case "error":
         verbosityLevel = LogLevel.Error;
         break;
+
     case "log":
         verbosityLevel = LogLevel.Log;
         break;
+
     case "debug":
         verbosityLevel = LogLevel.Debug;
         break;
+
     case "verbose":
         verbosityLevel = LogLevel.Verbose;
         break;
-    default:
+
+    case null:
         verbosityLevel = LogLevel.Log;
+        break;
+
+    default:
+        console.error(`Unknown log level "${logLevel}", defaulting to "log"`);
+        process.exit(1);
+        break;
 }
 
 setConsoleLevel(verbosityLevel);
 
 // Set log file if configured
-const logFile = config.get("logging.file");
+const logFile = config.string("logging.file");
 if (logFile && typeof logFile === "string") {
     setLogFile(logFile);
 }

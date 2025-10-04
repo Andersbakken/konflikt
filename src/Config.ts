@@ -24,9 +24,41 @@ export class Config {
         this.validate();
     }
 
-    // Convict accessor methods with support for dot notation
     get(key: string): unknown {
         return this.convictConfig.get(key);
+    }
+
+    string(key: string): string | null {
+        const value = this.get(key);
+        if (value === null) {
+            return null;
+        }
+        if (typeof value === "string") {
+            return value;
+        }
+        throw new Error(`Config key '${key}' is not a string`);
+    }
+
+    integer(key: string): number | null {
+        const value = this.get(key);
+        if (value === null) {
+            return null;
+        }
+        if (typeof value === "number" && Number.isInteger(value)) {
+            return value;
+        }
+        throw new Error(`Config key '${key}' is not an integer`);
+    }
+
+    number(key: string): number | null {
+        const value = this.get(key);
+        if (value === null) {
+            return null;
+        }
+        if (typeof value === "number") {
+            return value;
+        }
+        throw new Error(`Config key '${key}' is not a number`);
     }
 
     set(key: string, value: unknown): void {
