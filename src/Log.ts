@@ -53,10 +53,9 @@ function doLog(
     consoleMethod: (...args: unknown[]) => void,
     ...args: unknown[]
 ): void {
-    const formatted = formatMessage(levelName, args);
-
     // Write to log file if available
     if (logFile) {
+        const formatted = formatMessage(levelName, args);
         logFile.write(formatted + "\n");
     }
 

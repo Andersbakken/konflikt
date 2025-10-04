@@ -10,7 +10,7 @@ The Konflikt native module is a C++20 N-API addon that provides low-level keyboa
 native/
 ├── CMakeLists.txt          # Build configuration
 ├── include/
-│   └── konflikt_native.hpp # Public API and interfaces
+│   └── konflikt_native.h   # Public API and interfaces
 └── src/
     ├── konflikt_native.cpp # N-API bindings
     ├── platform_macos.cpp  # macOS implementation

@@ -11,22 +11,36 @@ export class Server {
     #wss: WebSocket.WebSocketServer;
     #heartbeatInterval: ReturnType<typeof setInterval> | undefined = undefined;
     #serviceDiscovery: ServiceDiscovery;
+    #instanceId: string;
+    #instanceName: string;
+    #version: string;
+    #capabilities: string[];
 
-    constructor(readonly port: number = 3000) {
+    constructor(
+        readonly port: number = 3000,
+        instanceId?: string,
+        instanceName?: string,
+        version: string = "1.0.0",
+        capabilities: string[] = ["input_events", "state_sync"]
+    ) {
+        this.#instanceId = instanceId || crypto.randomUUID();
+        this.#instanceName = instanceName || `konflikt-${process.pid}`;
+        this.#version = version;
+        this.#capabilities = capabilities;
         // Create a custom logger that integrates with our logging system
         const customLogger = {
-            level: 'debug',
+            level: "debug",
             stream: {
                 write: (msg: string): void => {
                     // Fastify logs are JSON, try to parse and format them nicely
                     try {
                         const logEntry = JSON.parse(msg.trim());
                         const level = logEntry.level;
-                        const message = logEntry.msg || '';
+                        const message = logEntry.msg || "";
                         const method = logEntry.reqId ? logEntry.method : undefined;
                         const url = logEntry.reqId ? logEntry.url : undefined;
                         const statusCode = logEntry.res ? logEntry.res.statusCode : undefined;
-                        
+
                         let logMessage = message;
                         if (method && url) {
                             logMessage = `${method} ${url}`;
@@ -34,15 +48,19 @@ export class Server {
                                 logMessage += ` - ${statusCode}`;
                             }
                         }
-                        
+
                         // Map Pino levels to our log levels
-                        if (level <= 20) { // trace/debug
+                        if (level <= 20) {
+                            // trace/debug
                             verbose(`[Fastify] ${logMessage}`);
-                        } else if (level <= 30) { // info
+                        } else if (level <= 30) {
+                            // info
                             debug(`[Fastify] ${logMessage}`);
-                        } else if (level <= 40) { // warn
+                        } else if (level <= 40) {
+                            // warn
                             log(`[Fastify] ${logMessage}`);
-                        } else { // error/fatal
+                        } else {
+                            // error/fatal
                             error(`[Fastify] ${logMessage}`);
                         }
                     } catch {
@@ -57,10 +75,8 @@ export class Server {
         this.#wss = new WebSocket.WebSocketServer({ noServer: true });
         this.#serviceDiscovery = new ServiceDiscovery();
 
-        // this.#registerRoutes();
         this.#setupWebSocket();
         this.#setupServiceDiscovery();
-        // this.#setupUpgradeHandling();
     }
 
     /** Get service discovery instance for external access */
@@ -75,7 +91,7 @@ export class Server {
         const opts: FastifyListenOptions = { port: this.port, host: "0.0.0.0" };
         try {
             const addr = await this.#fastify.listen(opts);
-            log(`HTTP listening at ${addr}, WS at ws://localhost:${this.port}/ws`);
+            debug(`HTTP listening at ${addr}, WS at ws://localhost:${this.port}/ws`);
 
             // Start service discovery after server is running
             this.#serviceDiscovery.advertise(this.port);

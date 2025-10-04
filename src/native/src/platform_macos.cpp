@@ -1,38 +1,42 @@
 #ifdef __APPLE__
 
-#include "konflikt_native.hpp"
+#include "konflikt_native.h"
 #include <ApplicationServices/ApplicationServices.h>
 #include <Carbon/Carbon.h>
-#include <thread>
 #include <atomic>
 #include <mutex>
+#include <thread>
 
 namespace konflikt {
 
-class MacOSHook : public IPlatformHook {
+class MacOSHook : public IPlatformHook
+{
 public:
-    MacOSHook() = default;
+    MacOSHook()           = default;
     ~MacOSHook() override = default;
 
-    bool initialize(const Logger& logger) override {
-        mLogger = logger;
-        mEventTap = nullptr;
+    bool initialize(const Logger &logger) override
+    {
+        mLogger        = logger;
+        mEventTap      = nullptr;
         mRunLoopSource = nullptr;
-        mEventLoop = nullptr;
-        mIsRunning = false;
+        mEventLoop     = nullptr;
+        mIsRunning     = false;
         return true;
     }
 
-    void shutdown() override {
+    void shutdown() override
+    {
         stop_listening();
     }
 
-    State get_state() const override {
-        State state{};
+    State get_state() const override
+    {
+        State state {};
 
         // Get mouse position
         CGEventRef event = CGEventCreate(nullptr);
-        CGPoint point = CGEventGetLocation(event);
+        CGPoint point    = CGEventGetLocation(event);
         CFRelease(event);
 
         state.x = static_cast<int32_t>(point.x);
@@ -72,16 +76,18 @@ public:
         return state;
     }
 
-    Desktop get_desktop() const override {
-        Desktop desktop{};
+    Desktop get_desktop() const override
+    {
+        Desktop desktop {};
         CGDirectDisplayID display = CGMainDisplayID();
-        desktop.width = static_cast<int32_t>(CGDisplayPixelsWide(display));
-        desktop.height = static_cast<int32_t>(CGDisplayPixelsHigh(display));
+        desktop.width             = static_cast<int32_t>(CGDisplayPixelsWide(display));
+        desktop.height            = static_cast<int32_t>(CGDisplayPixelsHigh(display));
         return desktop;
     }
 
-    void send_mouse_event(const Event& event) override {
-        CGPoint pos = CGPointMake(event.state.x, event.state.y);
+    void send_mouse_event(const Event &event) override
+    {
+        CGPoint pos             = CGPointMake(event.state.x, event.state.y);
         CGEventSourceRef source = CGEventSourceCreate(kCGEventSourceStateHIDSystemState);
 
         CGEventRef cg_event = nullptr;
@@ -92,14 +98,14 @@ public:
                 break;
             }
             case EventType::MousePress: {
-                CGEventType type = kCGEventLeftMouseDown;
+                CGEventType type     = kCGEventLeftMouseDown;
                 CGMouseButton button = kCGMouseButtonLeft;
 
                 if (event.button == MouseButton::Right) {
-                    type = kCGEventRightMouseDown;
+                    type   = kCGEventRightMouseDown;
                     button = kCGMouseButtonRight;
                 } else if (event.button == MouseButton::Middle) {
-                    type = kCGEventOtherMouseDown;
+                    type   = kCGEventOtherMouseDown;
                     button = kCGMouseButtonCenter;
                 }
 
@@ -107,14 +113,14 @@ public:
                 break;
             }
             case EventType::MouseRelease: {
-                CGEventType type = kCGEventLeftMouseUp;
+                CGEventType type     = kCGEventLeftMouseUp;
                 CGMouseButton button = kCGMouseButtonLeft;
 
                 if (event.button == MouseButton::Right) {
-                    type = kCGEventRightMouseUp;
+                    type   = kCGEventRightMouseUp;
                     button = kCGMouseButtonRight;
                 } else if (event.button == MouseButton::Middle) {
-                    type = kCGEventOtherMouseUp;
+                    type   = kCGEventOtherMouseUp;
                     button = kCGMouseButtonCenter;
                 }
 
@@ -133,10 +139,11 @@ public:
         CFRelease(source);
     }
 
-    void send_key_event(const Event& event) override {
+    void send_key_event(const Event &event) override
+    {
         CGEventSourceRef source = CGEventSourceCreate(kCGEventSourceStateHIDSystemState);
 
-        bool is_down = (event.type == EventType::KeyPress);
+        bool is_down        = (event.type == EventType::KeyPress);
         CGEventRef cg_event = CGEventCreateKeyboardEvent(source, event.keycode, is_down);
 
         if (cg_event) {
@@ -147,7 +154,8 @@ public:
         CFRelease(source);
     }
 
-    void start_listening() override {
+    void start_listening() override
+    {
         if (mIsRunning) {
             return;
         }
@@ -160,7 +168,8 @@ public:
         });
     }
 
-    void stop_listening() override {
+    void stop_listening() override
+    {
         if (!mIsRunning) {
             return;
         }
@@ -192,15 +201,15 @@ private:
         CGEventTapProxy /*proxy*/,
         CGEventType type,
         CGEventRef cg_event,
-        void* user_info
-    ) {
-        auto* hook = static_cast<MacOSHook*>(user_info);
+        void *user_info)
+    {
+        auto *hook = static_cast<MacOSHook *>(user_info);
 
         if (!hook->event_callback) {
             return cg_event;
         }
 
-        Event event{};
+        Event event {};
         event.timestamp = GetTimestamp();
 
         // Get current state
@@ -221,43 +230,43 @@ private:
                 break;
 
             case kCGEventLeftMouseDown:
-                event.type = EventType::MousePress;
+                event.type   = EventType::MousePress;
                 event.button = MouseButton::Left;
                 hook->event_callback(event);
                 break;
 
             case kCGEventLeftMouseUp:
-                event.type = EventType::MouseRelease;
+                event.type   = EventType::MouseRelease;
                 event.button = MouseButton::Left;
                 hook->event_callback(event);
                 break;
 
             case kCGEventRightMouseDown:
-                event.type = EventType::MousePress;
+                event.type   = EventType::MousePress;
                 event.button = MouseButton::Right;
                 hook->event_callback(event);
                 break;
 
             case kCGEventRightMouseUp:
-                event.type = EventType::MouseRelease;
+                event.type   = EventType::MouseRelease;
                 event.button = MouseButton::Right;
                 hook->event_callback(event);
                 break;
 
             case kCGEventOtherMouseDown:
-                event.type = EventType::MousePress;
+                event.type   = EventType::MousePress;
                 event.button = MouseButton::Middle;
                 hook->event_callback(event);
                 break;
 
             case kCGEventOtherMouseUp:
-                event.type = EventType::MouseRelease;
+                event.type   = EventType::MouseRelease;
                 event.button = MouseButton::Middle;
                 hook->event_callback(event);
                 break;
 
             case kCGEventKeyDown: {
-                event.type = EventType::KeyPress;
+                event.type    = EventType::KeyPress;
                 event.keycode = static_cast<uint32_t>(CGEventGetIntegerValueField(cg_event, kCGKeyboardEventKeycode));
 
                 // Try to get the text representation
@@ -265,7 +274,7 @@ private:
                 UniCharCount length = 0;
                 CGEventKeyboardGetUnicodeString(cg_event, 4, &length, chars);
                 if (length > 0) {
-                    event.text = std::string(reinterpret_cast<char*>(chars), length * sizeof(UniChar));
+                    event.text = std::string(reinterpret_cast<char *>(chars), length * sizeof(UniChar));
                 }
 
                 hook->event_callback(event);
@@ -273,7 +282,7 @@ private:
             }
 
             case kCGEventKeyUp: {
-                event.type = EventType::KeyRelease;
+                event.type    = EventType::KeyRelease;
                 event.keycode = static_cast<uint32_t>(CGEventGetIntegerValueField(cg_event, kCGKeyboardEventKeycode));
 
                 // Try to get the text representation
@@ -281,7 +290,7 @@ private:
                 UniCharCount length = 0;
                 CGEventKeyboardGetUnicodeString(cg_event, 4, &length, chars);
                 if (length > 0) {
-                    event.text = std::string(reinterpret_cast<char*>(chars), length * sizeof(UniChar));
+                    event.text = std::string(reinterpret_cast<char *>(chars), length * sizeof(UniChar));
                 }
 
                 hook->event_callback(event);
@@ -295,7 +304,8 @@ private:
         return cg_event;
     }
 
-    void RunEventLoop() {
+    void RunEventLoop()
+    {
         CGEventMask event_mask =
             CGEventMaskBit(kCGEventMouseMoved) |
             CGEventMaskBit(kCGEventLeftMouseDown) |
@@ -316,8 +326,7 @@ private:
             kCGEventTapOptionListenOnly,
             event_mask,
             EventTapCallback,
-            this
-        );
+            this);
 
         if (!mEventTap) {
             mIsRunning = false;
@@ -325,7 +334,7 @@ private:
         }
 
         mRunLoopSource = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, mEventTap, 0);
-        mEventLoop = CFRunLoopGetCurrent();
+        mEventLoop     = CFRunLoopGetCurrent();
         CFRunLoopAddSource(mEventLoop, mRunLoopSource, kCFRunLoopCommonModes);
         CGEventTapEnable(mEventTap, true);
 
@@ -340,7 +349,8 @@ private:
     Logger mLogger;
 };
 
-std::unique_ptr<IPlatformHook> CreatePlatformHook() {
+std::unique_ptr<IPlatformHook> CreatePlatformHook()
+{
     return std::make_unique<MacOSHook>();
 }
 

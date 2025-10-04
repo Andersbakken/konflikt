@@ -1,18 +1,20 @@
-#include "konflikt_native.hpp"
+#include "konflikt_native.h"
 #include <chrono>
 
 namespace konflikt {
 
 // Helper to get current timestamp in milliseconds
-uint64_t GetTimestamp() {
+uint64_t GetTimestamp()
+{
     using namespace std::chrono;
     return duration_cast<milliseconds>(
-        system_clock::now().time_since_epoch()
-    ).count();
+               system_clock::now().time_since_epoch())
+        .count();
 }
 
 // Helper to create State object
-Napi::Object StateToObject(Napi::Env env, const State& state) {
+Napi::Object StateToObject(Napi::Env env, const State &state)
+{
     auto obj = Napi::Object::New(env);
     obj.Set("keyboardModifiers", Napi::Number::New(env, state.keyboard_modifiers));
     obj.Set("mouseButtons", Napi::Number::New(env, state.mouse_buttons));
@@ -22,7 +24,8 @@ Napi::Object StateToObject(Napi::Env env, const State& state) {
 }
 
 // Helper to create Desktop object
-Napi::Object DesktopToObject(Napi::Env env, const Desktop& desktop) {
+Napi::Object DesktopToObject(Napi::Env env, const Desktop &desktop)
+{
     auto obj = Napi::Object::New(env);
     obj.Set("width", Napi::Number::New(env, desktop.width));
     obj.Set("height", Napi::Number::New(env, desktop.height));
@@ -30,7 +33,8 @@ Napi::Object DesktopToObject(Napi::Env env, const Desktop& desktop) {
 }
 
 // Helper to create Event object
-Napi::Object EventToObject(Napi::Env env, const Event& event) {
+Napi::Object EventToObject(Napi::Env env, const Event &event)
+{
     auto obj = Napi::Object::New(env);
 
     // Set type
@@ -73,16 +77,22 @@ Napi::Object EventToObject(Napi::Env env, const Event& event) {
 }
 
 // Helper to parse Event from JS object
-Event EventFromObject(const Napi::Object& obj) {
-    Event event{};
+Event EventFromObject(const Napi::Object &obj)
+{
+    Event event {};
 
     // Parse type
     std::string type_str = obj.Get("type").As<Napi::String>().Utf8Value();
-    if (type_str == "mouseMove") event.type = EventType::MouseMove;
-    else if (type_str == "mousePress") event.type = EventType::MousePress;
-    else if (type_str == "mouseRelease") event.type = EventType::MouseRelease;
-    else if (type_str == "keyPress") event.type = EventType::KeyPress;
-    else if (type_str == "keyRelease") event.type = EventType::KeyRelease;
+    if (type_str == "mouseMove")
+        event.type = EventType::MouseMove;
+    else if (type_str == "mousePress")
+        event.type = EventType::MousePress;
+    else if (type_str == "mouseRelease")
+        event.type = EventType::MouseRelease;
+    else if (type_str == "keyPress")
+        event.type = EventType::KeyPress;
+    else if (type_str == "keyRelease")
+        event.type = EventType::KeyRelease;
 
     // Parse state
     if (obj.Has("keyboardModifiers")) {
@@ -101,7 +111,7 @@ Event EventFromObject(const Napi::Object& obj) {
     // Parse button for mouse events
     if (obj.Has("button")) {
         uint32_t button_val = obj.Get("button").As<Napi::Number>().Uint32Value();
-        event.button = static_cast<MouseButton>(button_val);
+        event.button        = static_cast<MouseButton>(button_val);
     }
 
     // Parse keycode and text for key events
@@ -118,54 +128,48 @@ Event EventFromObject(const Napi::Object& obj) {
 }
 
 // KonfliktNative implementation
-Napi::Object KonfliktNative::Init(Napi::Env env, Napi::Object exports) {
-    Napi::Function func = DefineClass(env, "KonfliktNative", {
-        InstanceAccessor<&KonfliktNative::GetDesktop>("desktop"),
-        InstanceAccessor<&KonfliktNative::GetState>("state"),
-        InstanceMethod<&KonfliktNative::On>("on"),
-        InstanceMethod<&KonfliktNative::Off>("off"),
-        InstanceMethod<&KonfliktNative::SendMouseEvent>("sendMouseEvent"),
-        InstanceMethod<&KonfliktNative::SendKeyEvent>("sendKeyEvent")
-    });
+Napi::Object KonfliktNative::Init(Napi::Env env, Napi::Object exports)
+{
+    Napi::Function func = DefineClass(env, "KonfliktNative", { InstanceAccessor<&KonfliktNative::GetDesktop>("desktop"), InstanceAccessor<&KonfliktNative::GetState>("state"), InstanceMethod<&KonfliktNative::On>("on"), InstanceMethod<&KonfliktNative::Off>("off"), InstanceMethod<&KonfliktNative::SendMouseEvent>("sendMouseEvent"), InstanceMethod<&KonfliktNative::SendKeyEvent>("sendKeyEvent") });
 
-    Napi::FunctionReference* constructor = new Napi::FunctionReference();
-    *constructor = Napi::Persistent(func);
+    Napi::FunctionReference *constructor = new Napi::FunctionReference();
+    *constructor                         = Napi::Persistent(func);
     env.SetInstanceData(constructor);
 
     exports.Set("KonfliktNative", func);
     return exports;
 }
 
-KonfliktNative::KonfliktNative(const Napi::CallbackInfo& info)
-    : Napi::ObjectWrap<KonfliktNative>(info) {
-
+KonfliktNative::KonfliktNative(const Napi::CallbackInfo &info)
+    : Napi::ObjectWrap<KonfliktNative>(info)
+{
     // Parse logger callbacks if provided
     if (info.Length() > 0 && info[0].IsObject()) {
         Napi::Object loggerObj = info[0].As<Napi::Object>();
-        
+
         // Create thread-safe functions for each log level
         if (loggerObj.Has("verbose") && loggerObj.Get("verbose").IsFunction()) {
             auto verboseFunc = loggerObj.Get("verbose").As<Napi::Function>();
-            logger_.verbose = [verboseFunc, env = info.Env()](const std::string& message) {
-                verboseFunc.Call({Napi::String::New(env, message)});
+            logger_.verbose  = [verboseFunc, env = info.Env()](const std::string &message) {
+                verboseFunc.Call({ Napi::String::New(env, message) });
             };
         }
         if (loggerObj.Has("debug") && loggerObj.Get("debug").IsFunction()) {
             auto debugFunc = loggerObj.Get("debug").As<Napi::Function>();
-            logger_.debug = [debugFunc, env = info.Env()](const std::string& message) {
-                debugFunc.Call({Napi::String::New(env, message)});
+            logger_.debug  = [debugFunc, env = info.Env()](const std::string &message) {
+                debugFunc.Call({ Napi::String::New(env, message) });
             };
         }
         if (loggerObj.Has("log") && loggerObj.Get("log").IsFunction()) {
             auto logFunc = loggerObj.Get("log").As<Napi::Function>();
-            logger_.log = [logFunc, env = info.Env()](const std::string& message) {
-                logFunc.Call({Napi::String::New(env, message)});
+            logger_.log  = [logFunc, env = info.Env()](const std::string &message) {
+                logFunc.Call({ Napi::String::New(env, message) });
             };
         }
         if (loggerObj.Has("error") && loggerObj.Get("error").IsFunction()) {
             auto errorFunc = loggerObj.Get("error").As<Napi::Function>();
-            logger_.error = [errorFunc, env = info.Env()](const std::string& message) {
-                errorFunc.Call({Napi::String::New(env, message)});
+            logger_.error  = [errorFunc, env = info.Env()](const std::string &message) {
+                errorFunc.Call({ Napi::String::New(env, message) });
             };
         }
     }
@@ -189,17 +193,18 @@ KonfliktNative::KonfliktNative(const Napi::CallbackInfo& info)
     }
 
     // Set up callback for platform events
-    platform_hook_->event_callback = [this](const Event& event) {
+    platform_hook_->event_callback = [this](const Event &event) {
         HandlePlatformEvent(event);
     };
 
     // Don't start listening immediately - wait for user to register listeners
 }
 
-KonfliktNative::~KonfliktNative() {
+KonfliktNative::~KonfliktNative()
+{
     // Release all thread-safe functions first
-    for (auto& pair : listeners_) {
-        for (auto& tsfn : pair.second.listeners) {
+    for (auto &pair : listeners_) {
+        for (auto &tsfn : pair.second.listeners) {
             tsfn.Release();
         }
         pair.second.listeners.clear();
@@ -213,19 +218,22 @@ KonfliktNative::~KonfliktNative() {
     }
 }
 
-Napi::Value KonfliktNative::GetDesktop(const Napi::CallbackInfo& info) {
-    Napi::Env env = info.Env();
+Napi::Value KonfliktNative::GetDesktop(const Napi::CallbackInfo &info)
+{
+    Napi::Env env   = info.Env();
     Desktop desktop = platform_hook_->get_desktop();
     return DesktopToObject(env, desktop);
 }
 
-Napi::Value KonfliktNative::GetState(const Napi::CallbackInfo& info) {
+Napi::Value KonfliktNative::GetState(const Napi::CallbackInfo &info)
+{
     Napi::Env env = info.Env();
-    State state = platform_hook_->get_state();
+    State state   = platform_hook_->get_state();
     return StateToObject(env, state);
 }
 
-void KonfliktNative::On(const Napi::CallbackInfo& info) {
+void KonfliktNative::On(const Napi::CallbackInfo &info)
+{
     Napi::Env env = info.Env();
 
     if (info.Length() < 2 || !info[0].IsString() || !info[1].IsFunction()) {
@@ -233,17 +241,23 @@ void KonfliktNative::On(const Napi::CallbackInfo& info) {
         return;
     }
 
-    std::string type_str = info[0].As<Napi::String>().Utf8Value();
+    std::string type_str    = info[0].As<Napi::String>().Utf8Value();
     Napi::Function listener = info[1].As<Napi::Function>();
 
     // Convert type string to EventType
     EventType type;
-    if (type_str == "mouseMove") type = EventType::MouseMove;
-    else if (type_str == "mousePress") type = EventType::MousePress;
-    else if (type_str == "mouseRelease") type = EventType::MouseRelease;
-    else if (type_str == "keyPress") type = EventType::KeyPress;
-    else if (type_str == "keyRelease") type = EventType::KeyRelease;
-    else if (type_str == "desktopChanged") type = EventType::DesktopChanged;
+    if (type_str == "mouseMove")
+        type = EventType::MouseMove;
+    else if (type_str == "mousePress")
+        type = EventType::MousePress;
+    else if (type_str == "mouseRelease")
+        type = EventType::MouseRelease;
+    else if (type_str == "keyPress")
+        type = EventType::KeyPress;
+    else if (type_str == "keyRelease")
+        type = EventType::KeyRelease;
+    else if (type_str == "desktopChanged")
+        type = EventType::DesktopChanged;
     else {
         Napi::TypeError::New(env, "Unknown event type").ThrowAsJavaScriptException();
         return;
@@ -255,8 +269,7 @@ void KonfliktNative::On(const Napi::CallbackInfo& info) {
         listener,
         "KonfliktEventListener",
         0,
-        1
-    );
+        1);
 
     listeners_[type].listeners.push_back(std::move(tsfn));
 
@@ -267,7 +280,8 @@ void KonfliktNative::On(const Napi::CallbackInfo& info) {
     }
 }
 
-void KonfliktNative::Off(const Napi::CallbackInfo& info) {
+void KonfliktNative::Off(const Napi::CallbackInfo &info)
+{
     Napi::Env env = info.Env();
 
     if (info.Length() < 2 || !info[0].IsString() || !info[1].IsFunction()) {
@@ -279,12 +293,18 @@ void KonfliktNative::Off(const Napi::CallbackInfo& info) {
 
     // Convert type string to EventType
     EventType type;
-    if (type_str == "mouseMove") type = EventType::MouseMove;
-    else if (type_str == "mousePress") type = EventType::MousePress;
-    else if (type_str == "mouseRelease") type = EventType::MouseRelease;
-    else if (type_str == "keyPress") type = EventType::KeyPress;
-    else if (type_str == "keyRelease") type = EventType::KeyRelease;
-    else if (type_str == "desktopChanged") type = EventType::DesktopChanged;
+    if (type_str == "mouseMove")
+        type = EventType::MouseMove;
+    else if (type_str == "mousePress")
+        type = EventType::MousePress;
+    else if (type_str == "mouseRelease")
+        type = EventType::MouseRelease;
+    else if (type_str == "keyPress")
+        type = EventType::KeyPress;
+    else if (type_str == "keyRelease")
+        type = EventType::KeyRelease;
+    else if (type_str == "desktopChanged")
+        type = EventType::DesktopChanged;
     else {
         return;
     }
@@ -297,7 +317,8 @@ void KonfliktNative::Off(const Napi::CallbackInfo& info) {
     }
 }
 
-void KonfliktNative::SendMouseEvent(const Napi::CallbackInfo& info) {
+void KonfliktNative::SendMouseEvent(const Napi::CallbackInfo &info)
+{
     Napi::Env env = info.Env();
 
     if (info.Length() < 1 || !info[0].IsObject()) {
@@ -309,7 +330,8 @@ void KonfliktNative::SendMouseEvent(const Napi::CallbackInfo& info) {
     platform_hook_->send_mouse_event(event);
 }
 
-void KonfliktNative::SendKeyEvent(const Napi::CallbackInfo& info) {
+void KonfliktNative::SendKeyEvent(const Napi::CallbackInfo &info)
+{
     Napi::Env env = info.Env();
 
     if (info.Length() < 1 || !info[0].IsObject()) {
@@ -321,7 +343,8 @@ void KonfliktNative::SendKeyEvent(const Napi::CallbackInfo& info) {
     platform_hook_->send_key_event(event);
 }
 
-void KonfliktNative::HandlePlatformEvent(const Event& event) {
+void KonfliktNative::HandlePlatformEvent(const Event &event)
+{
     if (!is_listening_) {
         return;
     }
@@ -331,11 +354,11 @@ void KonfliktNative::HandlePlatformEvent(const Event& event) {
         return;
     }
 
-    for (auto& tsfn : it->second.listeners) {
+    for (auto &tsfn : it->second.listeners) {
         // Call the thread-safe function with the event
         auto status = tsfn.NonBlockingCall([event](Napi::Env env, Napi::Function jsCallback) {
             try {
-                jsCallback.Call({EventToObject(env, event)});
+                jsCallback.Call({ EventToObject(env, event) });
             } catch (...) {
                 // Silently ignore errors in callbacks
             }
@@ -343,14 +366,15 @@ void KonfliktNative::HandlePlatformEvent(const Event& event) {
 
         // If the call fails repeatedly, it might mean the JS context is being destroyed
         // But we shouldn't stop listening on a single failure
-        (void)status;  // Ignore status for now
+        (void)status; // Ignore status for now
     }
 }
 
 } // namespace konflikt
 
 // Module initialization
-Napi::Object InitModule(Napi::Env env, Napi::Object exports) {
+Napi::Object InitModule(Napi::Env env, Napi::Object exports)
+{
     return konflikt::KonfliktNative::Init(env, exports);
 }
 
