@@ -71,6 +71,8 @@ struct State
     uint32_t mouseButtons { 0 };
     int32_t x { 0 };
     int32_t y { 0 };
+    int32_t dx { 0 };  // Relative X delta since last event
+    int32_t dy { 0 };  // Relative Y delta since last event
 };
 
 struct Desktop

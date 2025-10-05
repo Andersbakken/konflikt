@@ -1003,7 +1003,33 @@ private:
             }
 
             case XCB_INPUT_RAW_MOTION: {
-                event.type     = EventType::MouseMove;
+                auto *motionEvent = reinterpret_cast<xcb_input_raw_motion_event_t *>(ge);
+                event.type = EventType::MouseMove;
+
+                // Extract raw deltas from XInput2 raw motion event
+                // The raw values are FP3232 (fixed point) values following the event structure
+                // First comes the valuator mask, then raw values, then unaccelerated values
+                uint32_t *valuator_mask = (uint32_t *)(&motionEvent[1]);
+                int mask_len = motionEvent->valuators_len;
+
+                // Skip past the valuator mask to get to raw values
+                xcb_input_fp3232_t *raw_values = (xcb_input_fp3232_t *)(valuator_mask + mask_len);
+
+                // Extract deltas from valuators 0 (x) and 1 (y)
+                int value_index = 0;
+                for (int i = 0; i < 32 && value_index < 2; i++) {
+                    if (valuator_mask[i / 32] & (1 << (i % 32))) {
+                        if (value_index == 0) {
+                            // X delta
+                            event.state.dx = raw_values[value_index].integral;
+                        } else if (value_index == 1) {
+                            // Y delta
+                            event.state.dy = raw_values[value_index].integral;
+                        }
+                        value_index++;
+                    }
+                }
+
                 shouldDispatch = true;
                 break;
             }

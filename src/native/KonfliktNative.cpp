@@ -172,6 +172,8 @@ Napi::Object stateToObject(Napi::Env env, const State &state)
     obj.Set("mouseButtons", Napi::Number::New(env, state.mouseButtons));
     obj.Set("x", Napi::Number::New(env, state.x));
     obj.Set("y", Napi::Number::New(env, state.y));
+    obj.Set("dx", Napi::Number::New(env, state.dx));
+    obj.Set("dy", Napi::Number::New(env, state.dy));
     return obj;
 }
 
@@ -209,6 +211,8 @@ Napi::Object eventToObject(Napi::Env env, const Event &event)
     obj.Set("mouseButtons", Napi::Number::New(env, event.state.mouseButtons));
     obj.Set("x", Napi::Number::New(env, event.state.x));
     obj.Set("y", Napi::Number::New(env, event.state.y));
+    obj.Set("dx", Napi::Number::New(env, event.state.dx));
+    obj.Set("dy", Napi::Number::New(env, event.state.dy));
 
     // Set button for mouse button events
     if (event.type == EventType::MousePress || event.type == EventType::MouseRelease) {

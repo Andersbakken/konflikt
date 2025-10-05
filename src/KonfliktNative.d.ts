@@ -25,6 +25,8 @@ export interface KonfliktState {
     mouseButtons: KonfliktMouseButton;
     x: number;
     y: number;
+    dx: number; // Relative X delta since last event
+    dy: number; // Relative Y delta since last event
 }
 
 export interface KonfliktEvent extends KonfliktState {

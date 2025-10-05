@@ -444,6 +444,12 @@ private:
         event.state.x = static_cast<int32_t>(point.x);
         event.state.y = static_cast<int32_t>(point.y);
 
+        // Get delta from OS (works even when cursor is at screen edge)
+        int64_t deltaX = CGEventGetIntegerValueField(cgEvent, kCGMouseEventDeltaX);
+        int64_t deltaY = CGEventGetIntegerValueField(cgEvent, kCGMouseEventDeltaY);
+        event.state.dx = static_cast<int32_t>(deltaX);
+        event.state.dy = static_cast<int32_t>(deltaY);
+
         switch (type) {
             case kCGEventMouseMoved:
             case kCGEventLeftMouseDragged:
