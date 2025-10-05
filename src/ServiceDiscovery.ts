@@ -20,10 +20,10 @@ export class ServiceDiscovery extends EventEmitter {
     /**
      * Advertise this instance as a Konflikt service
      */
-    advertise(port: number, instanceName?: string): void {
+    advertise(port: number, instanceName?: string, role?: string, startTime?: number): void {
         const serviceName = instanceName || `konflikt-${process.pid}`;
 
-        debug(`Advertising Konflikt service "${serviceName}" on port ${port}`);
+        debug(`Advertising Konflikt service "${serviceName}" on port ${port}${role ? ` (role: ${role})` : ""}`);
 
         this.#advertisedService = this.#bonjour.publish({
             name: serviceName,
@@ -32,7 +32,8 @@ export class ServiceDiscovery extends EventEmitter {
             txt: {
                 version: "1.0.0",
                 pid: process.pid.toString(),
-                started: Date.now().toString()
+                started: (startTime || Date.now()).toString(),
+                role: role || "unknown"
             }
         });
 

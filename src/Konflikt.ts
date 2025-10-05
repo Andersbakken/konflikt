@@ -6,7 +6,9 @@ import { Rect } from "./Rect";
 import { Server } from "./Server";
 import { createHash } from "crypto";
 import { createNativeLogger } from "./createNativeLogger";
+import { error } from "./error";
 import { hostname, platform } from "os";
+import { log } from "./log";
 import { setLogBroadcaster } from "./logBroadcaster";
 import { verbose } from "./verbose";
 import type { Config } from "./Config";
@@ -56,10 +58,16 @@ export class Konflikt {
 
     constructor(config: Config) {
         this.#config = config;
-        this.#native = new KonfliktNativeConstructor(createNativeLogger());
-        this.#server = new Server(config.port, config.instanceId, config.instanceName);
-
         this.#role = config.role;
+        this.#native = new KonfliktNativeConstructor(createNativeLogger());
+        this.#server = new Server(
+            config.port, 
+            config.instanceId, 
+            config.instanceName, 
+            "1.0.0", 
+            ["input_events", "state_sync"],
+            this.#role === InstanceRole.Server ? "server" : "client"
+        );
 
         // Generate machine identifier
         this.#machineId = Konflikt.#generateMachineId();
@@ -155,6 +163,49 @@ export class Konflikt {
 
         await this.#server.start();
 
+        // Set up service discovery event handlers for all roles
+        this.#server.serviceDiscovery.on("serviceUp", (service: DiscoveredService) => {
+            if (this.#role === InstanceRole.Server && service.txt?.role === "server") {
+                // Check if this is on the same host (localhost, 127.0.0.1, or our actual hostname)
+                const isSameHost = service.host === "localhost" || 
+                                  service.host === "127.0.0.1" || 
+                                  service.addresses.includes("127.0.0.1") ||
+                                  service.addresses.includes("::1");
+                
+                if (isSameHost) {
+                    // Compare start timestamps to determine which server should quit
+                    const discoveredStartTime = parseInt(service.txt!.started as string || "0", 10);
+                    const ourStartTime = this.#server.startTime;
+                    
+                    if (discoveredStartTime < ourStartTime) {
+                        // The discovered server started earlier - we are newer, so tell it to quit
+                        log(`Discovered older server at ${service.host}:${service.port} (started: ${new Date(discoveredStartTime).toISOString()})`);
+                        log("Requesting older server to quit so this newer instance can take over...");
+                        Konflikt.#requestServerQuit(service);
+                    } else if (discoveredStartTime > ourStartTime) {
+                        // The discovered server is newer - it should tell us to quit eventually
+                        verbose(`Discovered newer server at ${service.host}:${service.port} (started: ${new Date(discoveredStartTime).toISOString()})`);
+                        verbose("Newer server should request this instance to quit shortly...");
+                    } else {
+                        // Same start time (very unlikely) - use PID as tiebreaker
+                        const discoveredPid = parseInt(service.txt?.pid as string || "0", 10);
+                        if (discoveredPid < process.pid) {
+                            log(`Server collision with same start time, using PID tiebreaker. Requesting server ${discoveredPid} to quit...`);
+                            Konflikt.#requestServerQuit(service);
+                        }
+                    }
+                } else {
+                    verbose(`Discovered server on different host: ${service.name} at ${service.host}:${service.port}`);
+                }
+                return;
+            }
+
+            if (this.#role === InstanceRole.Client && service.txt?.role === "server") {
+                verbose(`Client discovered server: ${service.name} at ${service.host}:${service.port}`);
+                this.#connectToServer(service);
+            }
+        });
+
         // Role-specific initialization
         if (this.#role === InstanceRole.Server) {
             verbose(`Server ${this.#config.instanceId} is now ready to capture input events`);
@@ -175,12 +226,6 @@ export class Konflikt {
 
             // Set up peer connection event handlers
             this.#setupPeerConnectionHandlers();
-
-            // Listen for service discovery events to connect to servers
-            this.#server.serviceDiscovery.on("serviceUp", (service: DiscoveredService) => {
-                verbose(`Client discovered server: ${service.name} at ${service.host}:${service.port}`);
-                this.#connectToServer(service);
-            });
         }
 
         // Send initial instance info and set up periodic broadcasting
@@ -578,8 +623,8 @@ export class Konflikt {
             }
         );
 
-        this.#peerManager.on("error", (error: Error, service?: DiscoveredService) => {
-            verbose(`Peer connection error${service ? ` with ${service.name}` : ""}: ${error.message}`);
+        this.#peerManager.on("error", (err: Error, service?: DiscoveredService) => {
+            verbose(`Peer connection error${service ? ` with ${service.name}` : ""}: ${err.message}`);
         });
     }
 
@@ -595,8 +640,8 @@ export class Konflikt {
                 this.#screenBounds,
                 { side: "right" as Side } // Default positioning to right side of server
             )
-            .catch((error: Error) => {
-                verbose(`Failed to connect to server ${service.name}: ${error.message}`);
+            .catch((err: Error) => {
+                verbose(`Failed to connect to server ${service.name}: ${err.message}`);
             });
     }
 
@@ -609,6 +654,51 @@ export class Konflikt {
         // Send additional screen positioning information to the server
         // This could be done via a separate message after handshake
         // For now, the handshake includes the screen geometry
+    }
+
+    // Server quit request method
+    static async #requestServerQuit(service: DiscoveredService): Promise<void> {
+        try {
+            const WebSocket = (await import("ws")).default;
+            const wsUrl = `ws://${service.host}:${service.port}/console`;
+            
+            verbose(`Connecting to existing server console at ${wsUrl} to request quit...`);
+            const ws = new WebSocket(wsUrl);
+            
+            await new Promise<void>((resolve: () => void, reject: (err: Error) => void) => {
+                const timeout = setTimeout(() => {
+                    ws.close();
+                    reject(new Error("Timeout connecting to existing server"));
+                }, 5000);
+                
+                ws.on("open", () => {
+                    clearTimeout(timeout);
+                    const quitMessage = {
+                        type: "console_command",
+                        command: "quit",
+                        args: [],
+                        timestamp: Date.now()
+                    };
+                    
+                    ws.send(JSON.stringify(quitMessage));
+                    verbose("Sent quit command to existing server");
+                    
+                    // Give the server a moment to process the quit
+                    setTimeout(() => {
+                        ws.close();
+                        resolve();
+                    }, 1000);
+                });
+                
+                ws.on("error", (err: Error) => {
+                    clearTimeout(timeout);
+                    reject(err);
+                });
+            });
+        } catch (err) {
+            error(`Failed to request server quit: ${err}`);
+            log("Existing server may already be shutting down or unreachable");
+        }
     }
 
     // Same-display detection methods

@@ -37,17 +37,23 @@ export class Server {
     // Message handler callback for input events
     #messageHandler?: (message: InputEventMessage | InstanceInfoMessage) => void;
 
+    #role: string;
+    readonly startTime: number;
+
     constructor(
         port: number | null,
         instanceId?: string,
         instanceName?: string,
         version: string = "1.0.0",
-        capabilities: string[] = ["input_events", "state_sync"]
+        capabilities: string[] = ["input_events", "state_sync"],
+        role: string = "server"
     ) {
         this.#instanceId = instanceId || crypto.randomUUID();
         this.#instanceName = instanceName || `konflikt-${process.pid}`;
         this.#version = version;
         this.#capabilities = capabilities;
+        this.#role = role;
+        this.startTime = Date.now();
         // Create a custom logger that integrates with our logging system
         const customLogger = {
             level: "debug",
@@ -163,7 +169,7 @@ export class Server {
                 debug(`HTTP listening at ${addr}, WS at ws://localhost:${port}/ws`);
 
                 // Start service discovery after server is running
-                this.#serviceDiscovery.advertise(port);
+                this.#serviceDiscovery.advertise(port, this.#instanceName, this.#role, this.startTime);
                 this.#serviceDiscovery.startDiscovery();
                 break;
             } catch (err: unknown) {
