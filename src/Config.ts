@@ -23,56 +23,13 @@ export class Config {
         this.#validate();
     }
 
-    #get(key: string): unknown {
-        return this.#convictConfig.get(key);
-    }
-
-    #string(key: string): string | null {
-        const value = this.#get(key);
-        if (value === null) {
-            return null;
-        }
-        if (typeof value === "string") {
-            return value;
-        }
-        throw new Error(`Config key '${key}' is not a string`);
-    }
-
-    #integer(key: string): number | null {
-        const value = this.#get(key);
-        if (value === null) {
-            return null;
-        }
-        if (typeof value === "number" && Number.isInteger(value)) {
-            return value;
-        }
-        throw new Error(`Config key '${key}' is not an integer`);
-    }
-
-    #number(key: string): number | null {
-        const value = this.#get(key);
-        if (value === null) {
-            return null;
-        }
-        if (typeof value === "number") {
-            return value;
-        }
-        throw new Error(`Config key '${key}' is not a number`);
-    }
-
-    #set(key: string, value: unknown): void {
-        this.#convictConfig.set(key, value);
-    }
-
-    // Typed getters for all configuration values with defaults
-
     // Instance configuration
     get instanceId(): string {
-        return (this.#get("instance.id") as string) || `konflikt-${process.pid}-${Date.now()}`;
+        return this.#string("instance.id") || `konflikt-${process.pid}-${Date.now()}`;
     }
 
     get instanceName(): string {
-        return (this.#get("instance.name") as string) || `${hostname()}-${process.pid}`;
+        return this.#string("instance.name") || `${hostname()}-${process.pid}`;
     }
 
     get role(): InstanceRole {
@@ -94,7 +51,7 @@ export class Config {
     }
 
     get discoveryEnabled(): boolean {
-        const enabled = this.#get("network.discovery.enabled") as boolean | null;
+        const enabled = this.#boolean("network.discovery.enabled");
         return enabled ?? true;
     }
 
@@ -123,14 +80,26 @@ export class Config {
         return this.#integer("screen.dimensions.height");
     }
 
-    get screenEdges(): ScreenEdges {
-        const edges = this.#get("screen.edges") as {
-            top: boolean;
-            right: boolean;
-            bottom: boolean;
-            left: boolean;
-        } | null;
-        return edges || { top: true, right: true, bottom: true, left: true };
+    get screenEdges(): ScreenEdges | null {
+        const edges = this.#get("screen.edges");
+        if (edges === null) {
+            return null;
+        }
+
+        if (
+            typeof edges === "object" &&
+            "top" in edges &&
+            "right" in edges &&
+            "bottom" in edges &&
+            "left" in edges &&
+            typeof edges.top === "boolean" &&
+            typeof edges.right === "boolean" &&
+            typeof edges.bottom === "boolean" &&
+            typeof edges.left === "boolean"
+        ) {
+            return edges as ScreenEdges;
+        }
+        throw new Error(`Config key 'screen.edges' is not a valid ScreenEdges object`);
     }
 
     // Cluster configuration
@@ -461,6 +430,60 @@ export class Config {
             this.#set("screen.id", `screen-${finalInstanceId}`);
         }
     }
+
+    #get(key: string): unknown {
+        return this.#convictConfig.get(key);
+    }
+
+    #string(key: string): string | null {
+        const value = this.#get(key);
+        if (value === null) {
+            return null;
+        }
+        if (typeof value === "string") {
+            return value;
+        }
+        throw new Error(`Config key '${key}' is not a string`);
+    }
+
+    #integer(key: string): number | null {
+        const value = this.#get(key);
+        if (value === null) {
+            return null;
+        }
+        if (typeof value === "number" && Number.isInteger(value)) {
+            return value;
+        }
+        throw new Error(`Config key '${key}' is not an integer`);
+    }
+
+    #boolean(key: string): boolean | null {
+        const value = this.#get(key);
+        if (value === null) {
+            return null;
+        }
+        if (typeof value === "boolean") {
+            return value;
+        }
+        throw new Error(`Config key '${key}' is not a boolean`);
+    }
+
+    #number(key: string): number | null {
+        const value = this.#get(key);
+        if (value === null) {
+            return null;
+        }
+        if (typeof value === "number") {
+            return value;
+        }
+        throw new Error(`Config key '${key}' is not a number`);
+    }
+
+    #set(key: string, value: unknown): void {
+        this.#convictConfig.set(key, value);
+    }
+
+    // Typed getters for all configuration values with defaults
 
     static #isFlagArgument(arg: string): boolean {
         return ["--dev", "--no-console", "-v", "--verbose"].includes(arg);
