@@ -1,12 +1,15 @@
 import { Console } from "./Console.js";
 import { InstanceRole } from "./Config.js";
 import { KonfliktNative as KonfliktNativeConstructor } from "./native.js";
+import { PeerManager } from "./PeerManager.js";
 import { Server } from "./Server.js";
 import { createHash } from "crypto";
 import { createNativeLogger, setLogBroadcaster, verbose } from "./Log";
 import { hostname, platform } from "os";
 import type { Config } from "./Config.js";
+import type { DiscoveredService } from "./DiscoveredService.js";
 import type { InputEventData, InputEventMessage, InstanceInfoMessage } from "./messageValidation";
+import type { KeyPressEvent, KeyReleaseEvent, MouseMoveEvent, MousePressEvent, MouseReleaseEvent } from "./messages/index.js";
 import type {
     KonfliktDesktopEvent,
     KonfliktKeyPressEvent,
@@ -16,6 +19,7 @@ import type {
     KonfliktMouseMoveEvent
 } from "./KonfliktNative";
 import type { KonfliktNative } from "./KonfliktNative.js";
+import type { Side } from "./types/ScreenPositioning.js";
 
 export interface Rect {
     x: number;
@@ -39,6 +43,7 @@ export class Konflikt {
     #config: Config;
     #native: KonfliktNative;
     #server: Server;
+    #peerManager: PeerManager | undefined;
     #console: Console | undefined;
 
     // Role-based behavior
@@ -153,7 +158,7 @@ export class Konflikt {
 
         await this.#server.start();
 
-        // Log server startup info
+        // Role-specific initialization
         if (this.#role === InstanceRole.Server) {
             verbose(`Server ${this.#config.instanceId} is now ready to capture input events`);
             verbose(`Screen bounds: ${JSON.stringify(this.#screenBounds)}`);
@@ -162,6 +167,25 @@ export class Konflikt {
             if (Object.keys(adjacency).length > 0) {
                 verbose(`Screen adjacency configuration: ${JSON.stringify(adjacency, null, 2)}`);
             }
+        } else {
+            // Client role: set up peer manager to connect to servers
+            verbose(`Client ${this.#config.instanceId} initializing - looking for servers to connect to`);
+            
+            this.#peerManager = new PeerManager(
+                this.#config.instanceId,
+                this.#config.instanceName,
+                "1.0.0",
+                ["input_events", "screen_info"]
+            );
+
+            // Set up peer connection event handlers
+            this.#setupPeerConnectionHandlers();
+            
+            // Listen for service discovery events to connect to servers
+            this.#server.serviceDiscovery.on("serviceUp", (service: DiscoveredService) => {
+                verbose(`Client discovered server: ${service.name} at ${service.host}:${service.port}`);
+                this.#connectToServer(service);
+            });
         }
 
         // Send initial instance info and set up periodic broadcasting
@@ -515,6 +539,60 @@ export class Konflikt {
             keyboardModifiers: event.keyboardModifiers,
             mouseButtons: event.mouseButtons
         });
+    }
+
+    // Client connection management methods
+    #setupPeerConnectionHandlers(): void {
+        if (!this.#peerManager) {
+            return;
+        }
+
+        this.#peerManager.on("peer_connected", (service: DiscoveredService, capabilities: string[]) => {
+            verbose(`Connected to server ${service.name} at ${service.host}:${service.port}`);
+            verbose(`Server capabilities: ${capabilities.join(", ")}`);
+            
+            // Send handshake with client information
+            this.#sendClientHandshake(service);
+        });
+
+        this.#peerManager.on("peer_disconnected", (service: DiscoveredService, reason?: string) => {
+            verbose(`Disconnected from server ${service.name}: ${reason || "unknown reason"}`);
+        });
+
+        this.#peerManager.on("input_event", (event: MouseMoveEvent | MousePressEvent | MouseReleaseEvent | KeyPressEvent | KeyReleaseEvent, from: DiscoveredService) => {
+            verbose(`Received input event from server ${from.name}:`, event);
+            // TODO: Execute the input event locally
+        });
+
+        this.#peerManager.on("error", (error: Error, service?: DiscoveredService) => {
+            verbose(`Peer connection error${service ? ` with ${service.name}` : ""}: ${error.message}`);
+        });
+    }
+
+    #connectToServer(service: DiscoveredService): void {
+        if (!this.#peerManager) {
+            return;
+        }
+
+        verbose(`Attempting to connect to server ${service.name} at ${service.host}:${service.port}`);
+        this.#peerManager.connectToPeer(
+            service, 
+            this.#screenBounds,
+            { side: "right" as Side } // Default positioning to right side of server
+        ).catch((error: Error) => {
+            verbose(`Failed to connect to server ${service.name}: ${error.message}`);
+        });
+    }
+
+    #sendClientHandshake(service: DiscoveredService): void {
+        // The handshake is already handled by the PeerManager/WebSocketClient
+        // But we can provide additional client-specific information via events
+        verbose(`Client ${this.#config.instanceId} handshake completed with server ${service.name}`);
+        verbose(`Client screen geometry: ${JSON.stringify(this.#screenBounds)}`);
+        
+        // Send additional screen positioning information to the server
+        // This could be done via a separate message after handshake
+        // For now, the handshake includes the screen geometry
     }
 
     // Same-display detection methods

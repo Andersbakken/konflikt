@@ -4,6 +4,7 @@ import { debug, error, log, verbose } from "./Log";
 import WebSocket from "ws";
 import type { DiscoveredService } from "./DiscoveredService";
 import type { HandshakeRequest, HandshakeResponse, Message } from "./messages";
+import type { PreferredPosition, ScreenGeometry } from "./types/ScreenPositioning.js";
 
 export interface WebSocketClientEvents {
     connected: [service: DiscoveredService];
@@ -21,6 +22,8 @@ export class WebSocketClient extends EventEmitter<WebSocketClientEvents> {
     #instanceName: string;
     #version: string;
     #capabilities: string[];
+    #screenGeometry?: ScreenGeometry;
+    #preferredPosition?: PreferredPosition;
     #heartbeatInterval: NodeJS.Timeout | null = null;
     #reconnectTimeout: NodeJS.Timeout | null = null;
     #isHandshakeCompleted = false;
@@ -32,6 +35,8 @@ export class WebSocketClient extends EventEmitter<WebSocketClientEvents> {
         instanceId: string,
         instanceName: string,
         version: string,
+        screenGeometry?: ScreenGeometry,
+        preferredPosition?: PreferredPosition,
         capabilities: string[] = []
     ) {
         super();
@@ -40,6 +45,8 @@ export class WebSocketClient extends EventEmitter<WebSocketClientEvents> {
         this.#instanceName = instanceName;
         this.#version = version;
         this.#capabilities = capabilities;
+        this.#screenGeometry = screenGeometry;
+        this.#preferredPosition = preferredPosition;
     }
 
     get isConnected(): boolean {
@@ -239,7 +246,9 @@ export class WebSocketClient extends EventEmitter<WebSocketClientEvents> {
             instanceId: this.#instanceId,
             instanceName: this.#instanceName,
             version: this.#version,
-            capabilities: this.#capabilities
+            capabilities: this.#capabilities,
+            screenGeometry: this.#screenGeometry,
+            preferredPosition: this.#preferredPosition
         };
 
         this.send(handshakeRequest);

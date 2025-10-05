@@ -12,6 +12,7 @@ import type {
     MousePressEvent,
     MouseReleaseEvent
 } from "./messages";
+import type { PreferredPosition, ScreenGeometry } from "./types/ScreenPositioning.js";
 
 export interface PeerManagerEvents {
     peer_connected: [service: DiscoveredService, capabilities: string[]];
@@ -46,7 +47,11 @@ export class PeerManager extends EventEmitter<PeerManagerEvents> {
     /**
      * Connect to a discovered peer service
      */
-    async connectToPeer(service: DiscoveredService): Promise<void> {
+    async connectToPeer(
+        service: DiscoveredService,
+        screenGeometry?: ScreenGeometry,
+        preferredPosition?: PreferredPosition
+    ): Promise<void> {
         const serviceKey = `${service.host}:${service.port}`;
 
         // Don't connect to ourselves
@@ -68,6 +73,8 @@ export class PeerManager extends EventEmitter<PeerManagerEvents> {
             this.#instanceId,
             this.#instanceName,
             this.#version,
+            screenGeometry,
+            preferredPosition,
             this.#capabilities
         );
 
