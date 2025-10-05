@@ -188,7 +188,7 @@ export class Konflikt {
                         verbose("Newer server should request this instance to quit shortly...");
                     } else {
                         // Same start time (very unlikely) - use PID as tiebreaker
-                        const discoveredPid = parseInt(service.txt?.pid as string || "0", 10);
+                        const discoveredPid = parseInt(service.txt!.pid as string || "0", 10);
                         if (discoveredPid < process.pid) {
                             log(`Server collision with same start time, using PID tiebreaker. Requesting server ${discoveredPid} to quit...`);
                             Konflikt.#requestServerQuit(service);
