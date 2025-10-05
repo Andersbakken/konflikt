@@ -27,9 +27,5 @@ export async function main(config: Config): Promise<void> {
         process.exit(0);
     });
 
-    // Keep the process alive indefinitely
-    return new Promise<void>(() => {
-        // This promise never resolves, keeping the process running
-        // Process will only exit through signal handlers above
-    });
+    return konflikt.run();
 }

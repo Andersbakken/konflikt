@@ -25,12 +25,25 @@ if(APPLE)
     find_library(COCOA Cocoa)
     set(PLATFORM_LIBS ${APPLICATION_SERVICES} ${CARBON} ${COCOA})
 elseif(UNIX)
-    list(APPEND SOURCE_FILES KonfliktNativeX11.cpp)
+    list(APPEND SOURCE_FILES KonfliktNativeLinux.cpp)
     find_package(PkgConfig REQUIRED)
+    
+    # X11/XCB dependencies
     pkg_check_modules(XCB REQUIRED xcb xcb-xinput xcb-xtest xcb-xkb xkbcommon xkbcommon-x11)
+    
+    # Wayland dependencies (make them optional)
+    pkg_check_modules(WAYLAND wayland-client)
+    
     set(PLATFORM_LIBS ${XCB_LIBRARIES})
     include_directories(${XCB_INCLUDE_DIRS})
     link_directories(${XCB_LIBRARY_DIRS})
+    
+    if(WAYLAND_FOUND)
+        list(APPEND PLATFORM_LIBS ${WAYLAND_LIBRARIES})
+        include_directories(${WAYLAND_INCLUDE_DIRS})
+        link_directories(${WAYLAND_LIBRARY_DIRS})
+        add_definitions(-DWAYLAND_AVAILABLE)
+    endif()
 endif()
 
 # Create the native addon

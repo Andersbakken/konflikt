@@ -8,20 +8,15 @@ export async function startRemoteConsole(remoteConsoleHost: string, logLevel: Lo
 
     await remoteConsole.connect();
     remoteConsole.start();
+    return new Promise<void>((resolve: () => void, reject: (err: Error) => void) => {
+        process.on("SIGINT", () => {
+            remoteConsole.stop();
+            resolve();
+        });
 
-    // Keep the process running
-    process.on("SIGINT", () => {
-        remoteConsole.stop();
-        process.exit(0);
-    });
-
-    process.on("SIGTERM", () => {
-        remoteConsole.stop();
-        process.exit(0);
-    });
-
-    // Keep the process alive indefinitely
-    return new Promise<void>(() => {
-        // This never resolves, keeping the process alive
+        process.on("SIGTERM", () => {
+            remoteConsole.stop();
+            reject(new Error("Process terminated"));
+        });
     });
 }

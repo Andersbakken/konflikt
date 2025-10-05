@@ -1170,10 +1170,7 @@ private:
     xcb_window_t mClipboardWindow { XCB_NONE };
 };
 
-std::unique_ptr<IPlatformHook> createPlatformHook()
-{
-    return std::make_unique<XCBHook>();
-}
+// createPlatformHook moved to KonfliktNativeLinux.cpp for platform detection
 
 } // namespace konflikt
 

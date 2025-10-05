@@ -229,6 +229,11 @@ export class RemoteConsole {
                 this.#handleLogMessage(message);
                 break;
 
+            case "console_command":
+                debug("Unexpected console_command received by RemoteConsole");
+                this.#readline.prompt();
+                break;
+
             default:
                 debug("Unknown message type:", message);
                 this.#readline.prompt();

@@ -41,6 +41,7 @@ export class Konflikt {
     #server: Server;
     #peerManager: PeerManager | undefined;
     #console: Console | undefined;
+    #runPromiseResolve?: () => void;
 
     // Role-based behavior
     #role: InstanceRole;
@@ -211,6 +212,22 @@ export class Konflikt {
             verbose("Console disabled by configuration");
         }
         // Remote console mode is handled in index.ts and doesn't reach here
+    }
+
+    run(): Promise<void> {
+        verbose("Running Konflikt instance...", this.#config);
+        // Keep the process alive until explicitly quit
+        return new Promise<void>((resolve: () => void) => {
+            this.#runPromiseResolve = resolve;
+        });
+    }
+
+    quit(): void {
+        verbose("Quitting Konflikt instance...");
+        if (!this.#runPromiseResolve) {
+            throw new Error("Cannot quit: Konflikt instance is not running or run() was never called");
+        }
+        this.#runPromiseResolve();
     }
 
     #getTargetClientForPosition(x: number, y: number): string | null {

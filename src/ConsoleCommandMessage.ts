@@ -1,6 +1,4 @@
-export interface ConsoleCommandMessage {
-    type: "console_command";
-    command: string;
-    args: string[];
-    timestamp?: number;
-}
+import type { ConsoleCommandMessageSchema } from "./ConsoleCommandMessageSchema";
+import type { z } from "zod";
+
+export type ConsoleCommandMessage = z.infer<typeof ConsoleCommandMessageSchema>;

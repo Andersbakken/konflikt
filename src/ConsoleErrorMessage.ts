@@ -1,4 +1,4 @@
-export interface ConsoleErrorMessage {
-    type: "console_error";
-    error: string;
-}
+import type { ConsoleErrorMessageSchema } from "./ConsoleErrorMessageSchema";
+import type { z } from "zod";
+
+export type ConsoleErrorMessage = z.infer<typeof ConsoleErrorMessageSchema>;

@@ -1,4 +1,4 @@
-export interface ConsoleResponseMessage {
-    type: "console_response";
-    output: string;
-}
+import type { ConsoleResponseMessageSchema } from "./ConsoleResponseMessageSchema";
+import type { z } from "zod";
+
+export type ConsoleResponseMessage = z.infer<typeof ConsoleResponseMessageSchema>;

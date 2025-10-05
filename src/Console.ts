@@ -234,11 +234,11 @@ export class Console {
         });
 
         this.#commands.set("quit", {
-            description: "Exit the application",
+            description: "Exit the application gracefully",
             usage: "quit",
             handler: () => {
                 this.#consoleLog("Exiting...");
-                process.exit(0);
+                this.#konflikt.quit();
             }
         });
     }
