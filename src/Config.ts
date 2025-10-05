@@ -7,21 +7,6 @@ import { runInNewContext } from "vm";
 import path from "path";
 import type { ScreenEdges } from "./ScreenEdges";
 
-// Type unions for configuration values
-export const enum InstanceRole {
-    Server = 0,
-    Client = 1
-}
-
-export type InstanceRoleType = InstanceRole;
-interface ConvictInstance {
-    get(key: string): unknown;
-    set(key: string, value: unknown): void;
-    getProperties(): ConfigType;
-    load(obj: Record<string, unknown>, options?: { args?: string[] }): void;
-    validate(options?: { allowed?: string }): void;
-}
-
 export class Config {
     #convictConfig: ConvictInstance;
 

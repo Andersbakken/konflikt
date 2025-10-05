@@ -1,48 +1,11 @@
-import * as convict from "convict";
+import { CommandLineArgs } from "./CommandLineArgs.js";
 import { format } from "util";
+import convict from "convict";
 // Note: convict-format-with-validator has issues with ES modules, using basic convict for now
-
-// Centralized CLI argument definitions - single source of truth
-const CLI_ARGS = {
-    "instance-id": { path: "instance.id" },
-    "instance-name": { path: "instance.name" },
-    role: { path: "instance.role", short: "-r" },
-    port: { path: "network.port", short: "-p" },
-    host: { path: "network.host", short: "-H" },
-    discovery: { path: "network.discovery.enabled" },
-    "service-name": { path: "network.discovery.serviceName", short: "-s" },
-    "screen-id": { path: "screen.id" },
-    "screen-x": { path: "screen.position.x" },
-    "screen-y": { path: "screen.position.y" },
-    "screen-width": { path: "screen.dimensions.width" },
-    "screen-height": { path: "screen.dimensions.height" },
-    "screen-edges": { path: "screen.edges" },
-    "server-host": { path: "cluster.server.host" },
-    "server-port": { path: "cluster.server.port" },
-    peers: { path: "cluster.peers" },
-    adjacency: { path: "cluster.adjacency" },
-    "capture-mouse": { path: "input.capture.mouse" },
-    "capture-keyboard": { path: "input.capture.keyboard" },
-    "forward-events": { path: "input.forward" },
-    "cursor-transition": { path: "input.cursorTransition.enabled" },
-    "dead-zone": { path: "input.cursorTransition.deadZone" },
-    "log-level": { path: "logging.level", short: "-l" },
-    "log-file": { path: "logging.file", short: "-f" },
-    dev: { path: "development.enabled", short: "-d" },
-    "mock-input": { path: "development.mockInput" },
-    "console": { path: "console.enabled" }
-} as const;
-
-// Generate short option mappings from CLI_ARGS
-export const SHORT_OPTIONS: Record<string, string> = Object.fromEntries(
-    Object.entries(CLI_ARGS)
-        .filter(([, config]: [string, { path: string; short?: string }]) => config.short)
-        .map(([longArg, config]: [string, { path: string; short?: string }]) => [config.short!, `--${longArg}`])
-);
 
 // Helper function to get the arg name for a config path
 function argForPath(configPath: string): string | undefined {
-    const entry: [string, { path: string; short?: string }] | undefined = Object.entries(CLI_ARGS).find(
+    const entry: [string, { path: string; short?: string }] | undefined = Object.entries(CommandLineArgs).find(
         ([, config]: [string, { path: string; short?: string }]) => config.path === configPath
     );
     return entry ? entry[0] : undefined;
@@ -351,5 +314,3 @@ export const configSchema = convict.default({
         }
     }
 });
-
-export type ConfigType = ReturnType<typeof configSchema.getProperties>;

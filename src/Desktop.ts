@@ -1,7 +1,4 @@
-import { z } from "zod";
+import type { DesktopSchema } from "./DesktopSchema";
+import type { z } from "zod";
 
-export const DesktopSchema = z.object({
-    width: z.number(),
-    height: z.number()
-});
 export type Desktop = z.infer<typeof DesktopSchema>;
