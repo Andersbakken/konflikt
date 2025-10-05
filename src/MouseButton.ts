@@ -1,4 +1,4 @@
-import { z } from "zod";
+import type { MouseButtonSchema } from "./MouseButtonSchema";
+import type { z } from "zod";
 
-export const MouseButtonSchema = z.enum(["left", "right", "middle"]);
 export type MouseButton = z.infer<typeof MouseButtonSchema>;

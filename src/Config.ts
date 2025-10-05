@@ -1,10 +1,14 @@
-import { type ConfigType, SHORT_OPTIONS, configSchema } from "./ConfigSchema";
+import { InstanceRole } from "./InstanceRole";
+import { configSchema } from "./configSchema";
 import { debug } from "./debug";
 import { error } from "./error";
 import { existsSync, readFileSync } from "fs";
 import { homedir, hostname } from "os";
 import { runInNewContext } from "vm";
+import { shortOptions } from "./shortOptions";
 import path from "path";
+import type { ConfigType } from "./ConfigType";
+import type { ConvictInstance } from "./ConvictInstance";
 import type { ScreenEdges } from "./ScreenEdges";
 
 export class Config {
@@ -467,7 +471,7 @@ export class Config {
                 continue;
             }
 
-            const shortOption = SHORT_OPTIONS[arg];
+            const shortOption = shortOptions[arg];
             if (shortOption) {
                 expanded.push(shortOption);
             } else {

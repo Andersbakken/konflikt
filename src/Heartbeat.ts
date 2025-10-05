@@ -1,7 +1,4 @@
-import { BaseMessageSchema } from "./BaseMessage";
-import { z } from "zod";
+import type { HeartbeatSchema } from "./HeartbeatSchema";
+import type { z } from "zod";
 
-export const HeartbeatSchema = BaseMessageSchema.extend({
-    type: z.literal("heartbeat")
-});
 export type Heartbeat = z.infer<typeof HeartbeatSchema>;

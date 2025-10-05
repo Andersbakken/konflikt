@@ -6,7 +6,7 @@ import path from "path";
 
 // Global logger state
 let logFile: fs.WriteStream | undefined;
-let consoleLevel: LogLevel = LogLevel.Log;
+const consoleLevel: LogLevel = LogLevel.Log;
 let consolePromptHandler: (() => void) | undefined;
 let logBroadcaster: ((level: "verbose" | "debug" | "log" | "error", message: string) => void) | undefined;
 
@@ -19,29 +19,6 @@ if (fs.existsSync(logDir)) {
     } catch {
         // Failed to create log file, continue without it
     }
-}
-
-export function setConsoleLevel(level: LogLevel): void {
-    consoleLevel = level;
-}
-
-export function setLogFile(filePath: string): void {
-    if (logFile) {
-        logFile.end();
-    }
-    try {
-        logFile = fs.createWriteStream(filePath, { flags: "a" });
-    } catch (e) {
-        console.error(`Failed to open log file: ${filePath}`, e);
-    }
-}
-
-export function setConsolePromptHandler(handler: (() => void) | undefined): void {
-    consolePromptHandler = handler;
-}
-
-export function setLogBroadcaster(broadcaster: ((level: "verbose" | "debug" | "log" | "error", message: string) => void) | undefined): void {
-    logBroadcaster = broadcaster;
 }
 
 function formatMessage(level: string, args: unknown[]): string {
@@ -81,52 +58,4 @@ export function doLog(
         const broadcastLevel = levelName.toLowerCase() as "verbose" | "debug" | "log" | "error";
         logBroadcaster(broadcastLevel, formatted);
     }
-}
-
-export function verbose(...args: unknown[]): void {
-    doLog(LogLevel.Verbose, "VERBOSE", console.log, ...args);
-}
-
-export function debug(...args: unknown[]): void {
-    doLog(LogLevel.Debug, "DEBUG", console.log, ...args);
-}
-
-export function log(...args: unknown[]): void {
-    doLog(LogLevel.Log, "INFO", console.log, ...args);
-}
-
-export function error(...args: unknown[]): void {
-    doLog(LogLevel.Error, "ERROR", console.error, ...args);
-}
-
-export function closeLogger(): void {
-    if (logFile) {
-        logFile.end();
-    }
-}
-
-// Native logging interface - provides callbacks for C++ code
-export interface NativeLogger {
-    verbose(message: string): void;
-    debug(message: string): void;
-    log(message: string): void;
-    error(message: string): void;
-}
-
-// Create logger instance for native code
-export function createNativeLogger(): NativeLogger {
-    return {
-        verbose: (message: string): void => {
-            verbose(message);
-        },
-        debug: (message: string): void => {
-            debug(message);
-        },
-        log: (message: string): void => {
-            log(message);
-        },
-        error: (message: string): void => {
-            error(message);
-        }
-    };
 }

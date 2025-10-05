@@ -10,6 +10,21 @@
 
 namespace konflikt {
 
+// MIME type to platform type mapping utilities
+class MimeTypeMapper {
+public:
+    // Convert MIME type to platform-specific type
+    static std::string mimeToMacType(const std::string &mimeType);
+    static std::string mimeToX11Type(const std::string &mimeType);
+    
+    // Convert platform type to MIME type
+    static std::string macTypeToMime(const std::string &macType);
+    static std::string x11TypeToMime(const std::string &x11Type);
+    
+    // Get all supported MIME types for platform
+    static std::vector<std::string> getSupportedMimeTypes();
+};
+
 enum class ClipboardSelection
 {
     Auto,      // Platform-specific default behavior

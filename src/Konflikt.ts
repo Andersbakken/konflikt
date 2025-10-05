@@ -1,5 +1,5 @@
 import { Console } from "./Console";
-import { InstanceRole } from "./Config";
+import { InstanceRole } from "./InstanceRole";
 import { KonfliktNative as KonfliktNativeConstructor } from "./native";
 import { PeerManager } from "./PeerManager";
 import { Rect } from "./Rect";
@@ -7,7 +7,7 @@ import { Server } from "./Server";
 import { createHash } from "crypto";
 import { createNativeLogger } from "./createNativeLogger";
 import { hostname, platform } from "os";
-import { setLogBroadcaster } from "./setLogBroadcaster";
+import { setLogBroadcaster } from "./logBroadcaster";
 import { verbose } from "./verbose";
 import type { Config } from "./Config";
 import type { ConnectedInstanceInfo } from "./ConnectedInstanceInfo";

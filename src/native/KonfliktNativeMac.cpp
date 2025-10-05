@@ -5,6 +5,7 @@
 #include <ApplicationServices/ApplicationServices.h>
 #include <Carbon/Carbon.h>
 #include <Cocoa/Cocoa.h>
+#include <algorithm>
 #include <atomic>
 #include <mutex>
 #include <thread>
@@ -259,29 +260,20 @@ public:
         
         NSPasteboard *pasteboard = [NSPasteboard generalPasteboard];
         
+        // Convert MIME type to macOS pasteboard type
+        std::string macType = MimeTypeMapper::mimeToMacType(mimeType);
+        NSString *nsType = [NSString stringWithUTF8String:macType.c_str()];
+        
+        // Special handling for text types
         if (mimeType == "text/plain" || mimeType == "text/plain;charset=utf-8") {
             std::string text = getClipboardText(selection);
             return std::vector<uint8_t>(text.begin(), text.end());
         }
-        else if (mimeType == "image/png") {
-            NSData *data = [pasteboard dataForType:NSPasteboardTypePNG];
-            if (data) {
-                const uint8_t *bytes = static_cast<const uint8_t *>([data bytes]);
-                return std::vector<uint8_t>(bytes, bytes + [data length]);
-            }
-        }
-        else if (mimeType == "image/tiff") {
+        
+        // Special handling for JPEG conversion from TIFF
+        if (mimeType == "image/jpeg" || mimeType == "image/jpg") {
             NSData *data = [pasteboard dataForType:NSPasteboardTypeTIFF];
             if (data) {
-                const uint8_t *bytes = static_cast<const uint8_t *>([data bytes]);
-                return std::vector<uint8_t>(bytes, bytes + [data length]);
-            }
-        }
-        else if (mimeType == "image/jpeg" || mimeType == "image/jpg") {
-            // Try to get TIFF first and convert, or check for direct JPEG data
-            NSData *data = [pasteboard dataForType:NSPasteboardTypeTIFF];
-            if (data) {
-                // Convert TIFF to JPEG
                 NSImage *image = [[NSImage alloc] initWithData:data];
                 if (image) {
                     NSBitmapImageRep *bitmap = [NSBitmapImageRep imageRepWithData:[image TIFFRepresentation]];
@@ -294,6 +286,14 @@ public:
                     }
                 }
             }
+            return {};
+        }
+        
+        // Generic data retrieval for all other types
+        NSData *data = [pasteboard dataForType:nsType];
+        if (data) {
+            const uint8_t *bytes = static_cast<const uint8_t *>([data bytes]);
+            return std::vector<uint8_t>(bytes, bytes + [data length]);
         }
         
         return {};
@@ -306,20 +306,14 @@ public:
         NSPasteboard *pasteboard = [NSPasteboard generalPasteboard];
         [pasteboard clearContents];
         
+        // Special handling for text types
         if (mimeType == "text/plain" || mimeType == "text/plain;charset=utf-8") {
             std::string text(data.begin(), data.end());
             return setClipboardText(text, selection);
         }
-        else if (mimeType == "image/png") {
-            NSData *nsData = [NSData dataWithBytes:data.data() length:data.size()];
-            return [pasteboard setData:nsData forType:NSPasteboardTypePNG];
-        }
-        else if (mimeType == "image/tiff") {
-            NSData *nsData = [NSData dataWithBytes:data.data() length:data.size()];
-            return [pasteboard setData:nsData forType:NSPasteboardTypeTIFF];
-        }
-        else if (mimeType == "image/jpeg" || mimeType == "image/jpg") {
-            // Convert JPEG to TIFF for better macOS compatibility
+        
+        // Special handling for JPEG conversion to TIFF
+        if (mimeType == "image/jpeg" || mimeType == "image/jpg") {
             NSData *jpegData = [NSData dataWithBytes:data.data() length:data.size()];
             NSImage *image = [[NSImage alloc] initWithData:jpegData];
             if (image) {
@@ -331,7 +325,12 @@ public:
             return false;
         }
         
-        return false;
+        // Generic data setting for all other types
+        std::string macType = MimeTypeMapper::mimeToMacType(mimeType);
+        NSString *nsType = [NSString stringWithUTF8String:macType.c_str()];
+        NSData *nsData = [NSData dataWithBytes:data.data() length:data.size()];
+        
+        return [pasteboard setData:nsData forType:nsType];
     }
 
     virtual std::vector<std::string> getClipboardMimeTypes(ClipboardSelection selection = ClipboardSelection::Auto) const override
@@ -343,16 +342,26 @@ public:
         std::vector<std::string> mimeTypes;
         
         for (NSString *type in types) {
+            std::string macType = [type UTF8String];
+            std::string mimeType = MimeTypeMapper::macTypeToMime(macType);
+            
+            // Add the converted MIME type
+            if (!mimeType.empty() && std::find(mimeTypes.begin(), mimeTypes.end(), mimeType) == mimeTypes.end()) {
+                mimeTypes.push_back(mimeType);
+            }
+            
+            // Special case: TIFF can be converted to JPEG
+            if ([type isEqualToString:NSPasteboardTypeTIFF]) {
+                if (std::find(mimeTypes.begin(), mimeTypes.end(), "image/jpeg") == mimeTypes.end()) {
+                    mimeTypes.push_back("image/jpeg");
+                }
+            }
+            
+            // Special case: text types
             if ([type isEqualToString:NSPasteboardTypeString]) {
-                mimeTypes.push_back("text/plain");
-                mimeTypes.push_back("text/plain;charset=utf-8");
-            }
-            else if ([type isEqualToString:NSPasteboardTypePNG]) {
-                mimeTypes.push_back("image/png");
-            }
-            else if ([type isEqualToString:NSPasteboardTypeTIFF]) {
-                mimeTypes.push_back("image/tiff");
-                mimeTypes.push_back("image/jpeg"); // Can convert from TIFF
+                if (std::find(mimeTypes.begin(), mimeTypes.end(), "text/plain;charset=utf-8") == mimeTypes.end()) {
+                    mimeTypes.push_back("text/plain;charset=utf-8");
+                }
             }
         }
         

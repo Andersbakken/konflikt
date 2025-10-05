@@ -1,4 +1,4 @@
-import type { ConfigType } from "./ConfigSchema";
+import type { ConfigType } from "./ConfigType";
 
 export interface ConvictInstance {
     get(key: string): unknown;

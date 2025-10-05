@@ -7,6 +7,7 @@
 #include <xcb/xtest.h>
 // xcb/xkb.h uses 'explicit' as a variable name which conflicts with C++ keyword
 // We only need xkbcommon, not the xcb xkb header
+#include <algorithm>
 #include <atomic>
 #include <chrono>
 #include <cstring>
@@ -604,7 +605,10 @@ private:
     std::vector<uint8_t> getSelectionData(const char* selection_name, const std::string &mimeType) const
     {
         xcb_atom_t selection_atom = getAtom(selection_name);
-        xcb_atom_t target_atom = getAtom(mimeType.c_str());
+        
+        // Convert MIME type to X11 selection target atom
+        std::string x11Type = MimeTypeMapper::mimeToX11Type(mimeType);
+        xcb_atom_t target_atom = getAtom(x11Type.c_str());
         xcb_atom_t target_property = getAtom("KONFLIKT_BINARY_DATA");
 
         if (selection_atom == XCB_NONE || target_atom == XCB_NONE || target_property == XCB_NONE) {
@@ -718,12 +722,19 @@ private:
                         for (int i = 0; i < count; ++i) {
                             std::string atomName = getAtomName(atoms[i]);
                             if (!atomName.empty()) {
-                                // Convert X11 atom names to MIME types
-                                if (atomName == "UTF8_STRING" || atomName == "TEXT" || atomName == "STRING") {
-                                    mimeTypes.push_back("text/plain");
-                                } else if (atomName.find("/") != std::string::npos) {
-                                    // Already looks like a MIME type
-                                    mimeTypes.push_back(atomName);
+                                // Convert X11 atom names to MIME types using mapper
+                                std::string mimeType = MimeTypeMapper::x11TypeToMime(atomName);
+                                
+                                // Add unique MIME types
+                                if (!mimeType.empty() && std::find(mimeTypes.begin(), mimeTypes.end(), mimeType) == mimeTypes.end()) {
+                                    mimeTypes.push_back(mimeType);
+                                }
+                                
+                                // If atom name looks like a MIME type already, add it too
+                                if (atomName.find("/") != std::string::npos && atomName != mimeType) {
+                                    if (std::find(mimeTypes.begin(), mimeTypes.end(), atomName) == mimeTypes.end()) {
+                                        mimeTypes.push_back(atomName);
+                                    }
                                 }
                             }
                         }

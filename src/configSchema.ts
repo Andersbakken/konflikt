@@ -1,4 +1,4 @@
-import { CommandLineArgs } from "./CommandLineArgs.js";
+import { CommandLineArgs } from "./CommandLineArgs";
 import { format } from "util";
 import convict from "convict";
 // Note: convict-format-with-validator has issues with ES modules, using basic convict for now
@@ -70,7 +70,7 @@ convict.addFormat({
 });
 
 // Define the configuration schema
-export const configSchema = convict.default({
+export const configSchema = convict({
     // Instance identity
     instance: {
         id: {

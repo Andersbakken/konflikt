@@ -1,16 +1,16 @@
 import { z } from "zod";
 
 // Import schemas for union type
-import { DisconnectSchema } from "./Disconnect";
-import { ErrorMessageSchema } from "./ErrorMessage";
-import { HandshakeRequestSchema } from "./HandshakeRequest";
-import { HandshakeResponseSchema } from "./HandshakeResponse";
-import { HeartbeatSchema } from "./Heartbeat";
-import { KeyPressEventSchema } from "./KeyPressEvent";
-import { KeyReleaseEventSchema } from "./KeyReleaseEvent";
-import { MouseMoveEventSchema } from "./MouseMoveEvent";
-import { MousePressEventSchema } from "./MousePressEvent";
-import { MouseReleaseEventSchema } from "./MouseReleaseEvent";
+import { DisconnectSchema } from "./DisconnectSchema";
+import { ErrorMessageSchema } from "./ErrorMessageSchema";
+import { HandshakeRequestSchema } from "./HandshakeRequestSchema";
+import { HandshakeResponseSchema } from "./HandshakeResponseSchema";
+import { HeartbeatSchema } from "./HeartbeatSchema";
+import { KeyPressEventSchema } from "./KeyPressEventSchema";
+import { KeyReleaseEventSchema } from "./KeyReleaseEventSchema";
+import { MouseMoveEventSchema } from "./MouseMoveEventSchema";
+import { MousePressEventSchema } from "./MousePressEventSchema";
+import { MouseReleaseEventSchema } from "./MouseReleaseEventSchema";
 
 // Union of all message types
 export const MessageSchema = z.discriminatedUnion("type", [

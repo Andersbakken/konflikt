@@ -1,5 +1,5 @@
 import { createInterface } from "readline";
-import { setConsolePromptHandler } from "./setConsolePromptHandler";
+import { setConsolePromptHandler } from "./consolePromptHandler";
 import type { Config } from "./Config";
 import type { Konflikt } from "./Konflikt";
 
@@ -10,12 +10,12 @@ export class Console {
 
     constructor(konflikt: Konflikt) {
         this.#konflikt = konflikt;
-        
+
         // Check if stdin is available and connected to a TTY
         if (!process.stdin.readable || !process.stdin.isTTY) {
             throw new Error("Console requires an interactive TTY stdin");
         }
-        
+
         this.#readline = createInterface({
             input: process.stdin,
             output: process.stdout,
@@ -32,7 +32,7 @@ export class Console {
         setConsolePromptHandler(() => {
             this.#readline.prompt(true);
         });
-        
+
         // Clear any existing output and show console startup message
         process.stdout.write('\n');
         this.#consoleLog("Interactive console started. Type 'help' for available commands.");
@@ -92,7 +92,7 @@ export class Console {
         if (!commandName) {
             return;
         }
-        
+
         const args = parts.slice(1);
         const command = this.#commands.get(commandName);
         if (command) {
@@ -235,7 +235,7 @@ export class Console {
 
         this.#commands.set("quit", {
             description: "Exit the application",
-            usage: "quit", 
+            usage: "quit",
             handler: () => {
                 this.#consoleLog("Exiting...");
                 process.exit(0);
@@ -246,22 +246,22 @@ export class Console {
     #showAllConfig(config: Config): void {
         this.#consoleLog("Current Configuration:");
         this.#consoleLog("======================");
-        
+
         this.#consoleLog("\\nInstance:");
         this.#consoleLog(`  ID: ${config.instanceId}`);
         this.#consoleLog(`  Name: ${config.instanceName}`);
         this.#consoleLog(`  Role: ${config.role}`);
-        
+
         this.#consoleLog("\\nNetwork:");
         this.#consoleLog(`  Port: ${config.port}`);
         this.#consoleLog(`  Host: ${config.host}`);
         this.#consoleLog(`  Discovery Enabled: ${config.discoveryEnabled}`);
         this.#consoleLog(`  Service Name: ${config.serviceName}`);
-        
+
         this.#consoleLog("\\nLogging:");
         this.#consoleLog(`  Level: ${config.logLevel}`);
         this.#consoleLog(`  File: ${config.logFile || "none"}`);
-        
+
         this.#consoleLog("\\nDevelopment:");
         this.#consoleLog(`  Enabled: ${config.developmentEnabled}`);
         this.#consoleLog(`  Mock Input: ${config.mockInput}`);
@@ -381,17 +381,17 @@ export class Console {
         const config = this.#konflikt.config;
         this.#consoleLog("Peers Configuration:");
         this.#consoleLog("===================");
-        
+
         if (config.serverHost && config.serverPort) {
             this.#consoleLog(`Server: ${config.serverHost}:${config.serverPort}`);
         }
-        
+
         if (config.peers.length > 0) {
             this.#consoleLog(`Manual Peers: ${JSON.stringify(config.peers, null, 2)}`);
         } else {
             this.#consoleLog("Manual Peers: none");
         }
-        
+
         const adjacency = config.adjacency;
         if (Object.keys(adjacency).length > 0) {
             this.#consoleLog(`Adjacency Map: ${JSON.stringify(adjacency, null, 2)}`);

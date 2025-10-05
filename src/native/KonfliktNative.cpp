@@ -4,6 +4,157 @@
 
 namespace konflikt {
 
+// MIME type mapping implementation
+std::string MimeTypeMapper::mimeToMacType(const std::string &mimeType) {
+    static const std::unordered_map<std::string, std::string> mimeToMac = {
+        // Text types
+        {"text/plain", "public.utf8-plain-text"},
+        {"text/plain;charset=utf-8", "public.utf8-plain-text"},
+        {"text/html", "public.html"},
+        {"text/rtf", "public.rtf"},
+        {"text/uri-list", "public.file-url"},
+        
+        // Image types
+        {"image/png", "public.png"},
+        {"image/jpeg", "public.jpeg"},
+        {"image/jpg", "public.jpeg"}, 
+        {"image/gif", "com.compuserve.gif"},
+        {"image/tiff", "public.tiff"},
+        {"image/bmp", "com.microsoft.bmp"},
+        {"image/webp", "org.webmproject.webp"},
+        {"image/svg+xml", "public.svg-image"},
+        
+        // Document types
+        {"application/pdf", "com.adobe.pdf"},
+        {"application/postscript", "com.adobe.postscript"},
+        {"application/rtf", "public.rtf"},
+        
+        // Archive types
+        {"application/zip", "public.zip-archive"},
+        {"application/x-tar", "public.tar-archive"},
+        {"application/gzip", "org.gnu.gnu-zip-archive"},
+        
+        // Audio types
+        {"audio/mpeg", "public.mp3"},
+        {"audio/wav", "com.microsoft.waveform-audio"},
+        {"audio/aac", "public.aac-audio"},
+        {"audio/flac", "org.xiph.flac"},
+        
+        // Video types  
+        {"video/mp4", "public.mpeg-4"},
+        {"video/quicktime", "com.apple.quicktime-movie"},
+        {"video/avi", "public.avi"},
+        
+        // Data types
+        {"application/json", "public.json"},
+        {"application/xml", "public.xml"},
+        {"text/csv", "public.comma-separated-values-text"},
+        {"text/tab-separated-values", "public.tab-separated-values-text"},
+    };
+    
+    auto it = mimeToMac.find(mimeType);
+    return (it != mimeToMac.end()) ? it->second : mimeType;
+}
+
+std::string MimeTypeMapper::mimeToX11Type(const std::string &mimeType) {
+    // X11 typically uses MIME types directly, but has some special cases
+    static const std::unordered_map<std::string, std::string> mimeToX11 = {
+        {"text/plain", "UTF8_STRING"},
+        {"text/plain;charset=utf-8", "UTF8_STRING"},
+        {"text/uri-list", "text/uri-list"},
+    };
+    
+    auto it = mimeToX11.find(mimeType);
+    return (it != mimeToX11.end()) ? it->second : mimeType;
+}
+
+std::string MimeTypeMapper::macTypeToMime(const std::string &macType) {
+    static const std::unordered_map<std::string, std::string> macToMime = {
+        // Text types
+        {"public.utf8-plain-text", "text/plain"},
+        {"public.plain-text", "text/plain"},
+        {"public.html", "text/html"},
+        {"public.rtf", "text/rtf"},
+        {"public.file-url", "text/uri-list"},
+        
+        // Image types
+        {"public.png", "image/png"},
+        {"public.jpeg", "image/jpeg"},
+        {"com.compuserve.gif", "image/gif"},
+        {"public.tiff", "image/tiff"},
+        {"com.microsoft.bmp", "image/bmp"},
+        {"org.webmproject.webp", "image/webp"},
+        {"public.svg-image", "image/svg+xml"},
+        
+        // Document types
+        {"com.adobe.pdf", "application/pdf"},
+        {"com.adobe.postscript", "application/postscript"},
+        
+        // Archive types
+        {"public.zip-archive", "application/zip"},
+        {"public.tar-archive", "application/x-tar"},
+        {"org.gnu.gnu-zip-archive", "application/gzip"},
+        
+        // Audio types
+        {"public.mp3", "audio/mpeg"},
+        {"com.microsoft.waveform-audio", "audio/wav"},
+        {"public.aac-audio", "audio/aac"},
+        {"org.xiph.flac", "audio/flac"},
+        
+        // Video types
+        {"public.mpeg-4", "video/mp4"},
+        {"com.apple.quicktime-movie", "video/quicktime"},
+        {"public.avi", "video/avi"},
+        
+        // Data types
+        {"public.json", "application/json"},
+        {"public.xml", "application/xml"},
+        {"public.comma-separated-values-text", "text/csv"},
+        {"public.tab-separated-values-text", "text/tab-separated-values"},
+    };
+    
+    auto it = macToMime.find(macType);
+    return (it != macToMime.end()) ? it->second : macType;
+}
+
+std::string MimeTypeMapper::x11TypeToMime(const std::string &x11Type) {
+    static const std::unordered_map<std::string, std::string> x11ToMime = {
+        {"UTF8_STRING", "text/plain"},
+        {"STRING", "text/plain"},
+        {"TEXT", "text/plain"},
+        {"text/uri-list", "text/uri-list"},
+    };
+    
+    auto it = x11ToMime.find(x11Type);
+    return (it != x11ToMime.end()) ? it->second : x11Type;
+}
+
+std::vector<std::string> MimeTypeMapper::getSupportedMimeTypes() {
+    return {
+        // Text types
+        "text/plain", "text/html", "text/rtf", "text/uri-list", "text/csv", "text/tab-separated-values",
+        
+        // Image types  
+        "image/png", "image/jpeg", "image/jpg", "image/gif", "image/tiff", "image/bmp", 
+        "image/webp", "image/svg+xml",
+        
+        // Document types
+        "application/pdf", "application/postscript", "application/rtf",
+        
+        // Archive types
+        "application/zip", "application/x-tar", "application/gzip",
+        
+        // Audio types
+        "audio/mpeg", "audio/wav", "audio/aac", "audio/flac",
+        
+        // Video types
+        "video/mp4", "video/quicktime", "video/avi",
+        
+        // Data types
+        "application/json", "application/xml"
+    };
+}
+
 // Helper to get current timestamp in milliseconds
 uint64_t timestamp()
 {
