@@ -1,9 +1,11 @@
 import { type ConfigType, SHORT_OPTIONS, configSchema } from "./ConfigSchema";
-import { debug, error } from "./Log";
+import { debug } from "./debug";
+import { error } from "./error";
 import { existsSync, readFileSync } from "fs";
 import { homedir, hostname } from "os";
 import { runInNewContext } from "vm";
 import path from "path";
+import type { ScreenEdges } from "./types/ScreenEdges";
 
 // Type unions for configuration values
 export const enum InstanceRole {
@@ -128,7 +130,7 @@ export class Config {
         return this.#integer("screen.dimensions.height");
     }
 
-    get screenEdges(): { top: boolean; right: boolean; bottom: boolean; left: boolean } {
+    get screenEdges(): ScreenEdges {
         const edges = this.#get("screen.edges") as {
             top: boolean;
             right: boolean;

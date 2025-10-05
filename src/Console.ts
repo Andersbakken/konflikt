@@ -1,5 +1,5 @@
 import { createInterface } from "readline";
-import { setConsolePromptHandler } from "./Log";
+import { setConsolePromptHandler } from "./setConsolePromptHandler";
 import type { Config } from "./Config";
 import type { Konflikt } from "./Konflikt";
 

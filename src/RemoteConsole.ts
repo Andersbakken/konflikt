@@ -1,8 +1,12 @@
 import { type ConsoleMessage, isConsoleMessage } from "./messageValidation";
-import { LogLevel, debug, error } from "./Log";
+import { LogLevel } from "./LogLevel";
 import { createInterface } from "readline";
+import { debug } from "./debug";
+import { error } from "./error";
 import { textFromWebSocketMessage } from "./textFromWebSocketMessage";
 import WebSocket from "ws";
+import type { ConsoleLogMessage } from "./types/ConsoleLogMessage";
+import type { HostAndPort } from "./types/HostAndPort";
 
 export class RemoteConsole {
     #readline: ReturnType<typeof createInterface>;
@@ -231,7 +235,7 @@ export class RemoteConsole {
         }
     }
 
-    #handleLogMessage(message: { type: "console_log"; level: string; message: string; timestamp?: number }): void {
+    #handleLogMessage(message: ConsoleLogMessage): void {
         // Map log level strings to LogLevel enum values
         let messageLogLevel: LogLevel;
         switch (message.level) {
@@ -261,7 +265,7 @@ export class RemoteConsole {
 }
 
 // Helper function to parse host:port string
-export function parseRemoteConsoleHost(hostString: string): { host: string; port: number } {
+export function parseRemoteConsoleHost(hostString: string): HostAndPort {
     const defaultPort = 3000;
 
     if (hostString.includes(":")) {

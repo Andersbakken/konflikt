@@ -1,6 +1,8 @@
 import { Bonjour } from "bonjour-service";
 import { EventEmitter } from "events";
-import { debug, error, log } from "./Log";
+import { debug } from "./debug";
+import { error } from "./error";
+import { log } from "./log";
 import type { DiscoveredService } from "./DiscoveredService";
 import type { Service } from "bonjour-service";
 

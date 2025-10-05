@@ -1,4 +1,4 @@
-import type { KonfliktNative as IKonfliktNative, NativeLoggerCallbacks } from "./KonfliktNative.js";
+import type { KonfliktNative as IKonfliktNative, NativeLoggerCallbacks } from "./KonfliktNative";
 
 // Determine which build to load based on NODE_ENV or KONFLIKT_BUILD
 const buildType =

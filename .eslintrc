@@ -34,6 +34,7 @@
         "eqeqeq": "error",
         "grouped-accessor-pairs": "error",
         "max-classes-per-file": ["error", 1],
+        "import/no-default-export": "error",
         "no-caller": "error",
         "no-case-declarations": "error",
         "no-console": "off",

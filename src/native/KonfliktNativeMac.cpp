@@ -4,6 +4,7 @@
 
 #include <ApplicationServices/ApplicationServices.h>
 #include <Carbon/Carbon.h>
+#include <Cocoa/Cocoa.h>
 #include <atomic>
 #include <mutex>
 #include <thread>
@@ -221,6 +222,29 @@ public:
     virtual bool isCursorVisible() const override
     {
         return mCursorVisible;
+    }
+
+    virtual std::string getClipboardText() const override
+    {
+        NSPasteboard *pasteboard = [NSPasteboard generalPasteboard];
+        NSString *string = [pasteboard stringForType:NSPasteboardTypeString];
+        
+        if (string) {
+            return std::string([string UTF8String]);
+        }
+        
+        return "";
+    }
+
+    virtual bool setClipboardText(const std::string &text) override
+    {
+        NSPasteboard *pasteboard = [NSPasteboard generalPasteboard];
+        [pasteboard clearContents];
+        
+        NSString *nsString = [NSString stringWithUTF8String:text.c_str()];
+        BOOL success = [pasteboard setString:nsString forType:NSPasteboardTypeString];
+        
+        return success == YES;
     }
 
 private:

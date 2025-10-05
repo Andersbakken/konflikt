@@ -1,5 +1,6 @@
 import { Konflikt } from "./Konflikt";
-import { debug, log } from "./Log";
+import { debug } from "./debug";
+import { log } from "./log";
 import type { Config } from "./Config";
 
 export async function main(config: Config): Promise<void> {

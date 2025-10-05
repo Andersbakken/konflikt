@@ -8,6 +8,7 @@
 // xcb/xkb.h uses 'explicit' as a variable name which conflicts with C++ keyword
 // We only need xkbcommon, not the xcb xkb header
 #include <atomic>
+#include <chrono>
 #include <cstring>
 #include <mutex>
 #include <thread>
@@ -117,6 +118,7 @@ public:
         mIsRunning     = false;
         mCursorVisible = true;
         mBlankCursor   = XCB_NONE;
+        mClipboardWindow = XCB_NONE;
         return true;
     }
 
@@ -127,6 +129,11 @@ public:
         if (mBlankCursor != XCB_NONE) {
             xcb_free_cursor(mConnection, mBlankCursor);
             mBlankCursor = XCB_NONE;
+        }
+
+        if (mClipboardWindow != XCB_NONE) {
+            xcb_destroy_window(mConnection, mClipboardWindow);
+            mClipboardWindow = XCB_NONE;
         }
 
         if (mXkbState) {
@@ -319,7 +326,157 @@ public:
         return mCursorVisible;
     }
 
+    virtual std::string getClipboardText() const override
+    {
+        if (!mConnection || !mScreen) {
+            return "";
+        }
+
+        // Try to get clipboard content from both CLIPBOARD and PRIMARY selections
+        std::string result = getSelectionText("CLIPBOARD");
+        if (result.empty()) {
+            result = getSelectionText("PRIMARY");
+        }
+        return result;
+    }
+
+    virtual bool setClipboardText(const std::string &text) override
+    {
+        if (!mConnection || !mScreen) {
+            return false;
+        }
+
+        xcb_atom_t clipboard_atom = getAtom("CLIPBOARD");
+        xcb_atom_t primary_atom = getAtom("PRIMARY");
+        
+        if (clipboard_atom == XCB_NONE) {
+            return false;
+        }
+
+        // Store the text for future selection requests
+        mClipboardText = text;
+
+        // Create a window to own the selection
+        if (mClipboardWindow == XCB_NONE) {
+            mClipboardWindow = xcb_generate_id(mConnection);
+            uint32_t values[] = { XCB_EVENT_MASK_PROPERTY_CHANGE };
+            xcb_create_window(mConnection, XCB_COPY_FROM_PARENT, mClipboardWindow, mScreen->root,
+                             0, 0, 1, 1, 0, XCB_WINDOW_CLASS_INPUT_OUTPUT,
+                             mScreen->root_visual, XCB_CW_EVENT_MASK, values);
+        }
+
+        // Set both CLIPBOARD and PRIMARY selections
+        xcb_set_selection_owner(mConnection, mClipboardWindow, clipboard_atom, XCB_CURRENT_TIME);
+        if (primary_atom != XCB_NONE) {
+            xcb_set_selection_owner(mConnection, mClipboardWindow, primary_atom, XCB_CURRENT_TIME);
+        }
+        xcb_flush(mConnection);
+
+        // Verify we own the CLIPBOARD selection
+        xcb_get_selection_owner_cookie_t cookie = xcb_get_selection_owner(mConnection, clipboard_atom);
+        xcb_get_selection_owner_reply_t *reply = xcb_get_selection_owner_reply(mConnection, cookie, nullptr);
+        
+        bool success = false;
+        if (reply) {
+            success = (reply->owner == mClipboardWindow);
+            free(reply);
+        }
+
+        return success;
+    }
+
 private:
+    std::string getSelectionText(const char* selection_name) const
+    {
+        xcb_atom_t selection_atom = getAtom(selection_name);
+        xcb_atom_t utf8_atom = getAtom("UTF8_STRING");
+        xcb_atom_t text_atom = getAtom("TEXT");
+        xcb_atom_t target_property = getAtom("KONFLIKT_SELECTION_DATA");
+
+        if (selection_atom == XCB_NONE || target_property == XCB_NONE) {
+            return "";
+        }
+
+        // Create a temporary window to receive the selection data
+        xcb_window_t window = xcb_generate_id(mConnection);
+        uint32_t values[] = { XCB_EVENT_MASK_PROPERTY_CHANGE };
+        xcb_create_window(mConnection, XCB_COPY_FROM_PARENT, window, mScreen->root,
+                         0, 0, 1, 1, 0, XCB_WINDOW_CLASS_INPUT_OUTPUT,
+                         mScreen->root_visual, XCB_CW_EVENT_MASK, values);
+
+        // Try UTF8_STRING first, then TEXT, then STRING
+        xcb_atom_t targets[] = { utf8_atom, text_atom, XCB_ATOM_STRING };
+        std::string result;
+
+        for (xcb_atom_t target : targets) {
+            if (target == XCB_NONE) continue;
+
+            // Request selection content
+            xcb_convert_selection(mConnection, window, selection_atom, target, 
+                                 target_property, XCB_CURRENT_TIME);
+            xcb_flush(mConnection);
+
+            bool received = false;
+            auto start_time = std::chrono::steady_clock::now();
+            const auto timeout = std::chrono::milliseconds(500);
+
+            // Wait for SelectionNotify event
+            while (!received && (std::chrono::steady_clock::now() - start_time) < timeout) {
+                xcb_generic_event_t *event = xcb_poll_for_event(mConnection);
+                if (!event) {
+                    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+                    continue;
+                }
+
+                uint8_t response_type = event->response_type & ~0x80;
+                if (response_type == XCB_SELECTION_NOTIFY) {
+                    xcb_selection_notify_event_t *se = (xcb_selection_notify_event_t*)event;
+                    if (se->selection == selection_atom && se->property != XCB_NONE) {
+                        // Get the actual data
+                        xcb_get_property_cookie_t cookie = xcb_get_property(mConnection, 1, window,
+                                                                           target_property, XCB_ATOM_ANY, 0, UINT32_MAX);
+                        xcb_get_property_reply_t *reply = xcb_get_property_reply(mConnection, cookie, nullptr);
+                        
+                        if (reply && xcb_get_property_value_length(reply) > 0) {
+                            const char* data = (const char*)xcb_get_property_value(reply);
+                            int length = xcb_get_property_value_length(reply);
+                            result = std::string(data, length);
+                        }
+                        
+                        if (reply) {
+                            free(reply);
+                        }
+                    }
+                    received = true;
+                }
+                free(event);
+            }
+
+            if (!result.empty()) {
+                break;
+            }
+        }
+
+        // Clean up window
+        xcb_destroy_window(mConnection, window);
+        xcb_flush(mConnection);
+
+        return result;
+    }
+
+    xcb_atom_t getAtom(const char* name) const
+    {
+        xcb_intern_atom_cookie_t cookie = xcb_intern_atom(mConnection, 0, strlen(name), name);
+        xcb_intern_atom_reply_t *reply = xcb_intern_atom_reply(mConnection, cookie, nullptr);
+        
+        xcb_atom_t atom = XCB_NONE;
+        if (reply) {
+            atom = reply->atom;
+            free(reply);
+        }
+        return atom;
+    }
+
     static uint8_t buttonFromMouseButton(MouseButton button)
     {
         switch (button) {
@@ -407,6 +564,10 @@ private:
                 if (ge->extension == mXinputOpcode) {
                     processXInputEvent(ge);
                 }
+            }
+            // Handle selection requests for clipboard
+            else if (response_type == XCB_SELECTION_REQUEST) {
+                processSelectionRequest(reinterpret_cast<xcb_selection_request_event_t*>(event));
             }
 
             free(event);
@@ -516,6 +677,45 @@ private:
         }
     }
 
+    void processSelectionRequest(xcb_selection_request_event_t *req)
+    {
+        xcb_atom_t clipboard_atom = getAtom("CLIPBOARD");
+        xcb_atom_t primary_atom = getAtom("PRIMARY");
+        xcb_atom_t utf8_atom = getAtom("UTF8_STRING");
+        xcb_atom_t text_atom = getAtom("TEXT");
+        xcb_atom_t targets_atom = getAtom("TARGETS");
+
+        xcb_selection_notify_event_t notify_event = {};
+        notify_event.response_type = XCB_SELECTION_NOTIFY;
+        notify_event.time = req->time;
+        notify_event.requestor = req->requestor;
+        notify_event.selection = req->selection;
+        notify_event.target = req->target;
+        notify_event.property = XCB_NONE; // Default to refusing
+
+        if ((req->selection == clipboard_atom || req->selection == primary_atom) && !mClipboardText.empty()) {
+            if (req->target == targets_atom) {
+                // Return list of supported targets
+                xcb_atom_t targets[] = { utf8_atom, text_atom, XCB_ATOM_STRING };
+                xcb_change_property(mConnection, XCB_PROP_MODE_REPLACE, req->requestor,
+                                   req->property, XCB_ATOM_ATOM, 32,
+                                   sizeof(targets) / sizeof(xcb_atom_t), targets);
+                notify_event.property = req->property;
+            }
+            else if (req->target == utf8_atom || req->target == text_atom || req->target == XCB_ATOM_STRING) {
+                // Return the clipboard text
+                xcb_change_property(mConnection, XCB_PROP_MODE_REPLACE, req->requestor,
+                                   req->property, req->target, 8,
+                                   mClipboardText.length(), mClipboardText.c_str());
+                notify_event.property = req->property;
+            }
+        }
+
+        xcb_send_event(mConnection, false, req->requestor, XCB_EVENT_MASK_NO_EVENT,
+                      reinterpret_cast<char*>(&notify_event));
+        xcb_flush(mConnection);
+    }
+
     xcb_cursor_t createBlankCursor()
     {
         if (!mConnection || !mScreen) {
@@ -549,6 +749,10 @@ private:
 
     bool mCursorVisible { true };
     xcb_cursor_t mBlankCursor { XCB_NONE };
+
+    // Clipboard support
+    mutable std::string mClipboardText;
+    xcb_window_t mClipboardWindow { XCB_NONE };
 };
 
 std::unique_ptr<IPlatformHook> createPlatformHook()

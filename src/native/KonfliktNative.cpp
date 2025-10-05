@@ -132,7 +132,7 @@ Event eventFromObject(const Napi::Object &obj)
 // KonfliktNative implementation
 Napi::Object KonfliktNative::Init(Napi::Env env, Napi::Object exports)
 {
-    Napi::Function func = DefineClass(env, "KonfliktNative", { InstanceAccessor<&KonfliktNative::GetDesktop>("desktop"), InstanceAccessor<&KonfliktNative::GetState>("state"), InstanceMethod<&KonfliktNative::On>("on"), InstanceMethod<&KonfliktNative::Off>("off"), InstanceMethod<&KonfliktNative::SendMouseEvent>("sendMouseEvent"), InstanceMethod<&KonfliktNative::SendKeyEvent>("sendKeyEvent"), InstanceMethod<&KonfliktNative::showCursor>("showCursor"), InstanceMethod<&KonfliktNative::hideCursor>("hideCursor"), InstanceAccessor<&KonfliktNative::isCursorVisible>("isCursorVisible") });
+    Napi::Function func = DefineClass(env, "KonfliktNative", { InstanceAccessor<&KonfliktNative::GetDesktop>("desktop"), InstanceAccessor<&KonfliktNative::GetState>("state"), InstanceMethod<&KonfliktNative::On>("on"), InstanceMethod<&KonfliktNative::Off>("off"), InstanceMethod<&KonfliktNative::SendMouseEvent>("sendMouseEvent"), InstanceMethod<&KonfliktNative::SendKeyEvent>("sendKeyEvent"), InstanceMethod<&KonfliktNative::showCursor>("showCursor"), InstanceMethod<&KonfliktNative::hideCursor>("hideCursor"), InstanceAccessor<&KonfliktNative::isCursorVisible>("isCursorVisible"), InstanceMethod<&KonfliktNative::getClipboardText>("getClipboardText"), InstanceMethod<&KonfliktNative::setClipboardText>("setClipboardText") });
 
     Napi::FunctionReference *constructor = new Napi::FunctionReference();
     *constructor                         = Napi::Persistent(func);
@@ -455,6 +455,34 @@ Napi::Value KonfliktNative::isCursorVisible(const Napi::CallbackInfo &info)
     }
 
     return Napi::Boolean::New(env, true);
+}
+
+Napi::Value KonfliktNative::getClipboardText(const Napi::CallbackInfo &info)
+{
+    Napi::Env env = info.Env();
+
+    if (mPlatformHook) {
+        std::string text = mPlatformHook->getClipboardText();
+        return Napi::String::New(env, text);
+    }
+
+    return Napi::String::New(env, "");
+}
+
+void KonfliktNative::setClipboardText(const Napi::CallbackInfo &info)
+{
+    Napi::Env env = info.Env();
+
+    if (info.Length() < 1 || !info[0].IsString()) {
+        Napi::TypeError::New(env, "Expected string argument").ThrowAsJavaScriptException();
+        return;
+    }
+
+    std::string text = info[0].As<Napi::String>().Utf8Value();
+
+    if (mPlatformHook) {
+        mPlatformHook->setClipboardText(text);
+    }
 }
 
 void KonfliktNative::handlePlatformEvent(const Event &event)

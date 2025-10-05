@@ -1,7 +1,10 @@
 import { EventEmitter } from "events";
 import { WebSocketClient } from "./WebSocketClient";
 import { createBaseMessage } from "./messages";
-import { debug, error, log, verbose } from "./Log";
+import { debug } from "./debug";
+import { error } from "./error";
+import { log } from "./log";
+import { verbose } from "./verbose";
 import type { DiscoveredService } from "./DiscoveredService";
 import type {
     HandshakeResponse,
@@ -12,7 +15,7 @@ import type {
     MousePressEvent,
     MouseReleaseEvent
 } from "./messages";
-import type { PreferredPosition, ScreenGeometry } from "./types/ScreenPositioning.js";
+import type { PreferredPosition, ScreenGeometry } from "./types/ScreenPositioning";
 
 export interface PeerManagerEvents {
     peer_connected: [service: DiscoveredService, capabilities: string[]];

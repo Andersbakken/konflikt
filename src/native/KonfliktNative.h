@@ -103,6 +103,9 @@ public:
     virtual void hideCursor()            = 0;
     virtual bool isCursorVisible() const = 0;
 
+    virtual std::string getClipboardText() const = 0;
+    virtual bool setClipboardText(const std::string &text) = 0;
+
     std::function<void(const Event &)> eventCallback;
 };
 
@@ -130,6 +133,10 @@ private:
     void showCursor(const Napi::CallbackInfo &info);
     void hideCursor(const Napi::CallbackInfo &info);
     Napi::Value isCursorVisible(const Napi::CallbackInfo &info);
+
+    // Clipboard methods
+    Napi::Value getClipboardText(const Napi::CallbackInfo &info);
+    void setClipboardText(const Napi::CallbackInfo &info);
 
     // Internal event handling
     void dispatchEvent(const Event &event);

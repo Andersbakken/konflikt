@@ -1,8 +1,11 @@
 import { ServerConsole } from "./ServerConsole";
 import { ServiceDiscovery } from "./ServiceDiscovery";
-import { debug, error, log, verbose } from "./Log";
+import { debug } from "./debug";
+import { error } from "./error";
 import { isInputEventMessage, isInstanceInfoMessage } from "./messageValidation";
+import { log } from "./log";
 import { textFromWebSocketMessage } from "./textFromWebSocketMessage";
+import { verbose } from "./verbose";
 import Fastify from "fastify";
 import WebSocket from "ws";
 import type { Config } from "./Config";

@@ -1,15 +1,17 @@
-import { Console } from "./Console.js";
-import { InstanceRole } from "./Config.js";
-import { KonfliktNative as KonfliktNativeConstructor } from "./native.js";
-import { PeerManager } from "./PeerManager.js";
-import { Server } from "./Server.js";
+import { Console } from "./Console";
+import { InstanceRole } from "./Config";
+import { KonfliktNative as KonfliktNativeConstructor } from "./native";
+import { PeerManager } from "./PeerManager";
+import { Server } from "./Server";
 import { createHash } from "crypto";
-import { createNativeLogger, setLogBroadcaster, verbose } from "./Log";
+import { createNativeLogger } from "./createNativeLogger";
 import { hostname, platform } from "os";
-import type { Config } from "./Config.js";
-import type { DiscoveredService } from "./DiscoveredService.js";
+import { setLogBroadcaster } from "./setLogBroadcaster";
+import { verbose } from "./verbose";
+import type { Config } from "./Config";
+import type { DiscoveredService } from "./DiscoveredService";
 import type { InputEventData, InputEventMessage, InstanceInfoMessage } from "./messageValidation";
-import type { KeyPressEvent, KeyReleaseEvent, MouseMoveEvent, MousePressEvent, MouseReleaseEvent } from "./messages/index.js";
+import type { KeyPressEvent, KeyReleaseEvent, MouseMoveEvent, MousePressEvent, MouseReleaseEvent } from "./messages/index";
 import type {
     KonfliktDesktopEvent,
     KonfliktKeyPressEvent,
@@ -17,9 +19,8 @@ import type {
     KonfliktMouseButtonPressEvent,
     KonfliktMouseButtonReleaseEvent,
     KonfliktMouseMoveEvent
-} from "./KonfliktNative";
-import type { KonfliktNative } from "./KonfliktNative.js";
-import type { Side } from "./types/ScreenPositioning.js";
+, KonfliktNative } from "./KonfliktNative";
+import type { Side } from "./types/ScreenPositioning";
 
 export interface Rect {
     x: number;

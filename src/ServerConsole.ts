@@ -1,5 +1,6 @@
 import { type ConsoleCommandMessage, isConsoleCommandMessage } from "./messageValidation";
-import { debug, error } from "./Log";
+import { debug } from "./debug";
+import { error } from "./error";
 import { textFromWebSocketMessage } from "./textFromWebSocketMessage";
 import WebSocket from "ws";
 import type { Config } from "./Config";

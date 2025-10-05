@@ -1,4 +1,4 @@
-import { LogLevel } from "./Log";
+import { LogLevel } from "./LogLevel";
 import { RemoteConsole, parseRemoteConsoleHost } from "./RemoteConsole";
 
 export async function startRemoteConsole(remoteConsoleHost: string, logLevel: LogLevel = LogLevel.Log): Promise<void> {

@@ -1,7 +1,9 @@
 #!/usr/bin/env node
 import { Config } from "./Config";
-import { LogLevel, setConsoleLevel, setLogFile } from "./Log";
+import { LogLevel } from "./LogLevel";
 import { main } from "./main";
+import { setConsoleLevel } from "./setConsoleLevel";
+import { setLogFile } from "./setLogFile";
 import { startRemoteConsole } from "./startRemoteConsole";
 
 // Handle help and version before config loading

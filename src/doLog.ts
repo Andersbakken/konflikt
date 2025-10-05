@@ -1,15 +1,8 @@
+import { LogLevel } from "./LogLevel";
 import { format } from "util";
 import { homedir } from "os";
 import fs from "fs";
 import path from "path";
-
-export const enum LogLevel {
-    Verbose = 0,
-    Debug = 1,
-    Log = 2,
-    Error = 3,
-    Silent = 4
-}
 
 // Global logger state
 let logFile: fs.WriteStream | undefined;
@@ -57,7 +50,7 @@ function formatMessage(level: string, args: unknown[]): string {
     return `[${timestamp}] [${level}] ${message}`;
 }
 
-function doLog(
+export function doLog(
     level: LogLevel,
     levelName: string,
     consoleMethod: (...args: unknown[]) => void,
