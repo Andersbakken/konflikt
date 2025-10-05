@@ -733,7 +733,8 @@ Napi::Value KonfliktNative::getClipboardMimeTypes(const Napi::CallbackInfo &info
 
 void KonfliktNative::handlePlatformEvent(const Event &event)
 {
-    if (!mIsListening) {
+    // Desktop changes should always be dispatched, even when not actively listening for user input
+    if (!mIsListening && event.type != EventType::DesktopChanged) {
         return;
     }
 

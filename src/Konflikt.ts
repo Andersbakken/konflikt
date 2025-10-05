@@ -147,7 +147,7 @@ export class Konflikt {
         verbose("Initializing Konflikt...", this.#config);
 
         // Pass config to server for console commands
-        this.#server.setConfig(this.#config);
+        this.#server.config = this.#config;
 
         // Set up message handler for input events
         this.#server.setMessageHandler(this.handleNetworkMessage.bind(this));

@@ -2,6 +2,7 @@ import { ServerConsole } from "./ServerConsole";
 import { ServiceDiscovery } from "./ServiceDiscovery";
 import { debug } from "./debug";
 import { error } from "./error";
+import { isEADDRINUSE } from "./isEADDRINUSE";
 import { isInputEventMessage } from "./isInputEventMessage";
 import { isInstanceInfoMessage } from "./isInstanceInfoMessage";
 import { log } from "./log";
@@ -26,7 +27,9 @@ export class Server {
     #instanceName: string;
     #version: string;
     #capabilities: string[];
-    #console: ServerConsole;
+    #console?: ServerConsole;
+    #config?: Config;
+    #port?: number;
 
     // Regular WebSocket connections (non-console)
     #regularConnections: Set<WebSocket> = new Set();
@@ -35,7 +38,7 @@ export class Server {
     #messageHandler?: (message: InputEventMessage | InstanceInfoMessage) => void;
 
     constructor(
-        readonly port: number = 3000,
+        port: number | null,
         instanceId?: string,
         instanceName?: string,
         version: string = "1.0.0",
@@ -92,32 +95,41 @@ export class Server {
         this.#fastify = Fastify({ logger: customLogger });
         this.#wss = new WebSocket.WebSocketServer({ noServer: true });
         this.#serviceDiscovery = new ServiceDiscovery();
-        this.#console = new ServerConsole(
-            this.port,
-            this.#instanceId,
-            this.#instanceName,
-            this.#version,
-            this.#capabilities
-        );
 
         this.#setupWebSocket();
         this.#setupServiceDiscovery();
         this.#setupUpgradeHandling();
     }
 
+    get port(): number {
+        if (this.#port === undefined) {
+            throw new Error("Server port is not available");
+        }
+        return this.#port;
+    }
+
+    get config(): Config {
+        if (!this.#config) {
+            throw new Error("Config is not set");
+        }
+        return this.#config;
+    }
+
+    set config(config: Config) {
+        this.#config = config;
+    }
+
     /** Get console instance for log broadcasting */
     get console(): ServerConsole {
+        if (!this.#console) {
+            throw new Error("Console instance is not available");
+        }
         return this.#console;
     }
 
     /** Get service discovery instance for external access */
     get serviceDiscovery(): ServiceDiscovery {
         return this.#serviceDiscovery;
-    }
-
-    /** Set config for console commands */
-    setConfig(config: Config): void {
-        this.#console.setConfig(config);
     }
 
     /** Set message handler for input events and instance info */
@@ -142,18 +154,40 @@ export class Server {
     async start(): Promise<void> {
         // this.#startHeartbeat();
 
-        const opts: FastifyListenOptions = { port: this.port, host: "0.0.0.0" };
-        try {
-            const addr = await this.#fastify.listen(opts);
-            debug(`HTTP listening at ${addr}, WS at ws://localhost:${this.port}/ws`);
+        let port = this.#port || 3000;
 
-            // Start service discovery after server is running
-            this.#serviceDiscovery.advertise(this.port);
-            this.#serviceDiscovery.startDiscovery();
-        } catch (err: unknown) {
-            error("Failed to start server:", err);
-            process.exit(1);
+        while (true) {
+            const opts: FastifyListenOptions = { port, host: "0.0.0.0" };
+            try {
+                const addr = await this.#fastify.listen(opts);
+                debug(`HTTP listening at ${addr}, WS at ws://localhost:${port}/ws`);
+
+                // Start service discovery after server is running
+                this.#serviceDiscovery.advertise(port);
+                this.#serviceDiscovery.startDiscovery();
+                break;
+            } catch (err: unknown) {
+                if (this.#port === undefined && port < 65535 && isEADDRINUSE(err)) {
+                    verbose(`Port ${port} in use, trying next port...`);
+                    ++port;
+                    continue;
+                }
+
+                throw err;
+            }
         }
+        if (this.#port === undefined) {
+            this.#port = port;
+        }
+
+        this.#console = new ServerConsole(
+            port,
+            this.#instanceId,
+            this.#instanceName,
+            this.#version,
+            this.#capabilities
+        );
+        this.console.setConfig(this.config);
 
         process.on("SIGINT", (): void => {
             this.stop();
@@ -216,7 +250,7 @@ export class Server {
             const isConsoleConnection = req.url?.startsWith("/console");
 
             if (isConsoleConnection) {
-                this.#console.handleConsoleConnection(socket, req, this.#wss);
+                this.console.handleConsoleConnection(socket, req, this.#wss);
             } else {
                 this.#handleRegularConnection(socket, req);
             }

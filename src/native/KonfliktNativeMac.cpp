@@ -26,12 +26,24 @@ public:
         mEventLoop     = nullptr;
         mIsRunning     = false;
         mCursorVisible = true;
+        
+        // Initialize current desktop state
+        CGDirectDisplayID display = CGMainDisplayID();
+        mCurrentDesktop.width = static_cast<int32_t>(CGDisplayPixelsWide(display));
+        mCurrentDesktop.height = static_cast<int32_t>(CGDisplayPixelsHigh(display));
+        
+        // Register for display configuration changes
+        CGDisplayRegisterReconfigurationCallback(displayConfigurationCallback, this);
+        
         return true;
     }
 
     virtual void shutdown() override
     {
         stopListening();
+        
+        // Unregister display configuration callback
+        CGDisplayRemoveReconfigurationCallback(displayConfigurationCallback, this);
     }
 
     virtual State getState() const override
@@ -82,11 +94,8 @@ public:
 
     virtual Desktop getDesktop() const override
     {
-        Desktop desktop {};
-        CGDirectDisplayID display = CGMainDisplayID();
-        desktop.width             = static_cast<int32_t>(CGDisplayPixelsWide(display));
-        desktop.height            = static_cast<int32_t>(CGDisplayPixelsHigh(display));
-        return desktop;
+        std::lock_guard<std::mutex> lock(mDesktopMutex);
+        return mCurrentDesktop;
     }
 
     virtual void sendMouseEvent(const Event &event) override
@@ -369,6 +378,49 @@ public:
     }
 
 private:
+    static void displayConfigurationCallback(
+        CGDirectDisplayID /*display*/,
+        CGDisplayChangeSummaryFlags flags,
+        void *userInfo)
+    {
+        auto *hook = static_cast<MacOSHook *>(userInfo);
+        
+        // Only respond to configuration changes (not just enable/disable)
+        if (flags & kCGDisplayDesktopShapeChangedFlag) {
+            hook->onDisplayConfigurationChanged();
+        }
+    }
+    
+    void onDisplayConfigurationChanged()
+    {
+        Desktop newDesktop;
+        CGDirectDisplayID display = CGMainDisplayID();
+        newDesktop.width = static_cast<int32_t>(CGDisplayPixelsWide(display));
+        newDesktop.height = static_cast<int32_t>(CGDisplayPixelsHigh(display));
+        
+        bool changed = false;
+        {
+            std::lock_guard<std::mutex> lock(mDesktopMutex);
+            if (newDesktop.width != mCurrentDesktop.width || 
+                newDesktop.height != mCurrentDesktop.height) {
+                mCurrentDesktop = newDesktop;
+                changed = true;
+            }
+        }
+        
+        if (changed && eventCallback) {
+            mLogger.debug("Desktop changed to " + std::to_string(newDesktop.width) + 
+                         "x" + std::to_string(newDesktop.height));
+                         
+            Event event {};
+            event.type = EventType::DesktopChanged;
+            event.timestamp = timestamp();
+            event.state = getState();
+            
+            eventCallback(event);
+        }
+    }
+
     static CGEventRef eventTapCallback(
         CGEventTapProxy /*proxy*/,
         CGEventType type,
@@ -520,6 +572,10 @@ private:
     std::atomic<bool> mIsRunning;
     Logger mLogger;
     bool mCursorVisible { true };
+    
+    // Desktop change monitoring
+    mutable std::mutex mDesktopMutex;
+    Desktop mCurrentDesktop;
 };
 
 std::unique_ptr<IPlatformHook> createPlatformHook()

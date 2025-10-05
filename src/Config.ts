@@ -81,8 +81,12 @@ export class Config {
     }
 
     // Network configuration
-    get port(): number {
-        return this.#integer("network.port") || 3000;
+    get port(): number | null {
+        return this.#integer("network.port");
+    }
+
+    set port(value: number | null) {
+        this.#set("network.port", value);
     }
 
     get host(): string {

@@ -123,6 +123,15 @@ public:
         mBlankCursor   = XCB_NONE;
         mClipboardWindow = XCB_NONE;
         
+        // Initialize current desktop state
+        mCurrentDesktop.width = mScreen->width_in_pixels;
+        mCurrentDesktop.height = mScreen->height_in_pixels;
+        
+        // Register for structure events on root window to monitor desktop changes
+        uint32_t values[] = { XCB_EVENT_MASK_STRUCTURE_NOTIFY };
+        xcb_change_window_attributes(mConnection, mScreen->root, XCB_CW_EVENT_MASK, values);
+        xcb_flush(mConnection);
+        
         // Start the event loop immediately - it will always run for clipboard support
         startEventLoop();
         
@@ -219,16 +228,8 @@ public:
 
     virtual Desktop getDesktop() const override
     {
-        Desktop desktop {};
-
-        if (!mScreen) {
-            return desktop;
-        }
-
-        desktop.width  = mScreen->width_in_pixels;
-        desktop.height = mScreen->height_in_pixels;
-
-        return desktop;
+        std::lock_guard<std::mutex> lock(mDesktopMutex);
+        return mCurrentDesktop;
     }
 
     virtual void sendMouseEvent(const Event &event) override
@@ -904,6 +905,10 @@ private:
             else if (response_type == XCB_SELECTION_REQUEST) {
                 processSelectionRequest(reinterpret_cast<xcb_selection_request_event_t*>(event));
             }
+            // Always monitor for desktop changes
+            else if (response_type == XCB_CONFIGURE_NOTIFY) {
+                processDesktopChangeEvent(reinterpret_cast<xcb_configure_notify_event_t*>(event));
+            }
 
             free(event);
         }
@@ -1084,6 +1089,42 @@ private:
         xcb_flush(mConnection);
     }
 
+    void processDesktopChangeEvent(xcb_configure_notify_event_t *config_event)
+    {
+        // Only process events for the root window (desktop changes)
+        if (config_event->window != mScreen->root) {
+            return;
+        }
+
+        bool changed = false;
+        Desktop newDesktop;
+        
+        {
+            std::lock_guard<std::mutex> lock(mDesktopMutex);
+            newDesktop.width = config_event->width;
+            newDesktop.height = config_event->height;
+            
+            // Check if desktop dimensions actually changed
+            if (newDesktop.width != mCurrentDesktop.width || 
+                newDesktop.height != mCurrentDesktop.height) {
+                mCurrentDesktop = newDesktop;
+                changed = true;
+            }
+        }
+        
+        if (changed && eventCallback) {
+            mLogger.debug("Desktop changed to " + std::to_string(newDesktop.width) + 
+                         "x" + std::to_string(newDesktop.height));
+                         
+            Event event {};
+            event.type = EventType::DesktopChanged;
+            event.timestamp = timestamp();
+            event.state = getState();
+            
+            eventCallback(event);
+        }
+    }
+
     xcb_cursor_t createBlankCursor()
     {
         if (!mConnection || !mScreen) {
@@ -1118,6 +1159,10 @@ private:
 
     bool mCursorVisible { true };
     xcb_cursor_t mBlankCursor { XCB_NONE };
+    
+    // Desktop change monitoring
+    mutable std::mutex mDesktopMutex;
+    Desktop mCurrentDesktop;
 
     // Clipboard support
     mutable std::string mClipboardText;
