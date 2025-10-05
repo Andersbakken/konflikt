@@ -132,7 +132,7 @@ Event eventFromObject(const Napi::Object &obj)
 // KonfliktNative implementation
 Napi::Object KonfliktNative::Init(Napi::Env env, Napi::Object exports)
 {
-    Napi::Function func = DefineClass(env, "KonfliktNative", { InstanceAccessor<&KonfliktNative::GetDesktop>("desktop"), InstanceAccessor<&KonfliktNative::GetState>("state"), InstanceMethod<&KonfliktNative::On>("on"), InstanceMethod<&KonfliktNative::Off>("off"), InstanceMethod<&KonfliktNative::SendMouseEvent>("sendMouseEvent"), InstanceMethod<&KonfliktNative::SendKeyEvent>("sendKeyEvent"), InstanceMethod<&KonfliktNative::showCursor>("showCursor"), InstanceMethod<&KonfliktNative::hideCursor>("hideCursor"), InstanceAccessor<&KonfliktNative::isCursorVisible>("isCursorVisible"), InstanceMethod<&KonfliktNative::getClipboardText>("getClipboardText"), InstanceMethod<&KonfliktNative::setClipboardText>("setClipboardText") });
+    Napi::Function func = DefineClass(env, "KonfliktNative", { InstanceAccessor<&KonfliktNative::GetDesktop>("desktop"), InstanceAccessor<&KonfliktNative::GetState>("state"), InstanceMethod<&KonfliktNative::On>("on"), InstanceMethod<&KonfliktNative::Off>("off"), InstanceMethod<&KonfliktNative::SendMouseEvent>("sendMouseEvent"), InstanceMethod<&KonfliktNative::SendKeyEvent>("sendKeyEvent"), InstanceMethod<&KonfliktNative::showCursor>("showCursor"), InstanceMethod<&KonfliktNative::hideCursor>("hideCursor"), InstanceAccessor<&KonfliktNative::isCursorVisible>("isCursorVisible"), InstanceMethod<&KonfliktNative::getClipboardText>("getClipboardText"), InstanceMethod<&KonfliktNative::setClipboardText>("setClipboardText"), InstanceMethod<&KonfliktNative::getClipboardData>("getClipboardData"), InstanceMethod<&KonfliktNative::setClipboardData>("setClipboardData"), InstanceMethod<&KonfliktNative::getClipboardMimeTypes>("getClipboardMimeTypes") });
 
     Napi::FunctionReference *constructor = new Napi::FunctionReference();
     *constructor                         = Napi::Persistent(func);
@@ -483,6 +483,101 @@ void KonfliktNative::setClipboardText(const Napi::CallbackInfo &info)
     if (mPlatformHook) {
         mPlatformHook->setClipboardText(text);
     }
+}
+
+Napi::Value KonfliktNative::getClipboardData(const Napi::CallbackInfo &info)
+{
+    Napi::Env env = info.Env();
+
+    if (info.Length() < 1 || !info[0].IsString()) {
+        Napi::TypeError::New(env, "Expected mimeType string argument").ThrowAsJavaScriptException();
+        return env.Null();
+    }
+
+    std::string mimeType = info[0].As<Napi::String>().Utf8Value();
+    
+    // Optional selection parameter
+    ClipboardSelection selection = ClipboardSelection::Auto;
+    if (info.Length() > 1 && info[1].IsString()) {
+        std::string selectionStr = info[1].As<Napi::String>().Utf8Value();
+        if (selectionStr == "clipboard") {
+            selection = ClipboardSelection::Clipboard;
+        } else if (selectionStr == "primary") {
+            selection = ClipboardSelection::Primary;
+        }
+    }
+
+    if (mPlatformHook) {
+        std::vector<uint8_t> data = mPlatformHook->getClipboardData(mimeType, selection);
+        
+        // Return as Buffer
+        return Napi::Buffer<uint8_t>::Copy(env, data.data(), data.size());
+    }
+
+    return env.Null();
+}
+
+void KonfliktNative::setClipboardData(const Napi::CallbackInfo &info)
+{
+    Napi::Env env = info.Env();
+
+    if (info.Length() < 2 || !info[0].IsString()) {
+        Napi::TypeError::New(env, "Expected (mimeType: string, data: Buffer, selection?: string)").ThrowAsJavaScriptException();
+        return;
+    }
+
+    std::string mimeType = info[0].As<Napi::String>().Utf8Value();
+    
+    if (!info[1].IsBuffer()) {
+        Napi::TypeError::New(env, "Expected Buffer for data argument").ThrowAsJavaScriptException();
+        return;
+    }
+
+    Napi::Buffer<uint8_t> buffer = info[1].As<Napi::Buffer<uint8_t>>();
+    std::vector<uint8_t> data(buffer.Data(), buffer.Data() + buffer.Length());
+
+    // Optional selection parameter
+    ClipboardSelection selection = ClipboardSelection::Auto;
+    if (info.Length() > 2 && info[2].IsString()) {
+        std::string selectionStr = info[2].As<Napi::String>().Utf8Value();
+        if (selectionStr == "clipboard") {
+            selection = ClipboardSelection::Clipboard;
+        } else if (selectionStr == "primary") {
+            selection = ClipboardSelection::Primary;
+        }
+    }
+
+    if (mPlatformHook) {
+        mPlatformHook->setClipboardData(mimeType, data, selection);
+    }
+}
+
+Napi::Value KonfliktNative::getClipboardMimeTypes(const Napi::CallbackInfo &info)
+{
+    Napi::Env env = info.Env();
+
+    // Optional selection parameter
+    ClipboardSelection selection = ClipboardSelection::Auto;
+    if (info.Length() > 0 && info[0].IsString()) {
+        std::string selectionStr = info[0].As<Napi::String>().Utf8Value();
+        if (selectionStr == "clipboard") {
+            selection = ClipboardSelection::Clipboard;
+        } else if (selectionStr == "primary") {
+            selection = ClipboardSelection::Primary;
+        }
+    }
+
+    if (mPlatformHook) {
+        std::vector<std::string> mimeTypes = mPlatformHook->getClipboardMimeTypes(selection);
+        
+        Napi::Array result = Napi::Array::New(env, mimeTypes.size());
+        for (size_t i = 0; i < mimeTypes.size(); ++i) {
+            result[i] = Napi::String::New(env, mimeTypes[i]);
+        }
+        return result;
+    }
+
+    return Napi::Array::New(env, 0);
 }
 
 void KonfliktNative::handlePlatformEvent(const Event &event)

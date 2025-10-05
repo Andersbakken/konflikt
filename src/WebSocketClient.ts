@@ -1,15 +1,20 @@
 import { EventEmitter } from "events";
-import { createBaseMessage, createErrorMessage, validateMessage } from "./messages";
+import { createBaseMessage } from "./createBaseMessage";
+import { createErrorMessage } from "./createErrorMessage";
 import { debug } from "./debug";
 import { error } from "./error";
 import { log } from "./log";
+import { validateMessage } from "./validateMessage";
 import { verbose } from "./verbose";
 import WebSocket from "ws";
 import type { DiscoveredService } from "./DiscoveredService";
-import type { HandshakeRequest, HandshakeResponse, Message } from "./messages";
-import type { PreferredPosition, ScreenGeometry } from "./types/ScreenPositioning";
+import type { HandshakeRequest } from "./HandshakeRequest";
+import type { HandshakeResponse } from "./HandshakeResponse";
+import type { Message } from "./Message";
+import type { PreferredPosition } from "./PreferredPosition";
+import type { Rect } from "./Rect";
 
-export interface WebSocketClientEvents {
+interface WebSocketClientEvents {
     connected: [service: DiscoveredService];
     disconnected: [service: DiscoveredService, reason?: string];
     handshake_completed: [service: DiscoveredService, response: HandshakeResponse];
@@ -25,7 +30,7 @@ export class WebSocketClient extends EventEmitter<WebSocketClientEvents> {
     #instanceName: string;
     #version: string;
     #capabilities: string[];
-    #screenGeometry: ScreenGeometry | undefined;
+    #screenGeometry: Rect | undefined;
     #preferredPosition: PreferredPosition | undefined;
     #heartbeatInterval: NodeJS.Timeout | null = null;
     #reconnectTimeout: NodeJS.Timeout | null = null;
@@ -38,7 +43,7 @@ export class WebSocketClient extends EventEmitter<WebSocketClientEvents> {
         instanceId: string,
         instanceName: string,
         version: string,
-        screenGeometry?: ScreenGeometry,
+        screenGeometry?: Rect,
         preferredPosition?: PreferredPosition,
         capabilities: string[] = []
     ) {

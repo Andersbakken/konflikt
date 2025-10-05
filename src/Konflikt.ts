@@ -2,6 +2,7 @@ import { Console } from "./Console";
 import { InstanceRole } from "./Config";
 import { KonfliktNative as KonfliktNativeConstructor } from "./native";
 import { PeerManager } from "./PeerManager";
+import { Rect } from "./Rect";
 import { Server } from "./Server";
 import { createHash } from "crypto";
 import { createNativeLogger } from "./createNativeLogger";
@@ -9,36 +10,30 @@ import { hostname, platform } from "os";
 import { setLogBroadcaster } from "./setLogBroadcaster";
 import { verbose } from "./verbose";
 import type { Config } from "./Config";
+import type { ConnectedInstanceInfo } from "./ConnectedInstanceInfo";
 import type { DiscoveredService } from "./DiscoveredService";
-import type { InputEventData, InputEventMessage, InstanceInfoMessage } from "./messageValidation";
-import type { KeyPressEvent, KeyReleaseEvent, MouseMoveEvent, MousePressEvent, MouseReleaseEvent } from "./messages/index";
+import type { InputEventData } from "./InputEventData";
+import type { InputEventMessage } from "./InputEventMessage";
+import type { InputEventType } from "./InputEventType";
+import type { InstanceInfoMessage } from "./InstanceInfoMessage";
+import type { KeyPressEvent } from "./KeyPressEvent";
+import type { KeyReleaseEvent } from "./KeyReleaseEvent";
 import type {
     KonfliktDesktopEvent,
     KonfliktKeyPressEvent,
     KonfliktKeyReleaseEvent,
     KonfliktMouseButtonPressEvent,
     KonfliktMouseButtonReleaseEvent,
-    KonfliktMouseMoveEvent
-, KonfliktNative } from "./KonfliktNative";
-import type { Side } from "./types/ScreenPositioning";
-
-export interface Rect {
-    x: number;
-    y: number;
-    width: number;
-    height: number;
-}
-
-export interface ConnectedInstanceInfo {
-    displayId: string;
-    machineId: string;
-    lastSeen: number;
-}
-
-export interface CursorPosition {
-    x: number;
-    y: number;
-}
+    KonfliktMouseMoveEvent,
+    KonfliktNative
+} from "./KonfliktNative";
+import type { MouseMoveEvent } from "./MouseMoveEvent";
+import type { MousePressEvent } from "./MousePressEvent";
+import type { MouseReleaseEvent } from "./MouseReleaseEvent";
+import type { NetworkMessage } from "./NetworkMessage";
+import type { Point } from "./Point";
+import type { PreferredPosition } from "./PreferredPosition";
+import type { Side } from "./Side";
 
 export class Konflikt {
     #config: Config;
@@ -50,7 +45,7 @@ export class Konflikt {
     // Role-based behavior
     #role: InstanceRole;
     #isActiveInstance: boolean = false;
-    #lastCursorPosition: CursorPosition = { x: 0, y: 0 };
+    #lastCursorPosition: Point = { x: 0, y: 0 };
     #screenBounds: Rect;
 
     // Same-display detection for loop prevention
@@ -70,12 +65,12 @@ export class Konflikt {
 
         // Calculate screen bounds from config
         const desktop = this.#native.desktop;
-        this.#screenBounds = {
-            x: config.screenX,
-            y: config.screenY,
-            width: config.screenWidth ?? desktop.width,
-            height: config.screenHeight ?? desktop.height
-        };
+        this.#screenBounds = new Rect(
+            config.screenX,
+            config.screenY,
+            config.screenWidth ?? desktop.width,
+            config.screenHeight ?? desktop.height
+        );
 
         console.log(
             "Using screen bounds:",
@@ -125,7 +120,7 @@ export class Konflikt {
     }
 
     get screenBounds(): Rect {
-        return { ...this.#screenBounds };
+        return this.#screenBounds.clone();
     }
 
     get lastCursorPosition(): { x: number; y: number } {
@@ -171,17 +166,15 @@ export class Konflikt {
         } else {
             // Client role: set up peer manager to connect to servers
             verbose(`Client ${this.#config.instanceId} initializing - looking for servers to connect to`);
-            
-            this.#peerManager = new PeerManager(
-                this.#config.instanceId,
-                this.#config.instanceName,
-                "1.0.0",
-                ["input_events", "screen_info"]
-            );
+
+            this.#peerManager = new PeerManager(this.#config.instanceId, this.#config.instanceName, "1.0.0", [
+                "input_events",
+                "screen_info"
+            ]);
 
             // Set up peer connection event handlers
             this.#setupPeerConnectionHandlers();
-            
+
             // Listen for service discovery events to connect to servers
             this.#server.serviceDiscovery.on("serviceUp", (service: DiscoveredService) => {
                 verbose(`Client discovered server: ${service.name} at ${service.host}:${service.port}`);
@@ -227,7 +220,7 @@ export class Konflikt {
         }
 
         // If cursor is within server's screen bounds, don't forward to clients
-        if (Konflikt.pointInRect({ x, y }, this.#screenBounds)) {
+        if (this.#screenBounds.contains({ x, y })) {
             verbose(`Cursor at (${x}, ${y}) is within server screen bounds - not forwarding`);
             return null;
         }
@@ -243,7 +236,7 @@ export class Konflikt {
     }
 
     // Method to be called by Server when receiving network messages
-    handleNetworkMessage(message: InputEventMessage | InstanceInfoMessage): void {
+    handleNetworkMessage(message: NetworkMessage): void {
         if (message.type === "input_event") {
             this.#handleInputEvent(message);
             // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
@@ -252,12 +245,6 @@ export class Konflikt {
         } else {
             this.#handleInstanceInfo(message);
         }
-    }
-
-    static pointInRect(point: CursorPosition, rect: Rect): boolean {
-        return (
-            point.x >= rect.x && point.x < rect.x + rect.width && point.y >= rect.y && point.y < rect.y + rect.height
-        );
     }
 
     // Active instance management methods
@@ -291,8 +278,8 @@ export class Konflikt {
         }
     }
 
-    #isCursorInScreenBounds(position: CursorPosition): boolean {
-        return Konflikt.pointInRect(position, this.#screenBounds);
+    #isCursorInScreenBounds(position: Point): boolean {
+        return this.#screenBounds.contains(position);
     }
 
     #generateDisplayId(): string {
@@ -302,11 +289,22 @@ export class Konflikt {
         return createHash("sha256").update(`${this.#machineId}-${displayInfo}`).digest("hex").substring(0, 16);
     }
 
-    #updateConnectedInstance(instanceId: string, displayId: string, machineId: string): void {
+    #updateConnectedInstance(
+        instanceId: string,
+        displayId: string,
+        machineId: string,
+        screenGeometry: Rect,
+        preferredPosition?: PreferredPosition
+    ): void {
+        if (preferredPosition === undefined) {
+            preferredPosition = { side: "right" };
+        }
         this.#connectedInstances.set(instanceId, {
             displayId,
             machineId,
-            lastSeen: Date.now()
+            lastSeen: Date.now(),
+            screenGeometry,
+            preferredPosition
         });
 
         // Clean up old instances (older than 30 seconds)
@@ -342,10 +340,7 @@ export class Konflikt {
     }
 
     // Input event broadcasting methods for source/target architecture
-    #broadcastInputEvent(
-        eventType: "keyPress" | "keyRelease" | "mousePress" | "mouseRelease" | "mouseMove",
-        eventData: InputEventData
-    ): void {
+    #broadcastInputEvent(eventType: InputEventType, eventData: InputEventData): void {
         const message: InputEventMessage = {
             type: "input_event",
             sourceInstanceId: this.#config.instanceId,
@@ -367,9 +362,6 @@ export class Konflikt {
             return; // Servers don't execute received input events
         }
 
-        // Update connected instance info for same-display detection
-        this.#updateConnectedInstance(message.sourceInstanceId, message.sourceDisplayId, message.sourceMachineId);
-
         // Don't execute events from the same instance
         if (message.sourceInstanceId === this.#config.instanceId) {
             return;
@@ -380,10 +372,7 @@ export class Konflikt {
         this.#executeInputEvent(message.eventType, message.eventData);
     }
 
-    #executeInputEvent(
-        eventType: "keyPress" | "keyRelease" | "mousePress" | "mouseRelease" | "mouseMove",
-        eventData: InputEventData
-    ): void {
+    #executeInputEvent(eventType: InputEventType, eventData: InputEventData): void {
         try {
             if (eventType === "keyPress" || eventType === "keyRelease") {
                 this.#native.sendKeyEvent({
@@ -418,7 +407,8 @@ export class Konflikt {
             instanceId: this.#config.instanceId,
             displayId: this.#displayId,
             machineId: this.#machineId,
-            timestamp: Date.now()
+            timestamp: Date.now(),
+            screenGeometry: this.#screenBounds
         };
 
         this.#server.broadcastToClients(JSON.stringify(message));
@@ -427,7 +417,7 @@ export class Konflikt {
 
     #handleInstanceInfo(message: InstanceInfoMessage): void {
         // Update our tracking of connected instances
-        this.#updateConnectedInstance(message.instanceId, message.displayId, message.machineId);
+        this.#updateConnectedInstance(message.instanceId, message.displayId, message.machineId, message.screenGeometry);
         verbose(`Received instance info from ${message.instanceId}`);
     }
 
@@ -436,12 +426,12 @@ export class Konflikt {
 
         // Update screen bounds if dimensions weren't manually configured
         if (!this.#config.screenWidth || !this.#config.screenHeight) {
-            this.#screenBounds = {
-                x: this.#config.screenX,
-                y: this.#config.screenY,
-                width: this.#config.screenWidth ?? event.desktop.width,
-                height: this.#config.screenHeight ?? event.desktop.height
-            };
+            this.#screenBounds = new Rect(
+                this.#config.screenX,
+                this.#config.screenY,
+                this.#config.screenWidth ?? event.desktop.width,
+                this.#config.screenHeight ?? event.desktop.height
+            );
             verbose("Updated screen bounds:", this.#screenBounds);
         }
     }
@@ -551,7 +541,7 @@ export class Konflikt {
         this.#peerManager.on("peer_connected", (service: DiscoveredService, capabilities: string[]) => {
             verbose(`Connected to server ${service.name} at ${service.host}:${service.port}`);
             verbose(`Server capabilities: ${capabilities.join(", ")}`);
-            
+
             // Send handshake with client information
             this.#sendClientHandshake(service);
         });
@@ -560,10 +550,16 @@ export class Konflikt {
             verbose(`Disconnected from server ${service.name}: ${reason || "unknown reason"}`);
         });
 
-        this.#peerManager.on("input_event", (event: MouseMoveEvent | MousePressEvent | MouseReleaseEvent | KeyPressEvent | KeyReleaseEvent, from: DiscoveredService) => {
-            verbose(`Received input event from server ${from.name}:`, event);
-            // TODO: Execute the input event locally
-        });
+        this.#peerManager.on(
+            "input_event",
+            (
+                event: MouseMoveEvent | MousePressEvent | MouseReleaseEvent | KeyPressEvent | KeyReleaseEvent,
+                from: DiscoveredService
+            ) => {
+                verbose(`Received input event from server ${from.name}:`, event);
+                // TODO: Execute the input event locally
+            }
+        );
 
         this.#peerManager.on("error", (error: Error, service?: DiscoveredService) => {
             verbose(`Peer connection error${service ? ` with ${service.name}` : ""}: ${error.message}`);
@@ -576,13 +572,15 @@ export class Konflikt {
         }
 
         verbose(`Attempting to connect to server ${service.name} at ${service.host}:${service.port}`);
-        this.#peerManager.connectToPeer(
-            service, 
-            this.#screenBounds,
-            { side: "right" as Side } // Default positioning to right side of server
-        ).catch((error: Error) => {
-            verbose(`Failed to connect to server ${service.name}: ${error.message}`);
-        });
+        this.#peerManager
+            .connectToPeer(
+                service,
+                this.#screenBounds,
+                { side: "right" as Side } // Default positioning to right side of server
+            )
+            .catch((error: Error) => {
+                verbose(`Failed to connect to server ${service.name}: ${error.message}`);
+            });
     }
 
     #sendClientHandshake(service: DiscoveredService): void {
@@ -590,7 +588,7 @@ export class Konflikt {
         // But we can provide additional client-specific information via events
         verbose(`Client ${this.#config.instanceId} handshake completed with server ${service.name}`);
         verbose(`Client screen geometry: ${JSON.stringify(this.#screenBounds)}`);
-        
+
         // Send additional screen positioning information to the server
         // This could be done via a separate message after handshake
         // For now, the handshake includes the screen geometry

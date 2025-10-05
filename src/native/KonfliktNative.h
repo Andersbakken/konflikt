@@ -10,6 +10,13 @@
 
 namespace konflikt {
 
+enum class ClipboardSelection
+{
+    Auto,      // Platform-specific default behavior
+    Clipboard, // System clipboard (Ctrl+C/V)
+    Primary    // Primary selection (X11 mouse selection)
+};
+
 // Logger callback interface for C++ native code
 struct Logger
 {
@@ -103,8 +110,14 @@ public:
     virtual void hideCursor()            = 0;
     virtual bool isCursorVisible() const = 0;
 
-    virtual std::string getClipboardText() const = 0;
-    virtual bool setClipboardText(const std::string &text) = 0;
+    // Text clipboard methods with optional selection type
+    virtual std::string getClipboardText(ClipboardSelection selection = ClipboardSelection::Auto) const = 0;
+    virtual bool setClipboardText(const std::string &text, ClipboardSelection selection = ClipboardSelection::Auto) = 0;
+    
+    // Clipboard methods for multiple MIME types with optional selection type 
+    virtual std::vector<uint8_t> getClipboardData(const std::string &mimeType, ClipboardSelection selection = ClipboardSelection::Auto) const = 0;
+    virtual bool setClipboardData(const std::string &mimeType, const std::vector<uint8_t> &data, ClipboardSelection selection = ClipboardSelection::Auto) = 0;
+    virtual std::vector<std::string> getClipboardMimeTypes(ClipboardSelection selection = ClipboardSelection::Auto) const = 0;
 
     std::function<void(const Event &)> eventCallback;
 };
@@ -137,6 +150,9 @@ private:
     // Clipboard methods
     Napi::Value getClipboardText(const Napi::CallbackInfo &info);
     void setClipboardText(const Napi::CallbackInfo &info);
+    Napi::Value getClipboardData(const Napi::CallbackInfo &info);
+    void setClipboardData(const Napi::CallbackInfo &info);
+    Napi::Value getClipboardMimeTypes(const Napi::CallbackInfo &info);
 
     // Internal event handling
     void dispatchEvent(const Event &event);

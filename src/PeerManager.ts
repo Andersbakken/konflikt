@@ -1,23 +1,22 @@
 import { EventEmitter } from "events";
 import { WebSocketClient } from "./WebSocketClient";
-import { createBaseMessage } from "./messages";
+import { createBaseMessage } from "./createBaseMessage";
 import { debug } from "./debug";
 import { error } from "./error";
 import { log } from "./log";
 import { verbose } from "./verbose";
 import type { DiscoveredService } from "./DiscoveredService";
-import type {
-    HandshakeResponse,
-    KeyPressEvent,
-    KeyReleaseEvent,
-    Message,
-    MouseMoveEvent,
-    MousePressEvent,
-    MouseReleaseEvent
-} from "./messages";
-import type { PreferredPosition, ScreenGeometry } from "./types/ScreenPositioning";
+import type { HandshakeResponse } from "./HandshakeResponse";
+import type { KeyPressEvent } from "./KeyPressEvent";
+import type { KeyReleaseEvent } from "./KeyReleaseEvent";
+import type { Message } from "./Message";
+import type { MouseMoveEvent } from "./MouseMoveEvent";
+import type { MousePressEvent } from "./MousePressEvent";
+import type { MouseReleaseEvent } from "./MouseReleaseEvent";
+import type { PreferredPosition } from "./PreferredPosition";
+import type { Rect } from "./Rect";
 
-export interface PeerManagerEvents {
+interface PeerManagerEvents {
     peer_connected: [service: DiscoveredService, capabilities: string[]];
     peer_disconnected: [service: DiscoveredService, reason?: string];
     input_event: [
@@ -52,7 +51,7 @@ export class PeerManager extends EventEmitter<PeerManagerEvents> {
      */
     async connectToPeer(
         service: DiscoveredService,
-        screenGeometry?: ScreenGeometry,
+        screenGeometry?: Rect,
         preferredPosition?: PreferredPosition
     ): Promise<void> {
         const serviceKey = `${service.host}:${service.port}`;

@@ -1,6 +1,6 @@
 export interface ConsoleLogMessage {
     type: "console_log";
-    level: string;
+    level: "verbose" | "debug" | "log" | "error";
     message: string;
     timestamp?: number;
 }

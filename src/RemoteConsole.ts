@@ -1,12 +1,13 @@
-import { type ConsoleMessage, isConsoleMessage } from "./messageValidation";
 import { LogLevel } from "./LogLevel";
 import { createInterface } from "readline";
 import { debug } from "./debug";
 import { error } from "./error";
+import { isConsoleMessage } from "./isConsoleMessage";
 import { textFromWebSocketMessage } from "./textFromWebSocketMessage";
 import WebSocket from "ws";
-import type { ConsoleLogMessage } from "./types/ConsoleLogMessage";
-import type { HostAndPort } from "./types/HostAndPort";
+import type { ConsoleLogMessage } from "./ConsoleLogMessage";
+import type { ConsoleMessage } from "./ConsoleMessage";
+import type { HostPort } from "./HostPort";
 
 export class RemoteConsole {
     #readline: ReturnType<typeof createInterface>;
@@ -265,7 +266,7 @@ export class RemoteConsole {
 }
 
 // Helper function to parse host:port string
-export function parseRemoteConsoleHost(hostString: string): HostAndPort {
+export function parseRemoteConsoleHost(hostString: string): HostPort {
     const defaultPort = 3000;
 
     if (hostString.includes(":")) {

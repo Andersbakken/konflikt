@@ -224,8 +224,11 @@ public:
         return mCursorVisible;
     }
 
-    virtual std::string getClipboardText() const override
+    virtual std::string getClipboardText(ClipboardSelection selection = ClipboardSelection::Auto) const override
     {
+        // macOS only has system clipboard, ignore Primary selection
+        (void)selection; // Suppress unused parameter warning
+        
         NSPasteboard *pasteboard = [NSPasteboard generalPasteboard];
         NSString *string = [pasteboard stringForType:NSPasteboardTypeString];
         
@@ -236,8 +239,11 @@ public:
         return "";
     }
 
-    virtual bool setClipboardText(const std::string &text) override
+    virtual bool setClipboardText(const std::string &text, ClipboardSelection selection = ClipboardSelection::Auto) override
     {
+        // macOS only has system clipboard, ignore Primary selection
+        (void)selection; // Suppress unused parameter warning
+        
         NSPasteboard *pasteboard = [NSPasteboard generalPasteboard];
         [pasteboard clearContents];
         
@@ -245,6 +251,112 @@ public:
         BOOL success = [pasteboard setString:nsString forType:NSPasteboardTypeString];
         
         return success == YES;
+    }
+
+    virtual std::vector<uint8_t> getClipboardData(const std::string &mimeType, ClipboardSelection selection = ClipboardSelection::Auto) const override
+    {
+        (void)selection; // macOS only has system clipboard
+        
+        NSPasteboard *pasteboard = [NSPasteboard generalPasteboard];
+        
+        if (mimeType == "text/plain" || mimeType == "text/plain;charset=utf-8") {
+            std::string text = getClipboardText(selection);
+            return std::vector<uint8_t>(text.begin(), text.end());
+        }
+        else if (mimeType == "image/png") {
+            NSData *data = [pasteboard dataForType:NSPasteboardTypePNG];
+            if (data) {
+                const uint8_t *bytes = static_cast<const uint8_t *>([data bytes]);
+                return std::vector<uint8_t>(bytes, bytes + [data length]);
+            }
+        }
+        else if (mimeType == "image/tiff") {
+            NSData *data = [pasteboard dataForType:NSPasteboardTypeTIFF];
+            if (data) {
+                const uint8_t *bytes = static_cast<const uint8_t *>([data bytes]);
+                return std::vector<uint8_t>(bytes, bytes + [data length]);
+            }
+        }
+        else if (mimeType == "image/jpeg" || mimeType == "image/jpg") {
+            // Try to get TIFF first and convert, or check for direct JPEG data
+            NSData *data = [pasteboard dataForType:NSPasteboardTypeTIFF];
+            if (data) {
+                // Convert TIFF to JPEG
+                NSImage *image = [[NSImage alloc] initWithData:data];
+                if (image) {
+                    NSBitmapImageRep *bitmap = [NSBitmapImageRep imageRepWithData:[image TIFFRepresentation]];
+                    if (bitmap) {
+                        NSData *jpegData = [bitmap representationUsingType:NSBitmapImageFileTypeJPEG properties:@{}];
+                        if (jpegData) {
+                            const uint8_t *bytes = static_cast<const uint8_t *>([jpegData bytes]);
+                            return std::vector<uint8_t>(bytes, bytes + [jpegData length]);
+                        }
+                    }
+                }
+            }
+        }
+        
+        return {};
+    }
+
+    virtual bool setClipboardData(const std::string &mimeType, const std::vector<uint8_t> &data, ClipboardSelection selection = ClipboardSelection::Auto) override
+    {
+        (void)selection; // macOS only has system clipboard
+        
+        NSPasteboard *pasteboard = [NSPasteboard generalPasteboard];
+        [pasteboard clearContents];
+        
+        if (mimeType == "text/plain" || mimeType == "text/plain;charset=utf-8") {
+            std::string text(data.begin(), data.end());
+            return setClipboardText(text, selection);
+        }
+        else if (mimeType == "image/png") {
+            NSData *nsData = [NSData dataWithBytes:data.data() length:data.size()];
+            return [pasteboard setData:nsData forType:NSPasteboardTypePNG];
+        }
+        else if (mimeType == "image/tiff") {
+            NSData *nsData = [NSData dataWithBytes:data.data() length:data.size()];
+            return [pasteboard setData:nsData forType:NSPasteboardTypeTIFF];
+        }
+        else if (mimeType == "image/jpeg" || mimeType == "image/jpg") {
+            // Convert JPEG to TIFF for better macOS compatibility
+            NSData *jpegData = [NSData dataWithBytes:data.data() length:data.size()];
+            NSImage *image = [[NSImage alloc] initWithData:jpegData];
+            if (image) {
+                NSData *tiffData = [image TIFFRepresentation];
+                if (tiffData) {
+                    return [pasteboard setData:tiffData forType:NSPasteboardTypeTIFF];
+                }
+            }
+            return false;
+        }
+        
+        return false;
+    }
+
+    virtual std::vector<std::string> getClipboardMimeTypes(ClipboardSelection selection = ClipboardSelection::Auto) const override
+    {
+        (void)selection; // macOS only has system clipboard
+        
+        NSPasteboard *pasteboard = [NSPasteboard generalPasteboard];
+        NSArray *types = [pasteboard types];
+        std::vector<std::string> mimeTypes;
+        
+        for (NSString *type in types) {
+            if ([type isEqualToString:NSPasteboardTypeString]) {
+                mimeTypes.push_back("text/plain");
+                mimeTypes.push_back("text/plain;charset=utf-8");
+            }
+            else if ([type isEqualToString:NSPasteboardTypePNG]) {
+                mimeTypes.push_back("image/png");
+            }
+            else if ([type isEqualToString:NSPasteboardTypeTIFF]) {
+                mimeTypes.push_back("image/tiff");
+                mimeTypes.push_back("image/jpeg"); // Can convert from TIFF
+            }
+        }
+        
+        return mimeTypes;
     }
 
 private:

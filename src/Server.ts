@@ -2,7 +2,8 @@ import { ServerConsole } from "./ServerConsole";
 import { ServiceDiscovery } from "./ServiceDiscovery";
 import { debug } from "./debug";
 import { error } from "./error";
-import { isInputEventMessage, isInstanceInfoMessage } from "./messageValidation";
+import { isInputEventMessage } from "./isInputEventMessage";
+import { isInstanceInfoMessage } from "./isInstanceInfoMessage";
 import { log } from "./log";
 import { textFromWebSocketMessage } from "./textFromWebSocketMessage";
 import { verbose } from "./verbose";
@@ -13,7 +14,8 @@ import type { DiscoveredService } from "./DiscoveredService";
 import type { Duplex } from "stream";
 import type { FastifyInstance, FastifyListenOptions } from "fastify";
 import type { IncomingMessage } from "http";
-import type { InputEventMessage, InstanceInfoMessage } from "./messageValidation";
+import type { InputEventMessage } from "./InputEventMessage";
+import type { InstanceInfoMessage } from "./InstanceInfoMessage";
 
 export class Server {
     #fastify: FastifyInstance;

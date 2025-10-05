@@ -1,9 +1,10 @@
-import { type ConsoleCommandMessage, isConsoleCommandMessage } from "./messageValidation";
 import { debug } from "./debug";
 import { error } from "./error";
+import { isConsoleCommandMessage } from "./isConsoleCommandMessage";
 import { textFromWebSocketMessage } from "./textFromWebSocketMessage";
 import WebSocket from "ws";
 import type { Config } from "./Config";
+import type { ConsoleCommandMessage } from "./ConsoleCommandMessage";
 import type { IncomingMessage } from "http";
 
 export class ServerConsole {

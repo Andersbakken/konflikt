@@ -5,7 +5,7 @@ import { existsSync, readFileSync } from "fs";
 import { homedir, hostname } from "os";
 import { runInNewContext } from "vm";
 import path from "path";
-import type { ScreenEdges } from "./types/ScreenEdges";
+import type { ScreenEdges } from "./ScreenEdges";
 
 // Type unions for configuration values
 export const enum InstanceRole {
