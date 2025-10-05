@@ -5,8 +5,8 @@ import { error } from "./error";
 import { existsSync, readFileSync } from "fs";
 import { homedir, hostname } from "os";
 import { runInNewContext } from "vm";
-import { shortOptions } from "./shortOptions";
 import path from "path";
+import yargs from "yargs";
 import type { ConfigType } from "./ConfigType";
 import type { ConvictInstance } from "./ConvictInstance";
 import type { ScreenEdges } from "./ScreenEdges";
@@ -289,117 +289,119 @@ export class Config {
             return;
         }
 
-        // Expand short options to long options
-        const expandedArgs = Config.#expandShortOptions(args);
-
-        // Debug: log what args we're passing to convict
-        debug("Loading CLI args:", expandedArgs.join(" "));
+        // Debug: log what args we're parsing
+        debug("Loading CLI args:", args.join(" "));
 
         // Try convict's built-in CLI parsing first
-        this.#convictConfig.load({}, { args: expandedArgs });
+        this.#convictConfig.load({}, { args });
 
-        // Manual override for important args that might not work with convict
-        this.#manuallyParseImportantArgs(expandedArgs);
-    }
+        // Parse arguments with yargs for better handling
+        const argv = yargs(args)
+            .option('verbose', {
+                alias: 'v',
+                type: 'count',
+                description: 'Enable verbose logging (use -v for debug, -vv for verbose)'
+            })
+            .option('port', {
+                alias: 'p',
+                type: 'number',
+                description: 'WebSocket server port'
+            })
+            .option('host', {
+                alias: 'H',
+                type: 'string',
+                description: 'Host to bind server to'
+            })
+            .option('role', {
+                alias: 'r',
+                type: 'string',
+                choices: ['server', 'client'],
+                description: 'Instance role'
+            })
+            .option('log-level', {
+                alias: 'l',
+                type: 'string',
+                choices: ['silent', 'error', 'log', 'debug', 'verbose'],
+                description: 'Logging level'
+            })
+            .option('log-file', {
+                alias: 'f',
+                type: 'string',
+                description: 'Log file path'
+            })
+            .option('dev', {
+                alias: 'd',
+                type: 'boolean',
+                description: 'Enable development mode'
+            })
+            .option('console', {
+                type: 'string',
+                description: 'Enable console mode or specify remote console host'
+            })
+            .option('no-console', {
+                type: 'boolean',
+                description: 'Disable console mode'
+            })
+            .help(false) // Disable automatic help to avoid conflicts
+            .parseSync();
 
-    #manuallyParseImportantArgs(args: string[]): void {
-        let verboseCount = 0;
-
-        for (let i = 0; i < args.length; i++) {
-            const arg = args[i] as string | undefined;
-
-            if (!arg) {
-                continue;
-            }
-
-            // Count verbose flags first
-            if (arg === "-v" || arg === "--verbose") {
-                verboseCount++;
-                continue;
-            }
-
-            // Handle --arg=value syntax
-            if (arg.includes("=")) {
-                const [argName, argValue] = arg.split("=", 2);
-                this.#handleArgument(argName as string, argValue as string);
-                continue;
-            }
-
-            // Handle --arg value syntax
-            const value = args[i + 1];
-
-            // Skip if the next arg looks like another option (except for flags)
-            if (value?.startsWith("-") && !Config.#isFlagArgument(arg)) {
-                continue;
-            }
-
-            this.#handleArgument(arg, value);
-            if (!Config.#isFlagArgument(arg) && value) {
-                ++i; // Skip next value since we consumed it
+        // Apply yargs-parsed values to config
+        if (typeof argv.verbose === 'number' && argv.verbose > 0) {
+            if (argv.verbose === 1) {
+                this.#set("logging.level", "debug");
+                debug(`CLI override: ${argv.verbose} verbose flag - log-level = debug`);
+            } else if (argv.verbose >= 2) {
+                this.#set("logging.level", "verbose");
+                debug(`CLI override: ${argv.verbose} verbose flags - log-level = verbose`);
             }
         }
 
-        // Apply verbose count after processing all args
-        if (verboseCount > 0) {
-            this.#set("logging.level", "verbose");
-            debug(`CLI override: ${verboseCount} verbose flag${verboseCount > 1 ? "s" : ""} - log-level = verbose`);
+        if (typeof argv.port === 'number') {
+            this.#set("network.port", argv.port);
+            debug(`CLI override: port = ${argv.port}`);
+        }
+
+        if (typeof argv.host === 'string') {
+            this.#set("network.host", argv.host);
+            debug(`CLI override: host = ${argv.host}`);
+        }
+
+        if (typeof argv.role === 'string') {
+            this.#set("instance.role", argv.role);
+            debug(`CLI override: role = ${argv.role}`);
+        }
+
+        if (typeof argv['log-level'] === 'string') {
+            this.#set("logging.level", argv['log-level']);
+            debug(`CLI override: log-level = ${argv['log-level']}`);
+        }
+
+        if (typeof argv['log-file'] === 'string') {
+            this.#set("logging.file", argv['log-file']);
+            debug(`CLI override: log-file = ${argv['log-file']}`);
+        }
+
+        if (typeof argv.dev === 'boolean' && argv.dev) {
+            this.#set("development.enabled", true);
+            debug(`CLI override: development.enabled = true`);
+        }
+
+        if (typeof argv.console === 'string') {
+            if (argv.console !== "true") {
+                this.#set("console.enabled", argv.console);
+                debug(`CLI override: console = ${argv.console}`);
+            } else {
+                this.#set("console.enabled", "true");
+                debug(`CLI override: console = true`);
+            }
+        }
+
+        if (typeof argv['no-console'] === 'boolean' && argv['no-console']) {
+            this.#set("console.enabled", "false");
+            debug(`CLI override: no-console = true`);
         }
     }
 
-    #handleArgument(arg: string, value?: string): void {
-        switch (arg) {
-            case "--port":
-                if (value) {
-                    this.#set("network.port", parseInt(value, 10));
-                    debug(`CLI override: port = ${parseInt(value, 10)}`);
-                }
-                break;
-            case "--host":
-                if (value) {
-                    this.#set("network.host", value);
-                    debug(`CLI override: host = ${value}`);
-                }
-                break;
-            case "--role":
-                if (value) {
-                    this.#set("instance.role", value);
-                    debug(`CLI override: role = ${value}`);
-                }
-                break;
-            case "--log-level":
-                if (value) {
-                    this.#set("logging.level", value);
-                    debug(`CLI override: log-level = ${value}`);
-                }
-                break;
-            case "--log-file":
-                if (value) {
-                    this.#set("logging.file", value);
-                    debug(`CLI override: log-file = ${value}`);
-                }
-                break;
-            case "--dev":
-                this.#set("development.enabled", true);
-                debug(`CLI override: dev = true`);
-                break;
-            case "--console":
-                if (value && value !== "true") {
-                    this.#set("console.enabled", value);
-                    debug(`CLI override: console = ${value}`);
-                } else {
-                    this.#set("console.enabled", "true");
-                    debug(`CLI override: console = true`);
-                }
-                break;
-            case "--no-console":
-                this.#set("console.enabled", "false");
-                debug(`CLI override: no-console = true`);
-                break;
-            default:
-                // Ignore unknown arguments
-                break;
-        }
-    }
 
     #validate(): void {
         try {
@@ -485,29 +487,7 @@ export class Config {
 
     // Typed getters for all configuration values with defaults
 
-    static #isFlagArgument(arg: string): boolean {
-        return ["--dev", "--no-console", "-v", "--verbose"].includes(arg);
-    }
 
-    static #expandShortOptions(args: string[]): string[] {
-        const expanded: string[] = [];
-
-        for (let i = 0; i < args.length; i++) {
-            const arg = args[i];
-            if (!arg) {
-                continue;
-            }
-
-            const shortOption = shortOptions[arg];
-            if (shortOption) {
-                expanded.push(shortOption);
-            } else {
-                expanded.push(arg);
-            }
-        }
-
-        return expanded;
-    }
 
     static #executeJsConfig(jsCode: string, configPath: string): unknown {
         debug(`Executing JavaScript config in sandbox: ${configPath}`);

@@ -100,8 +100,8 @@ export const configSchema = convict({
     network: {
         port: {
             doc: "WebSocket server port",
-            format: "port",
-            default: 3000,
+            format: "nullable-port",
+            default: null,
             env: "KONFLIKT_PORT",
             arg: argForPath("network.port")
         },

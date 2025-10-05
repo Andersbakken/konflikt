@@ -12,12 +12,12 @@ export class RemoteConsole {
     #readline?: ReturnType<typeof createInterface>;
     #ws: WebSocket | undefined;
     #host: string;
-    #port: number;
+    #port: number | null;
     #connected: boolean = false;
     #logLevel: LogLevel;
     #hasInteractiveTTY: boolean;
 
-    constructor(host: string, port: number = 3000, logLevel: LogLevel = LogLevel.Log) {
+    constructor(host: string, port: number | null = null, logLevel: LogLevel = LogLevel.Log) {
         this.#host = host;
         this.#port = port;
         this.#logLevel = logLevel;

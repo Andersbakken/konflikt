@@ -155,7 +155,7 @@ export class Konflikt {
     }
 
     async init(): Promise<void> {
-        verbose("Initializing Konflikt...", this.#config);
+        verbose("Initializing Konflikt...", this.#config.port);
 
         // Pass config to server for console commands
         this.#server.config = this.#config;
@@ -168,10 +168,15 @@ export class Konflikt {
         // Set up service discovery event handlers for all roles
         this.#server.serviceDiscovery.on("serviceUp", (service: DiscoveredService) => {
             if (this.#role === InstanceRole.Server && service.txt?.role === "server") {
-                // Check if this is on the same host (localhost, 127.0.0.1, or our actual hostname)
+                // Skip our own service
+                if (service.port === this.#server.port) {
+                    return;
+                }
+                // Check if this is on the same host (localhost, 127.0.0.1, current hostname, or our actual hostname)
                 const isSameHost =
                     service.host === "localhost" ||
                     service.host === "127.0.0.1" ||
+                    service.host === hostname() ||
                     service.addresses.includes("127.0.0.1") ||
                     service.addresses.includes("::1");
 
@@ -185,7 +190,7 @@ export class Konflikt {
                         log(
                             `Discovered older server at ${service.host}:${service.port} (started: ${new Date(discoveredStartTime).toISOString()})`
                         );
-                        log("Requesting older server to quit so this newer instance can take over...");
+                        verbose("Requesting older server to quit so this newer instance can take over...");
                         Konflikt.#requestServerQuit(service);
                     } else if (discoveredStartTime > ourStartTime) {
                         // The discovered server is newer - it should tell us to quit eventually
@@ -197,7 +202,7 @@ export class Konflikt {
                         // Same start time (very unlikely) - use PID as tiebreaker
                         const discoveredPid = parseInt((service.txt!.pid as string) || "0", 10);
                         if (discoveredPid < process.pid) {
-                            log(
+                            verbose(
                                 `Server collision with same start time, using PID tiebreaker. Requesting server ${discoveredPid} to quit...`
                             );
                             Konflikt.#requestServerQuit(service);

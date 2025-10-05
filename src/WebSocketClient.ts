@@ -313,6 +313,7 @@ export class WebSocketClient extends EventEmitter<WebSocketClientEvents> {
 
         const wasConnected = this.isConnected;
         const wasHandshakeComplete = this.#isHandshakeCompleted;
+        const wasConnecting = this.#isConnecting;
 
         this.#isConnecting = false;
         this.#isHandshakeCompleted = false;
@@ -327,7 +328,9 @@ export class WebSocketClient extends EventEmitter<WebSocketClientEvents> {
             this.#ws = null;
         }
 
-        if (wasConnected || wasHandshakeComplete) {
+        // Always emit disconnected event so PeerManager can clean up
+        // even if connection failed during initial connection phase
+        if (wasConnected || wasHandshakeComplete || wasConnecting) {
             this.emit("disconnected", this.#service);
         }
     }
