@@ -9,28 +9,29 @@ import type { ConsoleLogMessage } from "./ConsoleLogMessage";
 import type { ConsoleMessage } from "./ConsoleMessage";
 
 export class RemoteConsole {
-    #readline: ReturnType<typeof createInterface>;
+    #readline?: ReturnType<typeof createInterface>;
     #ws: WebSocket | undefined;
     #host: string;
     #port: number;
     #connected: boolean = false;
     #logLevel: LogLevel;
+    #hasInteractiveTTY: boolean;
 
     constructor(host: string, port: number = 3000, logLevel: LogLevel = LogLevel.Log) {
         this.#host = host;
         this.#port = port;
         this.#logLevel = logLevel;
 
-        // Check if stdin is available and connected to a TTY
-        if (!process.stdin.readable || !process.stdin.isTTY) {
-            throw new Error("Remote console requires an interactive TTY stdin");
-        }
+        // Check if we have an interactive TTY
+        this.#hasInteractiveTTY = process.stdin.readable && process.stdin.isTTY;
 
-        this.#readline = createInterface({
-            input: process.stdin,
-            output: process.stdout,
-            prompt: `${host}:${port}> `
-        });
+        if (this.#hasInteractiveTTY) {
+            this.#readline = createInterface({
+                input: process.stdin,
+                output: process.stdout,
+                prompt: `${host}:${port}> `
+            });
+        }
 
         this.#setupEventHandlers();
     }
@@ -63,7 +64,7 @@ export class RemoteConsole {
                 this.#ws.on("close", (code: number, reason: Buffer) => {
                     this.#connected = false;
                     const msg = reason.length > 0 ? reason.toString() : `Connection closed (code: ${code})`;
-                    this.#consoleLog(`\\nDisconnected: ${msg}`);
+                    this.#consoleLog(`Disconnected: ${msg}`);
                     process.exit(0);
                 });
 
@@ -89,36 +90,41 @@ export class RemoteConsole {
     }
 
     start(): void {
-        this.#readline.prompt();
+        this.#readline?.prompt();
     }
 
     stop(): void {
         if (this.#ws && this.#connected) {
             this.#ws.close();
         }
-        this.#readline.close();
+        this.#readline?.close();
     }
 
     #consoleLog(...args: unknown[]): void {
-        // Clear the current line and write our message
-        process.stdout.clearLine(0);
-        process.stdout.cursorTo(0);
-        console.log(...args);
-        // Restore the prompt
-        this.#readline.prompt(true);
+        if (this.#hasInteractiveTTY && this.#readline) {
+            // Clear the current line and write our message
+            process.stdout.clearLine(0);
+            process.stdout.cursorTo(0);
+            console.log(...args);
+            // Restore the prompt
+            this.#readline.prompt(true);
+        } else {
+            // Non-interactive mode - just log normally
+            console.log(...args);
+        }
     }
 
     #setupEventHandlers(): void {
-        this.#readline.on("line", (input: string) => {
+        this.#readline?.on("line", (input: string) => {
             const trimmed = input.trim();
             if (trimmed) {
                 this.#handleCommand(trimmed);
             } else {
-                this.#readline.prompt();
+                this.#readline?.prompt();
             }
         });
 
-        this.#readline.on("close", () => {
+        this.#readline?.on("close", () => {
             this.#consoleLog("\\nConsole closed");
             this.stop();
         });
@@ -152,8 +158,8 @@ export class RemoteConsole {
     }
 
     #handleCommand(input: string): void {
-        // Handle local commands
-        if (input === "disconnect" || input === "exit" || input === "quit") {
+        // Handle local commands (only disconnect and exit are local)
+        if (input === "disconnect" || input === "exit") {
             this.#consoleLog("Disconnecting...");
             this.stop();
             return;
@@ -168,7 +174,7 @@ export class RemoteConsole {
         const parts = input.split(" ");
         const commandName = parts[0];
         if (!commandName) {
-            this.#readline.prompt();
+            this.#readline?.prompt();
             return;
         }
 
@@ -179,7 +185,7 @@ export class RemoteConsole {
     #sendCommand(command: string, args: string[]): void {
         if (!this.#ws || !this.#connected) {
             this.#consoleLog("Not connected to remote console");
-            this.#readline.prompt();
+            this.#readline?.prompt();
             return;
         }
 
@@ -194,7 +200,7 @@ export class RemoteConsole {
             this.#ws.send(JSON.stringify(message));
         } catch (err) {
             this.#consoleLog(`Failed to send command: ${err}`);
-            this.#readline.prompt();
+            this.#readline?.prompt();
         }
     }
 
@@ -210,19 +216,19 @@ export class RemoteConsole {
                         }
                     }
                 }
-                this.#readline.prompt();
+                this.#readline?.prompt();
                 break;
 
             case "console_error":
                 this.#consoleLog(`Error: ${message.error}`);
-                this.#readline.prompt();
+                this.#readline?.prompt();
                 break;
 
             case "pong":
                 this.#consoleLog(
                     `Pong from ${this.#host}:${this.#port} (round-trip: ${Date.now() - (message.timestamp || 0)}ms)`
                 );
-                this.#readline.prompt();
+                this.#readline?.prompt();
                 break;
 
             case "console_log":
@@ -231,12 +237,12 @@ export class RemoteConsole {
 
             case "console_command":
                 debug("Unexpected console_command received by RemoteConsole");
-                this.#readline.prompt();
+                this.#readline?.prompt();
                 break;
 
             default:
                 debug("Unknown message type:", message);
-                this.#readline.prompt();
+                this.#readline?.prompt();
         }
     }
 

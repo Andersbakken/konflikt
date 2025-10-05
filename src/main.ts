@@ -27,5 +27,5 @@ export async function main(config: Config): Promise<void> {
         process.exit(0);
     });
 
-    return konflikt.run();
+    await konflikt.run();
 }

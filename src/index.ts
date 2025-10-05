@@ -7,7 +7,6 @@ import { setConsoleLevel } from "./consoleLevel";
 import { setLogFile } from "./logFile";
 import { startRemoteConsole } from "./startRemoteConsole";
 
-// Handle help and version before config loading
 if (process.argv.includes("--help") || process.argv.includes("-h")) {
     console.log(`Usage: konflikt [options]
 Options:
@@ -43,7 +42,6 @@ if (process.argv.includes("--version")) {
     process.exit(0);
 }
 
-// Load configuration with CLI argument overrides
 let config: Config;
 try {
     config = Config.findAndLoadConfig();
@@ -52,10 +50,8 @@ try {
     process.exit(1);
 }
 
-// Determine console mode
 const consoleConfig = config.console;
 
-// Set up logging based on config first so we can pass it to remote console
 const logLevel = config.logLevel;
 let verbosityLevel: LogLevel;
 switch (logLevel) {
@@ -86,24 +82,20 @@ switch (logLevel) {
 
 setConsoleLevel(verbosityLevel);
 
-// Check if we're in remote console mode
-if (typeof consoleConfig === "string" && consoleConfig !== "true") {
-    startRemoteConsole(consoleConfig, verbosityLevel).catch((e: unknown) => {
-        console.error("Fatal error starting remote console:", e);
+(async (): Promise<void> => {
+    try {
+        if (typeof consoleConfig === "string" && consoleConfig !== "true") {
+            await startRemoteConsole(consoleConfig, verbosityLevel);
+        } else {
+            const logFile = config.logFile;
+            if (logFile) {
+                setLogFile(logFile);
+            }
+            await main(config);
+        }
+        process.exit();
+    } catch (err: unknown) {
+        console.error("Fatal error:", err);
         process.exit(1);
-    });
-    // Don't continue with normal server startup - use process.exit here is fine since remote console will keep the process running
-} else {
-    // Continue with normal server startup
-
-    // Set log file if configured
-    const logFile = config.logFile;
-    if (logFile) {
-        setLogFile(logFile);
     }
-
-    main(config).catch((e: unknown) => {
-        console.error("Fatal error:", e);
-        process.exit(1);
-    });
-}
+})();

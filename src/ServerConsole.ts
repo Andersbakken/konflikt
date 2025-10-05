@@ -8,30 +8,31 @@ import type { ConsoleCommandMessage } from "./ConsoleCommandMessage";
 import type { IncomingMessage } from "http";
 
 export class ServerConsole {
-    #config: Config | undefined;
+    #config: Config;
     #instanceId: string;
     #instanceName: string;
     #version: string;
     #capabilities: string[];
     #port: number;
     #consoleSockets: Set<WebSocket> = new Set();
+    #quitHandler: () => void;
 
     constructor(
         port: number,
+        quitHandler: () => void,
+        config: Config,
         instanceId: string,
         instanceName: string,
         version: string = "1.0.0",
         capabilities: string[] = ["input_events", "state_sync"]
     ) {
         this.#port = port;
+        this.#config = config;
         this.#instanceId = instanceId;
         this.#instanceName = instanceName;
         this.#version = version;
         this.#capabilities = capabilities;
-    }
-
-    setConfig(config: Config): void {
-        this.#config = config;
+        this.#quitHandler = quitHandler;
     }
 
     handleConsoleConnection(socket: WebSocket, req: IncomingMessage, wss: WebSocket.WebSocketServer): void {
@@ -118,6 +119,14 @@ export class ServerConsole {
                     output = this.#getDiscoveryInfo();
                     break;
 
+                case "quit":
+                    ServerConsole.#sendConsoleResponse(socket, "Server shutting down...");
+                    // Give the response time to be sent before quitting
+                    setTimeout(() => {
+                        this.#quitHandler();
+                    }, 100);
+                    return;
+
                 default:
                     ServerConsole.#sendConsoleError(
                         socket,
@@ -151,16 +160,13 @@ server            - Show server information
 connections       - Show WebSocket connections
 discovery         - Show service discovery information
 ping              - Test connection (returns pong)
+quit              - Shut down the server
 
 Local commands:
 disconnect        - Disconnect from remote console`;
     }
 
     #getConfigInfo(args: string[]): string {
-        if (!this.#config) {
-            return "Configuration not available";
-        }
-
         if (args.length > 0) {
             const key = args[0];
             if (key) {
@@ -172,10 +178,6 @@ disconnect        - Disconnect from remote console`;
     }
 
     #getAllConfigInfo(): string {
-        if (!this.#config) {
-            return "Configuration not available";
-        }
-
         return `Current Configuration:
 ======================
 
@@ -200,10 +202,6 @@ Development:
     }
 
     #getSpecificConfigInfo(key: string): string {
-        if (!this.#config) {
-            return "Configuration not available";
-        }
-
         const configMap: Record<string, unknown> = {
             "instance.id": this.#config.instanceId,
             "instance.name": this.#config.instanceName,
@@ -230,11 +228,11 @@ Available keys: ${Object.keys(configMap).join(", ")}`;
         const config = this.#config;
         return `System Status:
 ==============
-Instance: ${config?.instanceName || this.#instanceName} (${config?.instanceId || this.#instanceId})
-Role: ${config?.role || "unknown"}
-Server: Running on ${config?.host || "unknown"}:${this.#port}
-Discovery: ${config?.discoveryEnabled ? "Enabled" : "Disabled"}
-Development Mode: ${config?.developmentEnabled ? "Yes" : "No"}
+Instance: ${config.instanceName || this.#instanceName} (${config.instanceId || this.#instanceId})
+Role: ${config.role || "unknown"}
+Server: Running on ${config.host || "unknown"}:${this.#port}
+Discovery: ${config.discoveryEnabled ? "Enabled" : "Disabled"}
+Development Mode: ${config.developmentEnabled ? "Yes" : "No"}
 Process ID: ${process.pid}
 Memory Usage: ${Math.round(process.memoryUsage().heapUsed / 1024 / 1024)}MB
 Uptime: ${Math.round(process.uptime())}s`;
@@ -244,8 +242,8 @@ Uptime: ${Math.round(process.uptime())}s`;
         return `Server Status:
 ==============
 Port: ${this.#port}
-Host: ${this.#config?.host || "unknown"}
-Service Name: ${this.#config?.serviceName || "konflikt"}
+Host: ${this.#config.host || "unknown"}
+Service Name: ${this.#config.serviceName || "konflikt"}
 Status: Running
 WebSocket Connections: ${wss.clients.size}
 Version: ${this.#version}
@@ -266,8 +264,8 @@ Note: Detailed per-connection info requires enhanced tracking`;
         const config = this.#config;
         return `Service Discovery:
 ==================
-Enabled: ${config?.discoveryEnabled || "unknown"}
-Service Name: ${config?.serviceName || "konflikt"}
+Enabled: ${config.discoveryEnabled || "unknown"}
+Service Name: ${config.serviceName || "konflikt"}
 Advertising on port: ${this.#port}
 
 Note: Discovered services info requires ServiceDiscovery API exposure`;
@@ -287,9 +285,6 @@ Note: Discovered services info requires ServiceDiscovery API exposure`;
         this.#consoleSockets.forEach((socket: WebSocket) => {
             try {
                 if (socket.readyState === WebSocket.OPEN) {
-                    console.log(
-                        `[ServerConsole] Sending ${messageString.length} chars: ${messageString.substring(0, 50)}...`
-                    );
                     socket.send(messageString);
                 }
             } catch {

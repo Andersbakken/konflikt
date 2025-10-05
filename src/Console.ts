@@ -358,10 +358,12 @@ export class Console {
         this.#consoleLog(`ID: ${config.screenId}`);
         this.#consoleLog(`Position: (${config.screenX}, ${config.screenY})`);
         this.#consoleLog(`Dimensions: ${config.screenWidth || "auto"} x ${config.screenHeight || "auto"}`);
-        const activeEdges = Object.entries(config.screenEdges)
-            .filter(([, enabled]: [string, boolean]) => enabled)
-            .map(([edge]: [string, boolean]) => edge)
-            .join(", ");
+        const activeEdges = config.screenEdges 
+            ? Object.entries(config.screenEdges)
+                .filter(([, enabled]: [string, boolean]) => enabled)
+                .map(([edge]: [string, boolean]) => edge)
+                .join(", ")
+            : "";
         this.#consoleLog(`Active Edges: ${activeEdges || "none"}`);
     }
 

@@ -1,6 +1,6 @@
-import type { LogLevel } from "./LogLevel";
+import { LogLevel } from "./LogLevel";
 
-export let consoleLevel: LogLevel = 2; // LogLevel.Log
+let consoleLevel: LogLevel = LogLevel.Log;
 
 export function setConsoleLevel(level: LogLevel): void {
     consoleLevel = level;

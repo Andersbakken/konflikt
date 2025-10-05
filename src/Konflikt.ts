@@ -6,6 +6,7 @@ import { Rect } from "./Rect";
 import { Server } from "./Server";
 import { createHash } from "crypto";
 import { createNativeLogger } from "./createNativeLogger";
+import { createPromise } from "./createPromise";
 import { error } from "./error";
 import { hostname, platform } from "os";
 import { log } from "./log";
@@ -35,6 +36,7 @@ import type { MouseReleaseEvent } from "./MouseReleaseEvent";
 import type { NetworkMessage } from "./NetworkMessage";
 import type { Point } from "./Point";
 import type { PreferredPosition } from "./PreferredPosition";
+import type { PromiseData } from "./PromiseData";
 import type { Side } from "./Side";
 
 export class Konflikt {
@@ -43,28 +45,28 @@ export class Konflikt {
     #server: Server;
     #peerManager: PeerManager | undefined;
     #console: Console | undefined;
-    #runPromiseResolve?: () => void;
 
     // Role-based behavior
     #role: InstanceRole;
     #isActiveInstance: boolean = false;
     #lastCursorPosition: Point = { x: 0, y: 0 };
     #screenBounds: Rect;
-
-    // Same-display detection for loop prevention
+    #run: PromiseData<void>;
     #displayId: string;
     #machineId: string;
     #connectedInstances: Map<string, ConnectedInstanceInfo> = new Map();
 
     constructor(config: Config) {
+        this.#run = createPromise();
         this.#config = config;
         this.#role = config.role;
         this.#native = new KonfliktNativeConstructor(createNativeLogger());
         this.#server = new Server(
-            config.port, 
-            config.instanceId, 
-            config.instanceName, 
-            "1.0.0", 
+            config.port,
+            this.#run.resolve,
+            config.instanceId,
+            config.instanceName,
+            "1.0.0",
             ["input_events", "state_sync"],
             this.#role === InstanceRole.Server ? "server" : "client"
         );
@@ -167,30 +169,37 @@ export class Konflikt {
         this.#server.serviceDiscovery.on("serviceUp", (service: DiscoveredService) => {
             if (this.#role === InstanceRole.Server && service.txt?.role === "server") {
                 // Check if this is on the same host (localhost, 127.0.0.1, or our actual hostname)
-                const isSameHost = service.host === "localhost" || 
-                                  service.host === "127.0.0.1" || 
-                                  service.addresses.includes("127.0.0.1") ||
-                                  service.addresses.includes("::1");
-                
+                const isSameHost =
+                    service.host === "localhost" ||
+                    service.host === "127.0.0.1" ||
+                    service.addresses.includes("127.0.0.1") ||
+                    service.addresses.includes("::1");
+
                 if (isSameHost) {
                     // Compare start timestamps to determine which server should quit
-                    const discoveredStartTime = parseInt(service.txt!.started as string || "0", 10);
+                    const discoveredStartTime = parseInt((service.txt!.started as string) || "0", 10);
                     const ourStartTime = this.#server.startTime;
-                    
+
                     if (discoveredStartTime < ourStartTime) {
                         // The discovered server started earlier - we are newer, so tell it to quit
-                        log(`Discovered older server at ${service.host}:${service.port} (started: ${new Date(discoveredStartTime).toISOString()})`);
+                        log(
+                            `Discovered older server at ${service.host}:${service.port} (started: ${new Date(discoveredStartTime).toISOString()})`
+                        );
                         log("Requesting older server to quit so this newer instance can take over...");
                         Konflikt.#requestServerQuit(service);
                     } else if (discoveredStartTime > ourStartTime) {
                         // The discovered server is newer - it should tell us to quit eventually
-                        verbose(`Discovered newer server at ${service.host}:${service.port} (started: ${new Date(discoveredStartTime).toISOString()})`);
+                        verbose(
+                            `Discovered newer server at ${service.host}:${service.port} (started: ${new Date(discoveredStartTime).toISOString()})`
+                        );
                         verbose("Newer server should request this instance to quit shortly...");
                     } else {
                         // Same start time (very unlikely) - use PID as tiebreaker
-                        const discoveredPid = parseInt(service.txt!.pid as string || "0", 10);
+                        const discoveredPid = parseInt((service.txt!.pid as string) || "0", 10);
                         if (discoveredPid < process.pid) {
-                            log(`Server collision with same start time, using PID tiebreaker. Requesting server ${discoveredPid} to quit...`);
+                            log(
+                                `Server collision with same start time, using PID tiebreaker. Requesting server ${discoveredPid} to quit...`
+                            );
                             Konflikt.#requestServerQuit(service);
                         }
                     }
@@ -261,18 +270,12 @@ export class Konflikt {
 
     run(): Promise<void> {
         verbose("Running Konflikt instance...", this.#config);
-        // Keep the process alive until explicitly quit
-        return new Promise<void>((resolve: () => void) => {
-            this.#runPromiseResolve = resolve;
-        });
+        return this.#run.promise;
     }
 
     quit(): void {
         verbose("Quitting Konflikt instance...");
-        if (!this.#runPromiseResolve) {
-            throw new Error("Cannot quit: Konflikt instance is not running or run() was never called");
-        }
-        this.#runPromiseResolve();
+        this.#run.resolve();
     }
 
     #getTargetClientForPosition(x: number, y: number): string | null {
@@ -661,16 +664,16 @@ export class Konflikt {
         try {
             const WebSocket = (await import("ws")).default;
             const wsUrl = `ws://${service.host}:${service.port}/console`;
-            
+
             verbose(`Connecting to existing server console at ${wsUrl} to request quit...`);
             const ws = new WebSocket(wsUrl);
-            
+
             await new Promise<void>((resolve: () => void, reject: (err: Error) => void) => {
                 const timeout = setTimeout(() => {
                     ws.close();
                     reject(new Error("Timeout connecting to existing server"));
                 }, 5000);
-                
+
                 ws.on("open", () => {
                     clearTimeout(timeout);
                     const quitMessage = {
@@ -679,17 +682,17 @@ export class Konflikt {
                         args: [],
                         timestamp: Date.now()
                     };
-                    
+
                     ws.send(JSON.stringify(quitMessage));
                     verbose("Sent quit command to existing server");
-                    
+
                     // Give the server a moment to process the quit
                     setTimeout(() => {
                         ws.close();
                         resolve();
                     }, 1000);
                 });
-                
+
                 ws.on("error", (err: Error) => {
                     clearTimeout(timeout);
                     reject(err);

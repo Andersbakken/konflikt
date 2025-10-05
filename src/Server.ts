@@ -29,7 +29,8 @@ export class Server {
     #capabilities: string[];
     #console?: ServerConsole;
     #config?: Config;
-    #port?: number;
+    #port: number | null;
+    #quitHandler: () => void;
 
     // Regular WebSocket connections (non-console)
     #regularConnections: Set<WebSocket> = new Set();
@@ -42,12 +43,15 @@ export class Server {
 
     constructor(
         port: number | null,
+        quitHandler: () => void,
         instanceId?: string,
         instanceName?: string,
         version: string = "1.0.0",
         capabilities: string[] = ["input_events", "state_sync"],
         role: string = "server"
     ) {
+        this.#port = port;
+        this.#quitHandler = quitHandler;
         this.#instanceId = instanceId || crypto.randomUUID();
         this.#instanceName = instanceName || `konflikt-${process.pid}`;
         this.#version = version;
@@ -108,7 +112,7 @@ export class Server {
     }
 
     get port(): number {
-        if (this.#port === undefined) {
+        if (this.#port === null) {
             throw new Error("Server port is not available");
         }
         return this.#port;
@@ -173,7 +177,7 @@ export class Server {
                 this.#serviceDiscovery.startDiscovery();
                 break;
             } catch (err: unknown) {
-                if (this.#port === undefined && port < 65535 && isEADDRINUSE(err)) {
+                if (this.#port === null && port < 65535 && isEADDRINUSE(err)) {
                     verbose(`Port ${port} in use, trying next port...`);
                     ++port;
                     continue;
@@ -182,18 +186,19 @@ export class Server {
                 throw err;
             }
         }
-        if (this.#port === undefined) {
+        if (this.#port === null) {
             this.#port = port;
         }
 
         this.#console = new ServerConsole(
             port,
+            this.#quitHandler,
+            this.config,
             this.#instanceId,
             this.#instanceName,
             this.#version,
             this.#capabilities
         );
-        this.console.setConfig(this.config);
 
         process.on("SIGINT", (): void => {
             this.stop();
