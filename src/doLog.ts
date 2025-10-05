@@ -1,12 +1,12 @@
-import { LogLevel } from "./LogLevel";
+import { consoleLevel } from "./consoleLevel";
 import { format } from "util";
 import { homedir } from "os";
 import fs from "fs";
 import path from "path";
+import type { LogLevel } from "./LogLevel";
 
 // Global logger state
 let logFile: fs.WriteStream | undefined;
-const consoleLevel: LogLevel = LogLevel.Log;
 let consolePromptHandler: (() => void) | undefined;
 let logBroadcaster: ((level: "verbose" | "debug" | "log" | "error", message: string) => void) | undefined;
 
