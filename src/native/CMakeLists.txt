@@ -19,7 +19,7 @@ set(SOURCE_FILES KonfliktNative.cpp)
 
 # Platform-specific sources and libraries
 if(APPLE)
-    list(APPEND SOURCE_FILES KonfliktNativeMac.cpp)
+    list(APPEND SOURCE_FILES KonfliktNativeMac.mm)
     find_library(APPLICATION_SERVICES ApplicationServices)
     find_library(CARBON Carbon)
     find_library(COCOA Cocoa)

@@ -309,7 +309,7 @@ KonfliktNative::KonfliktNative(const Napi::CallbackInfo &info)
                 "VerboseLogger",
                 0,
                 1,
-                [this](Napi::Env) { /* Finalizer */ });
+                [](Napi::Env) { /* Finalizer */ });
             mLogger.verbose = [this](const std::string &message) {
                 if (mVerboseTsfn) {
                     mVerboseTsfn.BlockingCall(new std::string(message), [](Napi::Env env, Napi::Function jsCallback, std::string *data) {
@@ -327,7 +327,7 @@ KonfliktNative::KonfliktNative(const Napi::CallbackInfo &info)
                 "DebugLogger",
                 0,
                 1,
-                [this](Napi::Env) { /* Finalizer */ });
+                [](Napi::Env) { /* Finalizer */ });
             mLogger.debug = [this](const std::string &message) {
                 if (mDebugTsfn) {
                     mDebugTsfn.BlockingCall(new std::string(message), [](Napi::Env env, Napi::Function jsCallback, std::string *data) {
@@ -345,7 +345,7 @@ KonfliktNative::KonfliktNative(const Napi::CallbackInfo &info)
                 "LogLogger",
                 0,
                 1,
-                [this](Napi::Env) { /* Finalizer */ });
+                [](Napi::Env) { /* Finalizer */ });
             mLogger.log = [this](const std::string &message) {
                 if (mLogTsfn) {
                     mLogTsfn.BlockingCall(new std::string(message), [](Napi::Env env, Napi::Function jsCallback, std::string *data) {
@@ -363,7 +363,7 @@ KonfliktNative::KonfliktNative(const Napi::CallbackInfo &info)
                 "ErrorLogger",
                 0,
                 1,
-                [this](Napi::Env) { /* Finalizer */ });
+                [](Napi::Env) { /* Finalizer */ });
             mLogger.error = [this](const std::string &message) {
                 if (mErrorTsfn) {
                     mErrorTsfn.BlockingCall(new std::string(message), [](Napi::Env env, Napi::Function jsCallback, std::string *data) {
