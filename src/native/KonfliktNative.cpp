@@ -5,153 +5,179 @@
 namespace konflikt {
 
 // MIME type mapping implementation
-std::string MimeTypeMapper::mimeToMacType(const std::string &mimeType) {
+std::string MimeTypeMapper::mimeToMacType(const std::string &mimeType)
+{
     static const std::unordered_map<std::string, std::string> mimeToMac = {
         // Text types
-        {"text/plain", "public.utf8-plain-text"},
-        {"text/plain;charset=utf-8", "public.utf8-plain-text"},
-        {"text/html", "public.html"},
-        {"text/rtf", "public.rtf"},
-        {"text/uri-list", "public.file-url"},
-        
+        { "text/plain", "public.utf8-plain-text" },
+        { "text/plain;charset=utf-8", "public.utf8-plain-text" },
+        { "text/html", "public.html" },
+        { "text/rtf", "public.rtf" },
+        { "text/uri-list", "public.file-url" },
+
         // Image types
-        {"image/png", "public.png"},
-        {"image/jpeg", "public.jpeg"},
-        {"image/jpg", "public.jpeg"}, 
-        {"image/gif", "com.compuserve.gif"},
-        {"image/tiff", "public.tiff"},
-        {"image/bmp", "com.microsoft.bmp"},
-        {"image/webp", "org.webmproject.webp"},
-        {"image/svg+xml", "public.svg-image"},
-        
+        { "image/png", "public.png" },
+        { "image/jpeg", "public.jpeg" },
+        { "image/jpg", "public.jpeg" },
+        { "image/gif", "com.compuserve.gif" },
+        { "image/tiff", "public.tiff" },
+        { "image/bmp", "com.microsoft.bmp" },
+        { "image/webp", "org.webmproject.webp" },
+        { "image/svg+xml", "public.svg-image" },
+
         // Document types
-        {"application/pdf", "com.adobe.pdf"},
-        {"application/postscript", "com.adobe.postscript"},
-        {"application/rtf", "public.rtf"},
-        
+        { "application/pdf", "com.adobe.pdf" },
+        { "application/postscript", "com.adobe.postscript" },
+        { "application/rtf", "public.rtf" },
+
         // Archive types
-        {"application/zip", "public.zip-archive"},
-        {"application/x-tar", "public.tar-archive"},
-        {"application/gzip", "org.gnu.gnu-zip-archive"},
-        
+        { "application/zip", "public.zip-archive" },
+        { "application/x-tar", "public.tar-archive" },
+        { "application/gzip", "org.gnu.gnu-zip-archive" },
+
         // Audio types
-        {"audio/mpeg", "public.mp3"},
-        {"audio/wav", "com.microsoft.waveform-audio"},
-        {"audio/aac", "public.aac-audio"},
-        {"audio/flac", "org.xiph.flac"},
-        
-        // Video types  
-        {"video/mp4", "public.mpeg-4"},
-        {"video/quicktime", "com.apple.quicktime-movie"},
-        {"video/avi", "public.avi"},
-        
+        { "audio/mpeg", "public.mp3" },
+        { "audio/wav", "com.microsoft.waveform-audio" },
+        { "audio/aac", "public.aac-audio" },
+        { "audio/flac", "org.xiph.flac" },
+
+        // Video types
+        { "video/mp4", "public.mpeg-4" },
+        { "video/quicktime", "com.apple.quicktime-movie" },
+        { "video/avi", "public.avi" },
+
         // Data types
-        {"application/json", "public.json"},
-        {"application/xml", "public.xml"},
-        {"text/csv", "public.comma-separated-values-text"},
-        {"text/tab-separated-values", "public.tab-separated-values-text"},
+        { "application/json", "public.json" },
+        { "application/xml", "public.xml" },
+        { "text/csv", "public.comma-separated-values-text" },
+        { "text/tab-separated-values", "public.tab-separated-values-text" },
     };
-    
+
     auto it = mimeToMac.find(mimeType);
     return (it != mimeToMac.end()) ? it->second : mimeType;
 }
 
-std::string MimeTypeMapper::mimeToX11Type(const std::string &mimeType) {
+std::string MimeTypeMapper::mimeToX11Type(const std::string &mimeType)
+{
     // X11 typically uses MIME types directly, but has some special cases
     static const std::unordered_map<std::string, std::string> mimeToX11 = {
-        {"text/plain", "UTF8_STRING"},
-        {"text/plain;charset=utf-8", "UTF8_STRING"},
-        {"text/uri-list", "text/uri-list"},
+        { "text/plain", "UTF8_STRING" },
+        { "text/plain;charset=utf-8", "UTF8_STRING" },
+        { "text/uri-list", "text/uri-list" },
     };
-    
+
     auto it = mimeToX11.find(mimeType);
     return (it != mimeToX11.end()) ? it->second : mimeType;
 }
 
-std::string MimeTypeMapper::macTypeToMime(const std::string &macType) {
+std::string MimeTypeMapper::macTypeToMime(const std::string &macType)
+{
     static const std::unordered_map<std::string, std::string> macToMime = {
         // Text types
-        {"public.utf8-plain-text", "text/plain"},
-        {"public.plain-text", "text/plain"},
-        {"public.html", "text/html"},
-        {"public.rtf", "text/rtf"},
-        {"public.file-url", "text/uri-list"},
-        
+        { "public.utf8-plain-text", "text/plain" },
+        { "public.plain-text", "text/plain" },
+        { "public.html", "text/html" },
+        { "public.rtf", "text/rtf" },
+        { "public.file-url", "text/uri-list" },
+
         // Image types
-        {"public.png", "image/png"},
-        {"public.jpeg", "image/jpeg"},
-        {"com.compuserve.gif", "image/gif"},
-        {"public.tiff", "image/tiff"},
-        {"com.microsoft.bmp", "image/bmp"},
-        {"org.webmproject.webp", "image/webp"},
-        {"public.svg-image", "image/svg+xml"},
-        
+        { "public.png", "image/png" },
+        { "public.jpeg", "image/jpeg" },
+        { "com.compuserve.gif", "image/gif" },
+        { "public.tiff", "image/tiff" },
+        { "com.microsoft.bmp", "image/bmp" },
+        { "org.webmproject.webp", "image/webp" },
+        { "public.svg-image", "image/svg+xml" },
+
         // Document types
-        {"com.adobe.pdf", "application/pdf"},
-        {"com.adobe.postscript", "application/postscript"},
-        
+        { "com.adobe.pdf", "application/pdf" },
+        { "com.adobe.postscript", "application/postscript" },
+
         // Archive types
-        {"public.zip-archive", "application/zip"},
-        {"public.tar-archive", "application/x-tar"},
-        {"org.gnu.gnu-zip-archive", "application/gzip"},
-        
+        { "public.zip-archive", "application/zip" },
+        { "public.tar-archive", "application/x-tar" },
+        { "org.gnu.gnu-zip-archive", "application/gzip" },
+
         // Audio types
-        {"public.mp3", "audio/mpeg"},
-        {"com.microsoft.waveform-audio", "audio/wav"},
-        {"public.aac-audio", "audio/aac"},
-        {"org.xiph.flac", "audio/flac"},
-        
+        { "public.mp3", "audio/mpeg" },
+        { "com.microsoft.waveform-audio", "audio/wav" },
+        { "public.aac-audio", "audio/aac" },
+        { "org.xiph.flac", "audio/flac" },
+
         // Video types
-        {"public.mpeg-4", "video/mp4"},
-        {"com.apple.quicktime-movie", "video/quicktime"},
-        {"public.avi", "video/avi"},
-        
+        { "public.mpeg-4", "video/mp4" },
+        { "com.apple.quicktime-movie", "video/quicktime" },
+        { "public.avi", "video/avi" },
+
         // Data types
-        {"public.json", "application/json"},
-        {"public.xml", "application/xml"},
-        {"public.comma-separated-values-text", "text/csv"},
-        {"public.tab-separated-values-text", "text/tab-separated-values"},
+        { "public.json", "application/json" },
+        { "public.xml", "application/xml" },
+        { "public.comma-separated-values-text", "text/csv" },
+        { "public.tab-separated-values-text", "text/tab-separated-values" },
     };
-    
+
     auto it = macToMime.find(macType);
     return (it != macToMime.end()) ? it->second : macType;
 }
 
-std::string MimeTypeMapper::x11TypeToMime(const std::string &x11Type) {
+std::string MimeTypeMapper::x11TypeToMime(const std::string &x11Type)
+{
     static const std::unordered_map<std::string, std::string> x11ToMime = {
-        {"UTF8_STRING", "text/plain"},
-        {"STRING", "text/plain"},
-        {"TEXT", "text/plain"},
-        {"text/uri-list", "text/uri-list"},
+        { "UTF8_STRING", "text/plain" },
+        { "STRING", "text/plain" },
+        { "TEXT", "text/plain" },
+        { "text/uri-list", "text/uri-list" },
     };
-    
+
     auto it = x11ToMime.find(x11Type);
     return (it != x11ToMime.end()) ? it->second : x11Type;
 }
 
-std::vector<std::string> MimeTypeMapper::getSupportedMimeTypes() {
+std::vector<std::string> MimeTypeMapper::getSupportedMimeTypes()
+{
     return {
         // Text types
-        "text/plain", "text/html", "text/rtf", "text/uri-list", "text/csv", "text/tab-separated-values",
-        
-        // Image types  
-        "image/png", "image/jpeg", "image/jpg", "image/gif", "image/tiff", "image/bmp", 
-        "image/webp", "image/svg+xml",
-        
+        "text/plain",
+        "text/html",
+        "text/rtf",
+        "text/uri-list",
+        "text/csv",
+        "text/tab-separated-values",
+
+        // Image types
+        "image/png",
+        "image/jpeg",
+        "image/jpg",
+        "image/gif",
+        "image/tiff",
+        "image/bmp",
+        "image/webp",
+        "image/svg+xml",
+
         // Document types
-        "application/pdf", "application/postscript", "application/rtf",
-        
+        "application/pdf",
+        "application/postscript",
+        "application/rtf",
+
         // Archive types
-        "application/zip", "application/x-tar", "application/gzip",
-        
+        "application/zip",
+        "application/x-tar",
+        "application/gzip",
+
         // Audio types
-        "audio/mpeg", "audio/wav", "audio/aac", "audio/flac",
-        
+        "audio/mpeg",
+        "audio/wav",
+        "audio/aac",
+        "audio/flac",
+
         // Video types
-        "video/mp4", "video/quicktime", "video/avi",
-        
+        "video/mp4",
+        "video/quicktime",
+        "video/avi",
+
         // Data types
-        "application/json", "application/xml"
+        "application/json",
+        "application/xml"
     };
 }
 
@@ -498,8 +524,7 @@ void KonfliktNative::On(const Napi::CallbackInfo &info)
         type = EventType::KeyRelease;
     } else if (typeStr == "desktopChanged") {
         type = EventType::DesktopChanged;
-    }
-    else {
+    } else {
         std::string validTypes = "Valid event types are: 'mouseMove', 'mousePress', 'mouseRelease', 'keyPress', 'keyRelease', 'desktopChanged'";
         Napi::TypeError::New(env, "Unknown event type '" + typeStr + "'. " + validTypes).ThrowAsJavaScriptException();
         return;
@@ -518,9 +543,9 @@ void KonfliktNative::On(const Napi::CallbackInfo &info)
 
     // Store both
     ListenerEntry entry;
-    entry.tsfn = std::move(tsfn);
+    entry.tsfn    = std::move(tsfn);
     entry.funcRef = std::move(funcRef);
-    
+
     mListeners[type].listeners.push_back(std::move(entry));
 
     // Start listening if not already started
@@ -539,7 +564,7 @@ void KonfliktNative::Off(const Napi::CallbackInfo &info)
         return;
     }
 
-    std::string typeStr = info[0].As<Napi::String>().Utf8Value();
+    std::string typeStr           = info[0].As<Napi::String>().Utf8Value();
     Napi::Function targetListener = info[1].As<Napi::Function>();
 
     // Convert type string to EventType
@@ -556,8 +581,7 @@ void KonfliktNative::Off(const Napi::CallbackInfo &info)
         type = EventType::KeyRelease;
     } else if (typeStr == "desktopChanged") {
         type = EventType::DesktopChanged;
-    }
-    else {
+    } else {
         return;
     }
 
@@ -565,14 +589,14 @@ void KonfliktNative::Off(const Napi::CallbackInfo &info)
     auto it = mListeners.find(type);
     if (it != mListeners.end()) {
         auto &listeners = it->second.listeners;
-        
+
         for (auto listenerIt = listeners.begin(); listenerIt != listeners.end(); ++listenerIt) {
             // Compare the function references
             if (listenerIt->funcRef.Value().StrictEquals(targetListener)) {
                 // Release resources
                 listenerIt->tsfn.Release();
                 listenerIt->funcRef.Reset();
-                
+
                 // Remove from vector
                 listeners.erase(listenerIt);
                 break;
@@ -607,14 +631,14 @@ void KonfliktNative::SendKeyEvent(const Napi::CallbackInfo &info)
     mPlatformHook->sendKeyEvent(event);
 }
 
-void KonfliktNative::showCursor(const Napi::CallbackInfo &/*info*/)
+void KonfliktNative::showCursor(const Napi::CallbackInfo & /*info*/)
 {
     if (mPlatformHook) {
         mPlatformHook->showCursor();
     }
 }
 
-void KonfliktNative::hideCursor(const Napi::CallbackInfo &/*info*/)
+void KonfliktNative::hideCursor(const Napi::CallbackInfo & /*info*/)
 {
     if (mPlatformHook) {
         mPlatformHook->hideCursor();
@@ -670,7 +694,7 @@ Napi::Value KonfliktNative::getClipboardData(const Napi::CallbackInfo &info)
     }
 
     std::string mimeType = info[0].As<Napi::String>().Utf8Value();
-    
+
     // Optional selection parameter
     ClipboardSelection selection = ClipboardSelection::Auto;
     if (info.Length() > 1 && info[1].IsString()) {
@@ -684,7 +708,7 @@ Napi::Value KonfliktNative::getClipboardData(const Napi::CallbackInfo &info)
 
     if (mPlatformHook) {
         std::vector<uint8_t> data = mPlatformHook->getClipboardData(mimeType, selection);
-        
+
         // Return as Buffer
         return Napi::Buffer<uint8_t>::Copy(env, data.data(), data.size());
     }
@@ -702,7 +726,7 @@ void KonfliktNative::setClipboardData(const Napi::CallbackInfo &info)
     }
 
     std::string mimeType = info[0].As<Napi::String>().Utf8Value();
-    
+
     if (!info[1].IsBuffer()) {
         Napi::TypeError::New(env, "Expected Buffer for data argument").ThrowAsJavaScriptException();
         return;
@@ -744,7 +768,7 @@ Napi::Value KonfliktNative::getClipboardMimeTypes(const Napi::CallbackInfo &info
 
     if (mPlatformHook) {
         std::vector<std::string> mimeTypes = mPlatformHook->getClipboardMimeTypes(selection);
-        
+
         Napi::Array result = Napi::Array::New(env, mimeTypes.size());
         for (size_t i = 0; i < mimeTypes.size(); ++i) {
             result[i] = Napi::String::New(env, mimeTypes[i]);

@@ -11,16 +11,17 @@
 namespace konflikt {
 
 // MIME type to platform type mapping utilities
-class MimeTypeMapper {
+class MimeTypeMapper
+{
 public:
     // Convert MIME type to platform-specific type
     static std::string mimeToMacType(const std::string &mimeType);
     static std::string mimeToX11Type(const std::string &mimeType);
-    
+
     // Convert platform type to MIME type
     static std::string macTypeToMime(const std::string &macType);
     static std::string x11TypeToMime(const std::string &x11Type);
-    
+
     // Get all supported MIME types for platform
     static std::vector<std::string> getSupportedMimeTypes();
 };
@@ -71,23 +72,23 @@ struct State
     uint32_t mouseButtons { 0 };
     int32_t x { 0 };
     int32_t y { 0 };
-    int32_t dx { 0 };  // Relative X delta since last event
-    int32_t dy { 0 };  // Relative Y delta since last event
+    int32_t dx { 0 }; // Relative X delta since last event
+    int32_t dy { 0 }; // Relative Y delta since last event
 };
 
 struct Display
 {
-    uint32_t id { 0 };    // Display identifier
-    int32_t x { 0 };      // Position in virtual desktop coordinate space
+    uint32_t id { 0 }; // Display identifier
+    int32_t x { 0 };   // Position in virtual desktop coordinate space
     int32_t y { 0 };
-    int32_t width { 0 };  // Display dimensions
+    int32_t width { 0 }; // Display dimensions
     int32_t height { 0 };
     bool isPrimary { false };
 };
 
 struct Desktop
 {
-    int32_t width { 0 };   // Total virtual desktop bounding box size
+    int32_t width { 0 }; // Total virtual desktop bounding box size
     int32_t height { 0 };
     std::vector<Display> displays; // All displays with absolute positions
 };
@@ -139,13 +140,13 @@ public:
     virtual bool isCursorVisible() const = 0;
 
     // Text clipboard methods with optional selection type
-    virtual std::string getClipboardText(ClipboardSelection selection = ClipboardSelection::Auto) const = 0;
+    virtual std::string getClipboardText(ClipboardSelection selection = ClipboardSelection::Auto) const             = 0;
     virtual bool setClipboardText(const std::string &text, ClipboardSelection selection = ClipboardSelection::Auto) = 0;
-    
-    // Clipboard methods for multiple MIME types with optional selection type 
-    virtual std::vector<uint8_t> getClipboardData(const std::string &mimeType, ClipboardSelection selection = ClipboardSelection::Auto) const = 0;
+
+    // Clipboard methods for multiple MIME types with optional selection type
+    virtual std::vector<uint8_t> getClipboardData(const std::string &mimeType, ClipboardSelection selection = ClipboardSelection::Auto) const             = 0;
     virtual bool setClipboardData(const std::string &mimeType, const std::vector<uint8_t> &data, ClipboardSelection selection = ClipboardSelection::Auto) = 0;
-    virtual std::vector<std::string> getClipboardMimeTypes(ClipboardSelection selection = ClipboardSelection::Auto) const = 0;
+    virtual std::vector<std::string> getClipboardMimeTypes(ClipboardSelection selection = ClipboardSelection::Auto) const                                 = 0;
 
     std::function<void(const Event &)> eventCallback;
 };

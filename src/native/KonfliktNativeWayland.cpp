@@ -18,7 +18,7 @@ namespace konflikt {
 class WaylandHook : public IPlatformHook
 {
 public:
-    WaylandHook() = default;
+    WaylandHook()                   = default;
     virtual ~WaylandHook() override = default;
 
     virtual bool initialize(const Logger &logger) override
@@ -52,12 +52,12 @@ public:
         }
 
         // Initialize current desktop state
-        mCurrentDesktop.width = 1920;  // Default fallback
+        mCurrentDesktop.width  = 1920; // Default fallback
         mCurrentDesktop.height = 1080; // Default fallback
 
-        mIsRunning = false;
+        mIsRunning         = false;
         mListeningForInput = false;
-        mCursorVisible = true;
+        mCursorVisible     = true;
 
         // Start the event loop immediately for monitoring
         startEventLoop();
@@ -81,7 +81,7 @@ public:
         state.y = 0;
 
         // Mouse button and keyboard state would require seat input events
-        state.mouseButtons = 0;
+        state.mouseButtons      = 0;
         state.keyboardModifiers = 0;
 
         return state;
@@ -93,14 +93,14 @@ public:
         return mCurrentDesktop;
     }
 
-    virtual void sendMouseEvent(const Event &/*event*/) override
+    virtual void sendMouseEvent(const Event & /*event*/) override
     {
         // Mouse event injection is not supported in Wayland for security reasons
         // This would require compositor-specific protocols or running as compositor
         mLogger.error("Mouse event injection not supported on Wayland");
     }
 
-    virtual void sendKeyEvent(const Event &/*event*/) override
+    virtual void sendKeyEvent(const Event & /*event*/) override
     {
         // Key event injection is not supported in Wayland for security reasons
         // This would require compositor-specific protocols or running as compositor
@@ -147,21 +147,21 @@ public:
         return "";
     }
 
-    virtual bool setClipboardText(const std::string &/*text*/, ClipboardSelection /*selection*/ = ClipboardSelection::Auto) override
+    virtual bool setClipboardText(const std::string & /*text*/, ClipboardSelection /*selection*/ = ClipboardSelection::Auto) override
     {
         // Wayland clipboard access requires data device manager and seat
         mLogger.debug("Clipboard text setting not fully implemented for Wayland");
         return false;
     }
 
-    virtual std::vector<uint8_t> getClipboardData(const std::string &/*mimeType*/, ClipboardSelection /*selection*/ = ClipboardSelection::Auto) const override
+    virtual std::vector<uint8_t> getClipboardData(const std::string & /*mimeType*/, ClipboardSelection /*selection*/ = ClipboardSelection::Auto) const override
     {
         // Wayland clipboard access requires data device manager and seat
         mLogger.debug("Clipboard data access not fully implemented for Wayland");
         return {};
     }
 
-    virtual bool setClipboardData(const std::string &/*mimeType*/, const std::vector<uint8_t> &/*data*/, ClipboardSelection /*selection*/ = ClipboardSelection::Auto) override
+    virtual bool setClipboardData(const std::string & /*mimeType*/, const std::vector<uint8_t> & /*data*/, ClipboardSelection /*selection*/ = ClipboardSelection::Auto) override
     {
         // Wayland clipboard access requires data device manager and seat
         mLogger.debug("Clipboard data setting not fully implemented for Wayland");
@@ -220,7 +220,7 @@ private:
             return;
         }
 
-        mIsRunning = true;
+        mIsRunning      = true;
         mListenerThread = std::thread([this]() {
             runEventLoop();
         });
@@ -258,8 +258,8 @@ private:
 
             // Check for events with timeout
             struct pollfd pfd;
-            pfd.fd = wl_display_get_fd(mDisplay);
-            pfd.events = POLLIN;
+            pfd.fd      = wl_display_get_fd(mDisplay);
+            pfd.events  = POLLIN;
             pfd.revents = 0;
 
             int ret = poll(&pfd, 1, 10); // 10ms timeout
@@ -287,19 +287,19 @@ private:
         auto *hook = static_cast<WaylandHook *>(data);
 
         if (strcmp(interface, wl_compositor_interface.name) == 0) {
-            hook->mCompositor = static_cast<wl_compositor*>(
+            hook->mCompositor = static_cast<wl_compositor *>(
                 wl_registry_bind(registry, name, &wl_compositor_interface, std::min(version, 4u)));
         } else if (strcmp(interface, wl_shm_interface.name) == 0) {
-            hook->mShm = static_cast<wl_shm*>(
+            hook->mShm = static_cast<wl_shm *>(
                 wl_registry_bind(registry, name, &wl_shm_interface, std::min(version, 1u)));
         } else if (strcmp(interface, wl_seat_interface.name) == 0) {
-            hook->mSeat = static_cast<wl_seat*>(
+            hook->mSeat = static_cast<wl_seat *>(
                 wl_registry_bind(registry, name, &wl_seat_interface, std::min(version, 5u)));
         } else if (strcmp(interface, wl_data_device_manager_interface.name) == 0) {
-            hook->mDataDeviceManager = static_cast<wl_data_device_manager*>(
+            hook->mDataDeviceManager = static_cast<wl_data_device_manager *>(
                 wl_registry_bind(registry, name, &wl_data_device_manager_interface, std::min(version, 3u)));
         } else if (strcmp(interface, wl_output_interface.name) == 0) {
-            hook->mOutput = static_cast<wl_output*>(
+            hook->mOutput = static_cast<wl_output *>(
                 wl_registry_bind(registry, name, &wl_output_interface, std::min(version, 2u)));
 
             if (hook->mOutput) {
@@ -308,20 +308,20 @@ private:
         }
     }
 
-    static void handleGlobalRemove(void */*data*/, struct wl_registry */*registry*/, uint32_t /*name*/)
+    static void handleGlobalRemove(void * /*data*/, struct wl_registry * /*registry*/, uint32_t /*name*/)
     {
         // Handle interface removal if needed
     }
 
     // Output callbacks for desktop change detection
-    static void handleOutputGeometry(void */*data*/, struct wl_output */*output*/, int32_t /*x*/, int32_t /*y*/,
+    static void handleOutputGeometry(void * /*data*/, struct wl_output * /*output*/, int32_t /*x*/, int32_t /*y*/,
                                      int32_t /*physical_width*/, int32_t /*physical_height*/, int32_t /*subpixel*/,
-                                     const char */*make*/, const char */*model*/, int32_t /*transform*/)
+                                     const char * /*make*/, const char * /*model*/, int32_t /*transform*/)
     {
         // Geometry information received
     }
 
-    static void handleOutputMode(void *data, struct wl_output */*output*/, uint32_t flags,
+    static void handleOutputMode(void *data, struct wl_output * /*output*/, uint32_t flags,
                                  int32_t width, int32_t height, int32_t /*refresh*/)
     {
         auto *hook = static_cast<WaylandHook *>(data);
@@ -331,12 +331,12 @@ private:
         }
     }
 
-    static void handleOutputDone(void */*data*/, struct wl_output */*output*/)
+    static void handleOutputDone(void * /*data*/, struct wl_output * /*output*/)
     {
         // Output information is complete
     }
 
-    static void handleOutputScale(void */*data*/, struct wl_output */*output*/, int32_t /*factor*/)
+    static void handleOutputScale(void * /*data*/, struct wl_output * /*output*/, int32_t /*factor*/)
     {
         // Scale factor received
     }
@@ -344,7 +344,7 @@ private:
     void updateDesktop(int32_t width, int32_t height)
     {
         Desktop newDesktop;
-        newDesktop.width = width;
+        newDesktop.width  = width;
         newDesktop.height = height;
 
         bool changed = false;
@@ -353,18 +353,18 @@ private:
             if (newDesktop.width != mCurrentDesktop.width ||
                 newDesktop.height != mCurrentDesktop.height) {
                 mCurrentDesktop = newDesktop;
-                changed = true;
+                changed         = true;
             }
         }
 
         if (changed && eventCallback) {
             mLogger.debug("Desktop changed to " + std::to_string(newDesktop.width) +
-                         "x" + std::to_string(newDesktop.height));
+                          "x" + std::to_string(newDesktop.height));
 
             Event event {};
-            event.type = EventType::DesktopChanged;
+            event.type      = EventType::DesktopChanged;
             event.timestamp = timestamp();
-            event.state = getState();
+            event.state     = getState();
 
             eventCallback(event);
         }

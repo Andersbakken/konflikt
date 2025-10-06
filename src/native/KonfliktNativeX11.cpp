@@ -2,10 +2,10 @@
 
 #include "KonfliktNative.h"
 
+#include <xcb/randr.h>
 #include <xcb/xcb.h>
 #include <xcb/xinput.h>
 #include <xcb/xtest.h>
-#include <xcb/randr.h>
 // xcb/xkb.h uses 'explicit' as a variable name which conflicts with C++ keyword
 // We only need xkbcommon, not the xcb xkb header
 #include <algorithm>
@@ -118,29 +118,26 @@ public:
             return false;
         }
 
-        mIsRunning     = false;
+        mIsRunning         = false;
         mListeningForInput = false;
-        mCursorVisible = true;
-        mBlankCursor   = XCB_NONE;
-        mClipboardWindow = XCB_NONE;
-        
+        mCursorVisible     = true;
+        mBlankCursor       = XCB_NONE;
+        mClipboardWindow   = XCB_NONE;
+
         // Initialize current desktop state with all displays
         updateDesktopInfo();
 
         // Register for RandR events to monitor display configuration changes
-        xcb_randr_select_input(mConnection, mScreen->root,
-            XCB_RANDR_NOTIFY_MASK_SCREEN_CHANGE |
-            XCB_RANDR_NOTIFY_MASK_CRTC_CHANGE |
-            XCB_RANDR_NOTIFY_MASK_OUTPUT_CHANGE);
+        xcb_randr_select_input(mConnection, mScreen->root, XCB_RANDR_NOTIFY_MASK_SCREEN_CHANGE | XCB_RANDR_NOTIFY_MASK_CRTC_CHANGE | XCB_RANDR_NOTIFY_MASK_OUTPUT_CHANGE);
 
         // Also register for structure events on root window
         uint32_t values[] = { XCB_EVENT_MASK_STRUCTURE_NOTIFY };
         xcb_change_window_attributes(mConnection, mScreen->root, XCB_CW_EVENT_MASK, values);
         xcb_flush(mConnection);
-        
+
         // Start the event loop immediately - it will always run for clipboard support
         startEventLoop();
-        
+
         return true;
     }
 
@@ -283,7 +280,7 @@ public:
     {
         // Enable input event processing in the already-running event loop
         mListeningForInput = true;
-        
+
         // If event loop isn't running yet, start it
         if (!mIsRunning) {
             startEventLoop();
@@ -331,7 +328,6 @@ public:
         return mCursorVisible;
     }
 
-
     virtual std::string getClipboardText(ClipboardSelection selection = ClipboardSelection::Auto) const override
     {
         switch (selection) {
@@ -357,18 +353,16 @@ public:
         }
 
         xcb_atom_t clipboard_atom = getAtom("CLIPBOARD");
-        xcb_atom_t primary_atom = getAtom("PRIMARY");
-        
+        xcb_atom_t primary_atom   = getAtom("PRIMARY");
+
         // Store the text for future selection requests
         mClipboardText = text;
 
         // Create a window to own the selection
         if (mClipboardWindow == XCB_NONE) {
-            mClipboardWindow = xcb_generate_id(mConnection);
+            mClipboardWindow  = xcb_generate_id(mConnection);
             uint32_t values[] = { XCB_EVENT_MASK_PROPERTY_CHANGE };
-            xcb_create_window(mConnection, XCB_COPY_FROM_PARENT, mClipboardWindow, mScreen->root,
-                             0, 0, 1, 1, 0, XCB_WINDOW_CLASS_INPUT_OUTPUT,
-                             mScreen->root_visual, XCB_CW_EVENT_MASK, values);
+            xcb_create_window(mConnection, XCB_COPY_FROM_PARENT, mClipboardWindow, mScreen->root, 0, 0, 1, 1, 0, XCB_WINDOW_CLASS_INPUT_OUTPUT, mScreen->root_visual, XCB_CW_EVENT_MASK, values);
         }
 
         bool success = false;
@@ -410,9 +404,9 @@ public:
             std::string text = getClipboardText(selection);
             return std::vector<uint8_t>(text.begin(), text.end());
         }
-        
+
         // Try to get data for specific MIME type
-        const char* selectionName = (selection == ClipboardSelection::Primary) ? "PRIMARY" : "CLIPBOARD";
+        const char *selectionName = (selection == ClipboardSelection::Primary) ? "PRIMARY" : "CLIPBOARD";
         if (selection == ClipboardSelection::Auto) {
             // Try CLIPBOARD first, fallback to PRIMARY
             std::vector<uint8_t> result = getSelectionData("CLIPBOARD", mimeType);
@@ -437,11 +431,11 @@ public:
         }
 
         xcb_atom_t clipboard_atom = getAtom("CLIPBOARD");
-        xcb_atom_t primary_atom = getAtom("PRIMARY");
-        
+        xcb_atom_t primary_atom   = getAtom("PRIMARY");
+
         // Store the data for future selection requests
         mClipboardData[mimeType] = data;
-        
+
         // Also store as text if it's a text type for backwards compatibility
         if (mimeType.find("text/") == 0) {
             mClipboardText = std::string(data.begin(), data.end());
@@ -449,11 +443,9 @@ public:
 
         // Create a window to own the selection
         if (mClipboardWindow == XCB_NONE) {
-            mClipboardWindow = xcb_generate_id(mConnection);
+            mClipboardWindow  = xcb_generate_id(mConnection);
             uint32_t values[] = { XCB_EVENT_MASK_PROPERTY_CHANGE };
-            xcb_create_window(mConnection, XCB_COPY_FROM_PARENT, mClipboardWindow, mScreen->root,
-                             0, 0, 1, 1, 0, XCB_WINDOW_CLASS_INPUT_OUTPUT,
-                             mScreen->root_visual, XCB_CW_EVENT_MASK, values);
+            xcb_create_window(mConnection, XCB_COPY_FROM_PARENT, mClipboardWindow, mScreen->root, 0, 0, 1, 1, 0, XCB_WINDOW_CLASS_INPUT_OUTPUT, mScreen->root_visual, XCB_CW_EVENT_MASK, values);
         }
 
         bool success = false;
@@ -490,8 +482,8 @@ public:
 
     virtual std::vector<std::string> getClipboardMimeTypes(ClipboardSelection selection = ClipboardSelection::Auto) const override
     {
-        const char* selectionName = (selection == ClipboardSelection::Primary) ? "PRIMARY" : "CLIPBOARD";
-        
+        const char *selectionName = (selection == ClipboardSelection::Primary) ? "PRIMARY" : "CLIPBOARD";
+
         if (selection == ClipboardSelection::Auto) {
             // Try CLIPBOARD first, fallback to PRIMARY
             std::vector<std::string> types = getSelectionMimeTypes("CLIPBOARD");
@@ -505,11 +497,11 @@ public:
     }
 
 private:
-    std::string getSelectionText(const char* selection_name) const
+    std::string getSelectionText(const char *selection_name) const
     {
-        xcb_atom_t selection_atom = getAtom(selection_name);
-        xcb_atom_t utf8_atom = getAtom("UTF8_STRING");
-        xcb_atom_t text_atom = getAtom("TEXT");
+        xcb_atom_t selection_atom  = getAtom(selection_name);
+        xcb_atom_t utf8_atom       = getAtom("UTF8_STRING");
+        xcb_atom_t text_atom       = getAtom("TEXT");
         xcb_atom_t target_property = getAtom("KONFLIKT_SELECTION_DATA");
 
         if (selection_atom == XCB_NONE || target_property == XCB_NONE) {
@@ -518,25 +510,23 @@ private:
 
         // Create a temporary window to receive the selection data
         xcb_window_t window = xcb_generate_id(mConnection);
-        uint32_t values[] = { XCB_EVENT_MASK_PROPERTY_CHANGE };
-        xcb_create_window(mConnection, XCB_COPY_FROM_PARENT, window, mScreen->root,
-                         0, 0, 1, 1, 0, XCB_WINDOW_CLASS_INPUT_OUTPUT,
-                         mScreen->root_visual, XCB_CW_EVENT_MASK, values);
+        uint32_t values[]   = { XCB_EVENT_MASK_PROPERTY_CHANGE };
+        xcb_create_window(mConnection, XCB_COPY_FROM_PARENT, window, mScreen->root, 0, 0, 1, 1, 0, XCB_WINDOW_CLASS_INPUT_OUTPUT, mScreen->root_visual, XCB_CW_EVENT_MASK, values);
 
         // Try UTF8_STRING first, then TEXT, then STRING
         xcb_atom_t targets[] = { utf8_atom, text_atom, XCB_ATOM_STRING };
         std::string result;
 
         for (xcb_atom_t target : targets) {
-            if (target == XCB_NONE) continue;
+            if (target == XCB_NONE)
+                continue;
 
             // Request selection content
-            xcb_convert_selection(mConnection, window, selection_atom, target, 
-                                 target_property, XCB_CURRENT_TIME);
+            xcb_convert_selection(mConnection, window, selection_atom, target, target_property, XCB_CURRENT_TIME);
             xcb_flush(mConnection);
 
-            bool received = false;
-            auto start_time = std::chrono::steady_clock::now();
+            bool received      = false;
+            auto start_time    = std::chrono::steady_clock::now();
             const auto timeout = std::chrono::milliseconds(500);
 
             // Wait for SelectionNotify event
@@ -549,19 +539,18 @@ private:
 
                 uint8_t response_type = event->response_type & ~0x80;
                 if (response_type == XCB_SELECTION_NOTIFY) {
-                    xcb_selection_notify_event_t *se = (xcb_selection_notify_event_t*)event;
+                    xcb_selection_notify_event_t *se = (xcb_selection_notify_event_t *)event;
                     if (se->selection == selection_atom && se->property != XCB_NONE) {
                         // Get the actual data
-                        xcb_get_property_cookie_t cookie = xcb_get_property(mConnection, 1, window,
-                                                                           target_property, XCB_ATOM_ANY, 0, UINT32_MAX);
-                        xcb_get_property_reply_t *reply = xcb_get_property_reply(mConnection, cookie, nullptr);
-                        
+                        xcb_get_property_cookie_t cookie = xcb_get_property(mConnection, 1, window, target_property, XCB_ATOM_ANY, 0, UINT32_MAX);
+                        xcb_get_property_reply_t *reply  = xcb_get_property_reply(mConnection, cookie, nullptr);
+
                         if (reply && xcb_get_property_value_length(reply) > 0) {
-                            const char* data = (const char*)xcb_get_property_value(reply);
-                            int length = xcb_get_property_value_length(reply);
-                            result = std::string(data, length);
+                            const char *data = (const char *)xcb_get_property_value(reply);
+                            int length       = xcb_get_property_value_length(reply);
+                            result           = std::string(data, length);
                         }
-                        
+
                         if (reply) {
                             free(reply);
                         }
@@ -583,11 +572,11 @@ private:
         return result;
     }
 
-    xcb_atom_t getAtom(const char* name) const
+    xcb_atom_t getAtom(const char *name) const
     {
         xcb_intern_atom_cookie_t cookie = xcb_intern_atom(mConnection, 0, strlen(name), name);
-        xcb_intern_atom_reply_t *reply = xcb_intern_atom_reply(mConnection, cookie, nullptr);
-        
+        xcb_intern_atom_reply_t *reply  = xcb_intern_atom_reply(mConnection, cookie, nullptr);
+
         xcb_atom_t atom = XCB_NONE;
         if (reply) {
             atom = reply->atom;
@@ -599,8 +588,8 @@ private:
     bool verifySelectionOwnership(xcb_atom_t selection_atom) const
     {
         xcb_get_selection_owner_cookie_t cookie = xcb_get_selection_owner(mConnection, selection_atom);
-        xcb_get_selection_owner_reply_t *reply = xcb_get_selection_owner_reply(mConnection, cookie, nullptr);
-        
+        xcb_get_selection_owner_reply_t *reply  = xcb_get_selection_owner_reply(mConnection, cookie, nullptr);
+
         bool success = false;
         if (reply) {
             success = (reply->owner == mClipboardWindow);
@@ -609,13 +598,13 @@ private:
         return success;
     }
 
-    std::vector<uint8_t> getSelectionData(const char* selection_name, const std::string &mimeType) const
+    std::vector<uint8_t> getSelectionData(const char *selection_name, const std::string &mimeType) const
     {
         xcb_atom_t selection_atom = getAtom(selection_name);
-        
+
         // Convert MIME type to X11 selection target atom
-        std::string x11Type = MimeTypeMapper::mimeToX11Type(mimeType);
-        xcb_atom_t target_atom = getAtom(x11Type.c_str());
+        std::string x11Type        = MimeTypeMapper::mimeToX11Type(mimeType);
+        xcb_atom_t target_atom     = getAtom(x11Type.c_str());
         xcb_atom_t target_property = getAtom("KONFLIKT_BINARY_DATA");
 
         if (selection_atom == XCB_NONE || target_atom == XCB_NONE || target_property == XCB_NONE) {
@@ -624,19 +613,16 @@ private:
 
         // Create a temporary window to receive the selection data
         xcb_window_t window = xcb_generate_id(mConnection);
-        uint32_t values[] = { XCB_EVENT_MASK_PROPERTY_CHANGE };
-        xcb_create_window(mConnection, XCB_COPY_FROM_PARENT, window, mScreen->root,
-                         0, 0, 1, 1, 0, XCB_WINDOW_CLASS_INPUT_OUTPUT,
-                         mScreen->root_visual, XCB_CW_EVENT_MASK, values);
+        uint32_t values[]   = { XCB_EVENT_MASK_PROPERTY_CHANGE };
+        xcb_create_window(mConnection, XCB_COPY_FROM_PARENT, window, mScreen->root, 0, 0, 1, 1, 0, XCB_WINDOW_CLASS_INPUT_OUTPUT, mScreen->root_visual, XCB_CW_EVENT_MASK, values);
 
         // Request selection content
-        xcb_convert_selection(mConnection, window, selection_atom, target_atom, 
-                             target_property, XCB_CURRENT_TIME);
+        xcb_convert_selection(mConnection, window, selection_atom, target_atom, target_property, XCB_CURRENT_TIME);
         xcb_flush(mConnection);
 
         std::vector<uint8_t> result;
-        bool received = false;
-        auto start_time = std::chrono::steady_clock::now();
+        bool received      = false;
+        auto start_time    = std::chrono::steady_clock::now();
         const auto timeout = std::chrono::milliseconds(500);
 
         // Wait for SelectionNotify event
@@ -649,19 +635,18 @@ private:
 
             uint8_t response_type = event->response_type & ~0x80;
             if (response_type == XCB_SELECTION_NOTIFY) {
-                xcb_selection_notify_event_t *se = (xcb_selection_notify_event_t*)event;
+                xcb_selection_notify_event_t *se = (xcb_selection_notify_event_t *)event;
                 if (se->selection == selection_atom && se->property != XCB_NONE) {
                     // Get the actual data
-                    xcb_get_property_cookie_t cookie = xcb_get_property(mConnection, 1, window,
-                                                                       target_property, XCB_ATOM_ANY, 0, UINT32_MAX);
-                    xcb_get_property_reply_t *reply = xcb_get_property_reply(mConnection, cookie, nullptr);
-                    
+                    xcb_get_property_cookie_t cookie = xcb_get_property(mConnection, 1, window, target_property, XCB_ATOM_ANY, 0, UINT32_MAX);
+                    xcb_get_property_reply_t *reply  = xcb_get_property_reply(mConnection, cookie, nullptr);
+
                     if (reply && xcb_get_property_value_length(reply) > 0) {
-                        const uint8_t* data = (const uint8_t*)xcb_get_property_value(reply);
-                        int length = xcb_get_property_value_length(reply);
-                        result = std::vector<uint8_t>(data, data + length);
+                        const uint8_t *data = (const uint8_t *)xcb_get_property_value(reply);
+                        int length          = xcb_get_property_value_length(reply);
+                        result              = std::vector<uint8_t>(data, data + length);
                     }
-                    
+
                     if (reply) {
                         free(reply);
                     }
@@ -678,10 +663,10 @@ private:
         return result;
     }
 
-    std::vector<std::string> getSelectionMimeTypes(const char* selection_name) const
+    std::vector<std::string> getSelectionMimeTypes(const char *selection_name) const
     {
-        xcb_atom_t selection_atom = getAtom(selection_name);
-        xcb_atom_t targets_atom = getAtom("TARGETS");
+        xcb_atom_t selection_atom  = getAtom(selection_name);
+        xcb_atom_t targets_atom    = getAtom("TARGETS");
         xcb_atom_t target_property = getAtom("KONFLIKT_TARGETS");
 
         if (selection_atom == XCB_NONE || targets_atom == XCB_NONE || target_property == XCB_NONE) {
@@ -690,19 +675,16 @@ private:
 
         // Create a temporary window to receive the targets
         xcb_window_t window = xcb_generate_id(mConnection);
-        uint32_t values[] = { XCB_EVENT_MASK_PROPERTY_CHANGE };
-        xcb_create_window(mConnection, XCB_COPY_FROM_PARENT, window, mScreen->root,
-                         0, 0, 1, 1, 0, XCB_WINDOW_CLASS_INPUT_OUTPUT,
-                         mScreen->root_visual, XCB_CW_EVENT_MASK, values);
+        uint32_t values[]   = { XCB_EVENT_MASK_PROPERTY_CHANGE };
+        xcb_create_window(mConnection, XCB_COPY_FROM_PARENT, window, mScreen->root, 0, 0, 1, 1, 0, XCB_WINDOW_CLASS_INPUT_OUTPUT, mScreen->root_visual, XCB_CW_EVENT_MASK, values);
 
         // Request available targets
-        xcb_convert_selection(mConnection, window, selection_atom, targets_atom, 
-                             target_property, XCB_CURRENT_TIME);
+        xcb_convert_selection(mConnection, window, selection_atom, targets_atom, target_property, XCB_CURRENT_TIME);
         xcb_flush(mConnection);
 
         std::vector<std::string> mimeTypes;
-        bool received = false;
-        auto start_time = std::chrono::steady_clock::now();
+        bool received      = false;
+        auto start_time    = std::chrono::steady_clock::now();
         const auto timeout = std::chrono::milliseconds(500);
 
         // Wait for SelectionNotify event
@@ -715,28 +697,27 @@ private:
 
             uint8_t response_type = event->response_type & ~0x80;
             if (response_type == XCB_SELECTION_NOTIFY) {
-                xcb_selection_notify_event_t *se = (xcb_selection_notify_event_t*)event;
+                xcb_selection_notify_event_t *se = (xcb_selection_notify_event_t *)event;
                 if (se->selection == selection_atom && se->property != XCB_NONE) {
                     // Get the targets list
-                    xcb_get_property_cookie_t cookie = xcb_get_property(mConnection, 1, window,
-                                                                       target_property, XCB_ATOM_ATOM, 0, UINT32_MAX);
-                    xcb_get_property_reply_t *reply = xcb_get_property_reply(mConnection, cookie, nullptr);
-                    
+                    xcb_get_property_cookie_t cookie = xcb_get_property(mConnection, 1, window, target_property, XCB_ATOM_ATOM, 0, UINT32_MAX);
+                    xcb_get_property_reply_t *reply  = xcb_get_property_reply(mConnection, cookie, nullptr);
+
                     if (reply && xcb_get_property_value_length(reply) > 0) {
-                        xcb_atom_t *atoms = (xcb_atom_t*)xcb_get_property_value(reply);
-                        int count = xcb_get_property_value_length(reply) / sizeof(xcb_atom_t);
-                        
+                        xcb_atom_t *atoms = (xcb_atom_t *)xcb_get_property_value(reply);
+                        int count         = xcb_get_property_value_length(reply) / sizeof(xcb_atom_t);
+
                         for (int i = 0; i < count; ++i) {
                             std::string atomName = getAtomName(atoms[i]);
                             if (!atomName.empty()) {
                                 // Convert X11 atom names to MIME types using mapper
                                 std::string mimeType = MimeTypeMapper::x11TypeToMime(atomName);
-                                
+
                                 // Add unique MIME types
                                 if (!mimeType.empty() && std::find(mimeTypes.begin(), mimeTypes.end(), mimeType) == mimeTypes.end()) {
                                     mimeTypes.push_back(mimeType);
                                 }
-                                
+
                                 // If atom name looks like a MIME type already, add it too
                                 if (atomName.find("/") != std::string::npos && atomName != mimeType) {
                                     if (std::find(mimeTypes.begin(), mimeTypes.end(), atomName) == mimeTypes.end()) {
@@ -746,7 +727,7 @@ private:
                             }
                         }
                     }
-                    
+
                     if (reply) {
                         free(reply);
                     }
@@ -766,12 +747,12 @@ private:
     std::string getAtomName(xcb_atom_t atom) const
     {
         xcb_get_atom_name_cookie_t cookie = xcb_get_atom_name(mConnection, atom);
-        xcb_get_atom_name_reply_t *reply = xcb_get_atom_name_reply(mConnection, cookie, nullptr);
-        
+        xcb_get_atom_name_reply_t *reply  = xcb_get_atom_name_reply(mConnection, cookie, nullptr);
+
         std::string name;
         if (reply) {
             char *atom_name = xcb_get_atom_name_name(reply);
-            int length = xcb_get_atom_name_name_length(reply);
+            int length      = xcb_get_atom_name_name_length(reply);
             if (atom_name && length > 0) {
                 name = std::string(atom_name, length);
             }
@@ -806,7 +787,7 @@ private:
             return; // Already running
         }
 
-        mIsRunning = true;
+        mIsRunning         = true;
         mListeningForInput = false; // Start without input listening
 
         mListenerThread = std::thread([this]() {
@@ -820,7 +801,7 @@ private:
             return;
         }
 
-        mIsRunning = false;
+        mIsRunning         = false;
         mListeningForInput = false;
 
         // Wait for thread to exit
@@ -846,7 +827,7 @@ private:
             // Check if input listening state changed
             if (currentInputListening != mListeningForInput) {
                 currentInputListening = mListeningForInput;
-                
+
                 if (currentInputListening) {
                     // Enable XInput2 events
                     struct
@@ -857,7 +838,7 @@ private:
 
                     eventMask.header.deviceid = XCB_INPUT_DEVICE_ALL_MASTER;
                     eventMask.header.mask_len = 1;
-                    eventMask.mask = XCB_INPUT_XI_EVENT_MASK_RAW_KEY_PRESS |
+                    eventMask.mask            = XCB_INPUT_XI_EVENT_MASK_RAW_KEY_PRESS |
                         XCB_INPUT_XI_EVENT_MASK_RAW_KEY_RELEASE |
                         XCB_INPUT_XI_EVENT_MASK_RAW_BUTTON_PRESS |
                         XCB_INPUT_XI_EVENT_MASK_RAW_BUTTON_RELEASE |
@@ -875,7 +856,7 @@ private:
 
                     eventMask.header.deviceid = XCB_INPUT_DEVICE_ALL_MASTER;
                     eventMask.header.mask_len = 1;
-                    eventMask.mask = 0; // No events
+                    eventMask.mask            = 0; // No events
 
                     xcb_input_xi_select_events_checked(mConnection, mScreen->root, 1, &eventMask.header);
                     mLogger.debug("Disabled input event listening");
@@ -909,11 +890,11 @@ private:
             }
             // Always handle selection requests for clipboard
             else if (response_type == XCB_SELECTION_REQUEST) {
-                processSelectionRequest(reinterpret_cast<xcb_selection_request_event_t*>(event));
+                processSelectionRequest(reinterpret_cast<xcb_selection_request_event_t *>(event));
             }
             // Always monitor for desktop changes
             else if (response_type == XCB_CONFIGURE_NOTIFY) {
-                processDesktopChangeEvent(reinterpret_cast<xcb_configure_notify_event_t*>(event));
+                processDesktopChangeEvent(reinterpret_cast<xcb_configure_notify_event_t *>(event));
             }
 
             free(event);
@@ -1010,13 +991,13 @@ private:
 
             case XCB_INPUT_RAW_MOTION: {
                 auto *motionEvent = reinterpret_cast<xcb_input_raw_motion_event_t *>(ge);
-                event.type = EventType::MouseMove;
+                event.type        = EventType::MouseMove;
 
                 // Extract raw deltas from XInput2 raw motion event
                 // The raw values are FP3232 (fixed point) values following the event structure
                 // First comes the valuator mask, then raw values, then unaccelerated values
                 uint32_t *valuator_mask = (uint32_t *)(&motionEvent[1]);
-                int mask_len = motionEvent->valuators_len;
+                int mask_len            = motionEvent->valuators_len;
 
                 // Skip past the valuator mask to get to raw values
                 xcb_input_fp3232_t *raw_values = (xcb_input_fp3232_t *)(valuator_mask + mask_len);
@@ -1052,72 +1033,62 @@ private:
     void processSelectionRequest(xcb_selection_request_event_t *req)
     {
         xcb_atom_t clipboard_atom = getAtom("CLIPBOARD");
-        xcb_atom_t primary_atom = getAtom("PRIMARY");
-        xcb_atom_t utf8_atom = getAtom("UTF8_STRING");
-        xcb_atom_t text_atom = getAtom("TEXT");
-        xcb_atom_t targets_atom = getAtom("TARGETS");
+        xcb_atom_t primary_atom   = getAtom("PRIMARY");
+        xcb_atom_t utf8_atom      = getAtom("UTF8_STRING");
+        xcb_atom_t text_atom      = getAtom("TEXT");
+        xcb_atom_t targets_atom   = getAtom("TARGETS");
 
         xcb_selection_notify_event_t notify_event = {};
-        notify_event.response_type = XCB_SELECTION_NOTIFY;
-        notify_event.time = req->time;
-        notify_event.requestor = req->requestor;
-        notify_event.selection = req->selection;
-        notify_event.target = req->target;
-        notify_event.property = XCB_NONE; // Default to refusing
+        notify_event.response_type                = XCB_SELECTION_NOTIFY;
+        notify_event.time                         = req->time;
+        notify_event.requestor                    = req->requestor;
+        notify_event.selection                    = req->selection;
+        notify_event.target                       = req->target;
+        notify_event.property                     = XCB_NONE; // Default to refusing
 
-        if ((req->selection == clipboard_atom || req->selection == primary_atom) && 
+        if ((req->selection == clipboard_atom || req->selection == primary_atom) &&
             (!mClipboardText.empty() || !mClipboardData.empty())) {
-            
             if (req->target == targets_atom) {
                 // Return list of supported targets
                 std::vector<xcb_atom_t> targets;
-                
+
                 // Always include text targets if we have text
                 if (!mClipboardText.empty()) {
                     targets.push_back(utf8_atom);
                     targets.push_back(text_atom);
                     targets.push_back(XCB_ATOM_STRING);
                 }
-                
+
                 // Add MIME type targets for binary data
-                for (const auto& pair : mClipboardData) {
+                for (const auto &pair : mClipboardData) {
                     xcb_atom_t mimeAtom = getAtom(pair.first.c_str());
                     if (mimeAtom != XCB_NONE) {
                         targets.push_back(mimeAtom);
                     }
                 }
-                
+
                 if (!targets.empty()) {
-                    xcb_change_property(mConnection, XCB_PROP_MODE_REPLACE, req->requestor,
-                                       req->property, XCB_ATOM_ATOM, 32,
-                                       targets.size(), targets.data());
+                    xcb_change_property(mConnection, XCB_PROP_MODE_REPLACE, req->requestor, req->property, XCB_ATOM_ATOM, 32, targets.size(), targets.data());
                     notify_event.property = req->property;
                 }
-            }
-            else if (req->target == utf8_atom || req->target == text_atom || req->target == XCB_ATOM_STRING) {
+            } else if (req->target == utf8_atom || req->target == text_atom || req->target == XCB_ATOM_STRING) {
                 // Return the clipboard text
                 if (!mClipboardText.empty()) {
-                    xcb_change_property(mConnection, XCB_PROP_MODE_REPLACE, req->requestor,
-                                       req->property, req->target, 8,
-                                       mClipboardText.length(), mClipboardText.c_str());
+                    xcb_change_property(mConnection, XCB_PROP_MODE_REPLACE, req->requestor, req->property, req->target, 8, mClipboardText.length(), mClipboardText.c_str());
                     notify_event.property = req->property;
                 }
-            }
-            else {
+            } else {
                 // Check if it's a MIME type we have data for
                 std::string targetName = getAtomName(req->target);
-                auto it = mClipboardData.find(targetName);
+                auto it                = mClipboardData.find(targetName);
                 if (it != mClipboardData.end()) {
-                    xcb_change_property(mConnection, XCB_PROP_MODE_REPLACE, req->requestor,
-                                       req->property, req->target, 8,
-                                       it->second.size(), it->second.data());
+                    xcb_change_property(mConnection, XCB_PROP_MODE_REPLACE, req->requestor, req->property, req->target, 8, it->second.size(), it->second.data());
                     notify_event.property = req->property;
                 }
             }
         }
 
-        xcb_send_event(mConnection, false, req->requestor, XCB_EVENT_MASK_NO_EVENT,
-                      reinterpret_cast<char*>(&notify_event));
+        xcb_send_event(mConnection, false, req->requestor, XCB_EVENT_MASK_NO_EVENT, reinterpret_cast<char *>(&notify_event));
         xcb_flush(mConnection);
     }
 
@@ -1127,12 +1098,12 @@ private:
 
         // Query RandR for screen resources
         auto res_cookie = xcb_randr_get_screen_resources_current(mConnection, mScreen->root);
-        auto res_reply = xcb_randr_get_screen_resources_current_reply(mConnection, res_cookie, nullptr);
+        auto res_reply  = xcb_randr_get_screen_resources_current_reply(mConnection, res_cookie, nullptr);
 
         if (!res_reply) {
             mLogger.error("Failed to get RandR screen resources");
             // Fallback to screen dimensions
-            newDesktop.width = mScreen->width_in_pixels;
+            newDesktop.width  = mScreen->width_in_pixels;
             newDesktop.height = mScreen->height_in_pixels;
 
             std::lock_guard<std::mutex> lock(mDesktopMutex);
@@ -1142,15 +1113,15 @@ private:
 
         // Get CRTCs (display controllers)
         xcb_randr_crtc_t *crtcs = xcb_randr_get_screen_resources_current_crtcs(res_reply);
-        int num_crtcs = xcb_randr_get_screen_resources_current_crtcs_length(res_reply);
+        int num_crtcs           = xcb_randr_get_screen_resources_current_crtcs_length(res_reply);
 
         int32_t minX = 0, minY = 0, maxX = 0, maxY = 0;
-        bool first = true;
+        bool first         = true;
         uint32_t displayId = 0;
 
         for (int i = 0; i < num_crtcs; i++) {
             auto crtc_cookie = xcb_randr_get_crtc_info(mConnection, crtcs[i], XCB_CURRENT_TIME);
-            auto crtc_reply = xcb_randr_get_crtc_info_reply(mConnection, crtc_cookie, nullptr);
+            auto crtc_reply  = xcb_randr_get_crtc_info_reply(mConnection, crtc_cookie, nullptr);
 
             if (!crtc_reply) {
                 continue;
@@ -1163,21 +1134,21 @@ private:
             }
 
             Display display;
-            display.id = displayId++;
-            display.x = crtc_reply->x;
-            display.y = crtc_reply->y;
-            display.width = crtc_reply->width;
-            display.height = crtc_reply->height;
+            display.id        = displayId++;
+            display.x         = crtc_reply->x;
+            display.y         = crtc_reply->y;
+            display.width     = crtc_reply->width;
+            display.height    = crtc_reply->height;
             display.isPrimary = (i == 0); // First active CRTC is considered primary
 
             newDesktop.displays.push_back(display);
 
             // Update bounding box
             if (first) {
-                minX = display.x;
-                minY = display.y;
-                maxX = display.x + display.width;
-                maxY = display.y + display.height;
+                minX  = display.x;
+                minY  = display.y;
+                maxX  = display.x + display.width;
+                maxY  = display.y + display.height;
                 first = false;
             } else {
                 minX = std::min(minX, display.x);
@@ -1191,7 +1162,7 @@ private:
 
         free(res_reply);
 
-        newDesktop.width = maxX - minX;
+        newDesktop.width  = maxX - minX;
         newDesktop.height = maxY - minY;
 
         // Check if desktop configuration changed
@@ -1202,18 +1173,18 @@ private:
                 newDesktop.height != mCurrentDesktop.height ||
                 newDesktop.displays.size() != mCurrentDesktop.displays.size()) {
                 mCurrentDesktop = newDesktop;
-                changed = true;
+                changed         = true;
             }
         }
 
         if (changed && eventCallback) {
             mLogger.debug("Desktop changed: " + std::to_string(newDesktop.displays.size()) + " displays, " +
-                         std::to_string(newDesktop.width) + "x" + std::to_string(newDesktop.height));
+                          std::to_string(newDesktop.width) + "x" + std::to_string(newDesktop.height));
 
             Event event {};
-            event.type = EventType::DesktopChanged;
+            event.type      = EventType::DesktopChanged;
             event.timestamp = timestamp();
-            event.state = getState();
+            event.state     = getState();
 
             eventCallback(event);
         }
@@ -1264,7 +1235,7 @@ private:
 
     bool mCursorVisible { true };
     xcb_cursor_t mBlankCursor { XCB_NONE };
-    
+
     // Desktop change monitoring
     mutable std::mutex mDesktopMutex;
     Desktop mCurrentDesktop;
