@@ -27,11 +27,9 @@ public:
         mIsRunning     = false;
         mCursorVisible = true;
         
-        // Initialize current desktop state
-        CGDirectDisplayID display = CGMainDisplayID();
-        mCurrentDesktop.width = static_cast<int32_t>(CGDisplayPixelsWide(display));
-        mCurrentDesktop.height = static_cast<int32_t>(CGDisplayPixelsHigh(display));
-        
+        // Initialize current desktop state with all displays
+        updateDesktopInfo();
+
         // Register for display configuration changes
         CGDisplayRegisterReconfigurationCallback(displayConfigurationCallback, this);
         
@@ -391,34 +389,85 @@ private:
         }
     }
     
-    void onDisplayConfigurationChanged()
+    void updateDesktopInfo()
     {
         Desktop newDesktop;
-        CGDirectDisplayID display = CGMainDisplayID();
-        newDesktop.width = static_cast<int32_t>(CGDisplayPixelsWide(display));
-        newDesktop.height = static_cast<int32_t>(CGDisplayPixelsHigh(display));
-        
+
+        // Get all active displays
+        uint32_t maxDisplays = 32;
+        CGDirectDisplayID displays[32];
+        uint32_t displayCount = 0;
+
+        if (CGGetActiveDisplayList(maxDisplays, displays, &displayCount) != kCGErrorSuccess) {
+            mLogger.error("Failed to get active display list");
+            return;
+        }
+
+        CGDirectDisplayID mainDisplay = CGMainDisplayID();
+
+        // Calculate bounding box and collect display info
+        int32_t minX = 0, minY = 0, maxX = 0, maxY = 0;
+        bool first = true;
+
+        for (uint32_t i = 0; i < displayCount; i++) {
+            CGRect bounds = CGDisplayBounds(displays[i]);
+
+            Display display;
+            display.id = static_cast<uint32_t>(displays[i]);
+            display.x = static_cast<int32_t>(bounds.origin.x);
+            display.y = static_cast<int32_t>(bounds.origin.y);
+            display.width = static_cast<int32_t>(bounds.size.width);
+            display.height = static_cast<int32_t>(bounds.size.height);
+            display.isPrimary = (displays[i] == mainDisplay);
+
+            newDesktop.displays.push_back(display);
+
+            // Update bounding box
+            if (first) {
+                minX = display.x;
+                minY = display.y;
+                maxX = display.x + display.width;
+                maxY = display.y + display.height;
+                first = false;
+            } else {
+                minX = std::min(minX, display.x);
+                minY = std::min(minY, display.y);
+                maxX = std::max(maxX, display.x + display.width);
+                maxY = std::max(maxY, display.y + display.height);
+            }
+        }
+
+        newDesktop.width = maxX - minX;
+        newDesktop.height = maxY - minY;
+
+        // Check if desktop configuration changed
         bool changed = false;
         {
             std::lock_guard<std::mutex> lock(mDesktopMutex);
-            if (newDesktop.width != mCurrentDesktop.width || 
-                newDesktop.height != mCurrentDesktop.height) {
+            if (newDesktop.width != mCurrentDesktop.width ||
+                newDesktop.height != mCurrentDesktop.height ||
+                newDesktop.displays.size() != mCurrentDesktop.displays.size()) {
                 mCurrentDesktop = newDesktop;
                 changed = true;
             }
         }
-        
+
         if (changed && eventCallback) {
-            mLogger.debug("Desktop changed to " + std::to_string(newDesktop.width) + 
-                         "x" + std::to_string(newDesktop.height));
-                         
+            mLogger.debug("Desktop changed: " + std::to_string(displayCount) + " displays, " +
+                         std::to_string(newDesktop.width) + "x" + std::to_string(newDesktop.height));
+
             Event event {};
             event.type = EventType::DesktopChanged;
             event.timestamp = timestamp();
             event.state = getState();
-            
+
             eventCallback(event);
         }
+    }
+
+    void onDisplayConfigurationChanged()
+    {
+        updateDesktopInfo();
     }
 
     static CGEventRef eventTapCallback(

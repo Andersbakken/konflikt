@@ -75,10 +75,21 @@ struct State
     int32_t dy { 0 };  // Relative Y delta since last event
 };
 
+struct Display
+{
+    uint32_t id { 0 };    // Display identifier
+    int32_t x { 0 };      // Position in virtual desktop coordinate space
+    int32_t y { 0 };
+    int32_t width { 0 };  // Display dimensions
+    int32_t height { 0 };
+    bool isPrimary { false };
+};
+
 struct Desktop
 {
-    int32_t width { 0 };
+    int32_t width { 0 };   // Total virtual desktop bounding box size
     int32_t height { 0 };
+    std::vector<Display> displays; // All displays with absolute positions
 };
 
 enum class EventType

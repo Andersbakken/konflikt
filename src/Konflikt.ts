@@ -86,6 +86,7 @@ export class Konflikt {
         console.log(
             "Using screen bounds:",
             this.#screenBounds,
+            desktop,
             this.#role === InstanceRole.Server ? "(server)" : "(client)"
         );
 

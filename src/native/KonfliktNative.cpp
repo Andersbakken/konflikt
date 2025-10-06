@@ -177,12 +177,32 @@ Napi::Object stateToObject(Napi::Env env, const State &state)
     return obj;
 }
 
+// Helper to create Display object
+Napi::Object displayToObject(Napi::Env env, const Display &display)
+{
+    auto obj = Napi::Object::New(env);
+    obj.Set("id", Napi::Number::New(env, display.id));
+    obj.Set("x", Napi::Number::New(env, display.x));
+    obj.Set("y", Napi::Number::New(env, display.y));
+    obj.Set("width", Napi::Number::New(env, display.width));
+    obj.Set("height", Napi::Number::New(env, display.height));
+    obj.Set("isPrimary", Napi::Boolean::New(env, display.isPrimary));
+    return obj;
+}
+
 // Helper to create Desktop object
 Napi::Object desktopToObject(Napi::Env env, const Desktop &desktop)
 {
     auto obj = Napi::Object::New(env);
     obj.Set("width", Napi::Number::New(env, desktop.width));
     obj.Set("height", Napi::Number::New(env, desktop.height));
+
+    auto displays = Napi::Array::New(env, desktop.displays.size());
+    for (size_t i = 0; i < desktop.displays.size(); i++) {
+        displays[i] = displayToObject(env, desktop.displays[i]);
+    }
+    obj.Set("displays", displays);
+
     return obj;
 }
 

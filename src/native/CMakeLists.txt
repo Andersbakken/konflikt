@@ -29,7 +29,7 @@ elseif(UNIX)
     find_package(PkgConfig REQUIRED)
     
     # X11/XCB dependencies
-    pkg_check_modules(XCB REQUIRED xcb xcb-xinput xcb-xtest xcb-xkb xkbcommon xkbcommon-x11)
+    pkg_check_modules(XCB REQUIRED xcb xcb-xinput xcb-xtest xcb-xkb xcb-randr xkbcommon xkbcommon-x11)
     
     # Wayland dependencies (make them optional)
     pkg_check_modules(WAYLAND wayland-client)

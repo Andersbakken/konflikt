@@ -62,9 +62,19 @@ export interface KonfliktKeyReleaseEvent extends KonfliktKeyEvent {
     type: "keyRelease";
 }
 
+export interface KonfliktDisplay {
+    id: number;
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    isPrimary: boolean;
+}
+
 export interface KonfliktDesktop {
     width: number;
     height: number;
+    displays: KonfliktDisplay[];
 }
 
 export interface KonfliktDesktopEvent {

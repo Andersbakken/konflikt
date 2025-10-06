@@ -5,6 +5,7 @@
 #include <xcb/xcb.h>
 #include <xcb/xinput.h>
 #include <xcb/xtest.h>
+#include <xcb/randr.h>
 // xcb/xkb.h uses 'explicit' as a variable name which conflicts with C++ keyword
 // We only need xkbcommon, not the xcb xkb header
 #include <algorithm>
@@ -123,11 +124,16 @@ public:
         mBlankCursor   = XCB_NONE;
         mClipboardWindow = XCB_NONE;
         
-        // Initialize current desktop state
-        mCurrentDesktop.width = mScreen->width_in_pixels;
-        mCurrentDesktop.height = mScreen->height_in_pixels;
-        
-        // Register for structure events on root window to monitor desktop changes
+        // Initialize current desktop state with all displays
+        updateDesktopInfo();
+
+        // Register for RandR events to monitor display configuration changes
+        xcb_randr_select_input(mConnection, mScreen->root,
+            XCB_RANDR_NOTIFY_MASK_SCREEN_CHANGE |
+            XCB_RANDR_NOTIFY_MASK_CRTC_CHANGE |
+            XCB_RANDR_NOTIFY_MASK_OUTPUT_CHANGE);
+
+        // Also register for structure events on root window
         uint32_t values[] = { XCB_EVENT_MASK_STRUCTURE_NOTIFY };
         xcb_change_window_attributes(mConnection, mScreen->root, XCB_CW_EVENT_MASK, values);
         xcb_flush(mConnection);
@@ -1115,6 +1121,104 @@ private:
         xcb_flush(mConnection);
     }
 
+    void updateDesktopInfo()
+    {
+        Desktop newDesktop;
+
+        // Query RandR for screen resources
+        auto res_cookie = xcb_randr_get_screen_resources_current(mConnection, mScreen->root);
+        auto res_reply = xcb_randr_get_screen_resources_current_reply(mConnection, res_cookie, nullptr);
+
+        if (!res_reply) {
+            mLogger.error("Failed to get RandR screen resources");
+            // Fallback to screen dimensions
+            newDesktop.width = mScreen->width_in_pixels;
+            newDesktop.height = mScreen->height_in_pixels;
+
+            std::lock_guard<std::mutex> lock(mDesktopMutex);
+            mCurrentDesktop = newDesktop;
+            return;
+        }
+
+        // Get CRTCs (display controllers)
+        xcb_randr_crtc_t *crtcs = xcb_randr_get_screen_resources_current_crtcs(res_reply);
+        int num_crtcs = xcb_randr_get_screen_resources_current_crtcs_length(res_reply);
+
+        int32_t minX = 0, minY = 0, maxX = 0, maxY = 0;
+        bool first = true;
+        uint32_t displayId = 0;
+
+        for (int i = 0; i < num_crtcs; i++) {
+            auto crtc_cookie = xcb_randr_get_crtc_info(mConnection, crtcs[i], XCB_CURRENT_TIME);
+            auto crtc_reply = xcb_randr_get_crtc_info_reply(mConnection, crtc_cookie, nullptr);
+
+            if (!crtc_reply) {
+                continue;
+            }
+
+            // Skip disabled CRTCs
+            if (crtc_reply->mode == XCB_NONE || crtc_reply->width == 0 || crtc_reply->height == 0) {
+                free(crtc_reply);
+                continue;
+            }
+
+            Display display;
+            display.id = displayId++;
+            display.x = crtc_reply->x;
+            display.y = crtc_reply->y;
+            display.width = crtc_reply->width;
+            display.height = crtc_reply->height;
+            display.isPrimary = (i == 0); // First active CRTC is considered primary
+
+            newDesktop.displays.push_back(display);
+
+            // Update bounding box
+            if (first) {
+                minX = display.x;
+                minY = display.y;
+                maxX = display.x + display.width;
+                maxY = display.y + display.height;
+                first = false;
+            } else {
+                minX = std::min(minX, display.x);
+                minY = std::min(minY, display.y);
+                maxX = std::max(maxX, display.x + display.width);
+                maxY = std::max(maxY, display.y + display.height);
+            }
+
+            free(crtc_reply);
+        }
+
+        free(res_reply);
+
+        newDesktop.width = maxX - minX;
+        newDesktop.height = maxY - minY;
+
+        // Check if desktop configuration changed
+        bool changed = false;
+        {
+            std::lock_guard<std::mutex> lock(mDesktopMutex);
+            if (newDesktop.width != mCurrentDesktop.width ||
+                newDesktop.height != mCurrentDesktop.height ||
+                newDesktop.displays.size() != mCurrentDesktop.displays.size()) {
+                mCurrentDesktop = newDesktop;
+                changed = true;
+            }
+        }
+
+        if (changed && eventCallback) {
+            mLogger.debug("Desktop changed: " + std::to_string(newDesktop.displays.size()) + " displays, " +
+                         std::to_string(newDesktop.width) + "x" + std::to_string(newDesktop.height));
+
+            Event event {};
+            event.type = EventType::DesktopChanged;
+            event.timestamp = timestamp();
+            event.state = getState();
+
+            eventCallback(event);
+        }
+    }
+
     void processDesktopChangeEvent(xcb_configure_notify_event_t *config_event)
     {
         // Only process events for the root window (desktop changes)
@@ -1122,33 +1226,8 @@ private:
             return;
         }
 
-        bool changed = false;
-        Desktop newDesktop;
-        
-        {
-            std::lock_guard<std::mutex> lock(mDesktopMutex);
-            newDesktop.width = config_event->width;
-            newDesktop.height = config_event->height;
-            
-            // Check if desktop dimensions actually changed
-            if (newDesktop.width != mCurrentDesktop.width || 
-                newDesktop.height != mCurrentDesktop.height) {
-                mCurrentDesktop = newDesktop;
-                changed = true;
-            }
-        }
-        
-        if (changed && eventCallback) {
-            mLogger.debug("Desktop changed to " + std::to_string(newDesktop.width) + 
-                         "x" + std::to_string(newDesktop.height));
-                         
-            Event event {};
-            event.type = EventType::DesktopChanged;
-            event.timestamp = timestamp();
-            event.state = getState();
-            
-            eventCallback(event);
-        }
+        // Re-query display information when desktop changes
+        updateDesktopInfo();
     }
 
     xcb_cursor_t createBlankCursor()
