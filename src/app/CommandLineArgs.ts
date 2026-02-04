@@ -12,7 +12,7 @@ export const CommandLineArgs = {
     "screen-width": { path: "screen.dimensions.width" },
     "screen-height": { path: "screen.dimensions.height" },
     "screen-edges": { path: "screen.edges" },
-    "server-host": { path: "cluster.server.host" },
+    server: { path: "cluster.server.host" },
     "server-port": { path: "cluster.server.port" },
     peers: { path: "cluster.peers" },
     adjacency: { path: "cluster.adjacency" },

@@ -199,7 +199,7 @@ export const configSchema = convict({
             port: {
                 doc: "Server port to connect to (for client mode)",
                 format: "nullable-port",
-                default: null,
+                default: 3000,
                 env: "KONFLIKT_SERVER_PORT",
                 arg: argForPath("cluster.server.port")
             }

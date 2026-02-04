@@ -342,7 +342,16 @@ export class Config {
                 type: 'boolean',
                 description: 'Disable console mode'
             })
+            .option('server', {
+                type: 'string',
+                description: 'Server to connect to (host or host:port)'
+            })
+            .option('server-port', {
+                type: 'number',
+                description: 'Server port (overrides port from --server)'
+            })
             .help(false) // Disable automatic help to avoid conflicts
+            .strict() // Error on unknown arguments
             .parseSync();
 
         // Apply yargs-parsed values to config
@@ -399,6 +408,37 @@ export class Config {
         if (typeof argv['no-console'] === 'boolean' && argv['no-console']) {
             this.#set("console.enabled", "false");
             debug(`CLI override: no-console = true`);
+        }
+
+        // Handle --server with optional :port suffix
+        if (typeof argv.server === 'string') {
+            const serverArg = argv.server;
+            const colonIndex = serverArg.lastIndexOf(':');
+
+            // Check if there's a port in the string (handle IPv6 by checking for brackets)
+            if (colonIndex > 0 && !serverArg.includes('[')) {
+                // Simple host:port format
+                const host = serverArg.substring(0, colonIndex);
+                const port = parseInt(serverArg.substring(colonIndex + 1), 10);
+
+                this.#set("cluster.server.host", host);
+                debug(`CLI override: server host = ${host}`);
+
+                if (!isNaN(port) && port > 0 && port <= 65535) {
+                    this.#set("cluster.server.port", port);
+                    debug(`CLI override: server port = ${port}`);
+                }
+            } else {
+                // Just host, no port
+                this.#set("cluster.server.host", serverArg);
+                debug(`CLI override: server host = ${serverArg}`);
+            }
+        }
+
+        // --server-port overrides any port from --server
+        if (typeof argv['server-port'] === 'number') {
+            this.#set("cluster.server.port", argv['server-port']);
+            debug(`CLI override: server-port = ${argv['server-port']}`);
         }
     }
 

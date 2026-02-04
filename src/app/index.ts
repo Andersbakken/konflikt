@@ -25,8 +25,8 @@ Options:
   --screen-y                Screen Y position
   --screen-width            Screen width in pixels
   --screen-height           Screen height in pixels
-  --server-host             Server host to connect to (client mode)
-  --server-port             Server port to connect to (client mode)
+  --server                  Server to connect to: host or host:port (client mode)
+  --server-port             Server port override (client mode, default: 3000)
   --discovery               Enable service discovery
   --service-name, -s        Service name for mDNS advertising
   --dev, -d                 Enable development mode
