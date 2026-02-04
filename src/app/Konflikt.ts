@@ -286,6 +286,21 @@ export class Konflikt {
 
             // Set up peer connection event handlers
             this.#setupPeerConnectionHandlers();
+
+            // If --server was specified, connect directly (don't wait for mDNS)
+            const serverHost = this.#config.serverHost;
+            const serverPort = this.#config.serverPort;
+            if (serverHost) {
+                log(`Connecting to configured server: ${serverHost}:${serverPort}`);
+                const directService: DiscoveredService = {
+                    name: `server-${serverHost}`,
+                    host: serverHost,
+                    port: serverPort || 3000,
+                    addresses: [],
+                    txt: { role: "server" }
+                };
+                this.#connectToServer(directService);
+            }
         }
 
         // Send initial instance info and set up periodic broadcasting
