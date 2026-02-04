@@ -63,6 +63,7 @@ export class Konflikt {
     #lastCursorPosition: Point = { x: 0, y: 0 };
     #virtualCursorPosition: Point | null = null; // Virtual cursor for remote screen
     #activeRemoteScreenBounds: Rect | null = null; // Bounds of the currently active remote screen
+    #edgeHitCount: number = 0; // Count consecutive events at left edge for transition back
     #screenBounds: Rect;
     #activatedClientId: string | null = null; // Track which client we've activated at the edge
     #run: PromiseData<void>;
@@ -438,6 +439,7 @@ export class Konflikt {
 
         // Initialize virtual cursor for the remote screen
         this.#virtualCursorPosition = { x: cursorX, y: cursorY };
+        this.#edgeHitCount = 0;
 
         // Store the remote screen bounds for clamping
         const targetScreen = this.#layoutManager?.getScreen(targetInstanceId);
@@ -911,21 +913,27 @@ export class Konflikt {
 
         // Check if a remote screen is active (virtual cursor mode)
         if (this.#virtualCursorPosition !== null && this.#activeRemoteScreenBounds !== null) {
-            // Store previous position before update
-            const prevX = this.#virtualCursorPosition.x;
-
             // Update virtual cursor position using deltas
             const newX = this.#virtualCursorPosition.x + event.dx;
             const newY = this.#virtualCursorPosition.y + event.dy;
 
-            // Check if cursor should transition back to server:
-            // Only transition when cursor WAS at the left edge (prevX=0) AND calculated position goes negative
-            // This prevents deactivation during a fast swipe that just reached the edge
-            if (prevX === 0 && newX < 0) {
-                // Transitioning back to server (was at left edge and trying to go further left)
-                verbose(`Virtual cursor at left edge moving left (prevX=${prevX}, newX=${newX}), transitioning back to server`);
-                this.#deactivateRemoteScreen();
-                return;
+            // Track consecutive events at left edge trying to go further left
+            // This prevents accidental deactivation during fast swipes
+            const EDGE_HIT_THRESHOLD = 5; // Require 5 consecutive edge hits (~40ms at 8ms/event)
+
+            if (newX < 0) {
+                this.#edgeHitCount++;
+                verbose(`Edge hit count: ${this.#edgeHitCount}/${EDGE_HIT_THRESHOLD}`);
+
+                if (this.#edgeHitCount >= EDGE_HIT_THRESHOLD) {
+                    // Transitioning back to server after sustained edge contact
+                    verbose(`Virtual cursor at left edge for ${this.#edgeHitCount} events, transitioning back to server`);
+                    this.#deactivateRemoteScreen();
+                    return;
+                }
+            } else {
+                // Reset counter if cursor moves away from edge
+                this.#edgeHitCount = 0;
             }
 
             // Clamp to remote screen bounds
