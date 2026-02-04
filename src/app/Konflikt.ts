@@ -347,24 +347,69 @@ export class Konflikt {
 
     #getTargetClientForPosition(x: number, y: number): string | null {
         // For servers: determine which connected client should receive input at this position
-        if (this.#role !== InstanceRole.Server) {
+        if (this.#role !== InstanceRole.Server || !this.#layoutManager) {
             return null;
         }
 
         // If cursor is within server's screen bounds, don't forward to clients
         if (this.#screenBounds.contains({ x, y })) {
-            verbose(`Cursor at (${x}, ${y}) is within server screen bounds - not forwarding`);
             return null;
         }
 
-        // Check adjacency configuration to find which client's screen area contains this position
-        const adjacency = this.#config.adjacency;
-        verbose(`Checking adjacency for cursor position (${x}, ${y}) adjacency: ${JSON.stringify(adjacency)}`);
+        // Check if cursor has transitioned to another screen
+        const transition = this.#layoutManager.getTransitionTarget(this.#config.instanceId, x, y);
+        if (transition) {
+            return transition.targetScreen.instanceId;
+        }
 
-        // TODO: Implement logic to determine target client based on screen positioning
-        // This will use the adjacency configuration and connected clients' screen information
+        return null;
+    }
 
-        return null; // For now, return null until we have client connection management
+    /**
+     * Check if cursor should transition to another screen and handle the transition
+     */
+    #checkScreenTransition(x: number, y: number): boolean {
+        if (this.#role !== InstanceRole.Server || !this.#layoutManager) {
+            return false;
+        }
+
+        // Only check transition if cursor is outside our bounds
+        if (this.#screenBounds.contains({ x, y })) {
+            return false;
+        }
+
+        const transition = this.#layoutManager.getTransitionTarget(this.#config.instanceId, x, y);
+        if (!transition) {
+            return false;
+        }
+
+        log(
+            `Screen transition: cursor at (${x}, ${y}) -> ${transition.targetScreen.displayName} at (${transition.newX}, ${transition.newY})`
+        );
+
+        // Send activation message to the target client
+        this.#activateClient(transition.targetScreen.instanceId, transition.newX, transition.newY);
+
+        return true;
+    }
+
+    /**
+     * Send activation message to a client to make it the active input receiver
+     */
+    #activateClient(targetInstanceId: string, cursorX: number, cursorY: number): void {
+        const message = {
+            type: "activate_client",
+            targetInstanceId,
+            cursorX,
+            cursorY,
+            timestamp: Date.now()
+        };
+
+        this.#server.broadcastToClients(JSON.stringify(message));
+        log(`Sent activation to ${targetInstanceId} at (${cursorX}, ${cursorY})`);
+
+        // Server is no longer the active instance
+        this.#isActiveInstance = false;
     }
 
     // Method to be called by Server when receiving network messages
@@ -379,8 +424,61 @@ export class Konflikt {
             this.#handleLayoutAssignment(message);
         } else if (isLayoutUpdateMessage(message)) {
             this.#handleLayoutUpdate(message);
+        } else if (Konflikt.#isActivateClientMessage(message)) {
+            this.#handleActivateClient(message);
         } else {
             verbose(`Unknown message type: ${JSON.stringify(message)}`);
+        }
+    }
+
+    static #isActivateClientMessage(
+        message: unknown
+    ): message is { type: "activate_client"; targetInstanceId: string; cursorX: number; cursorY: number } {
+        return (
+            typeof message === "object" &&
+            message !== null &&
+            "type" in message &&
+            message.type === "activate_client" &&
+            "targetInstanceId" in message &&
+            "cursorX" in message &&
+            "cursorY" in message
+        );
+    }
+
+    #handleActivateClient(message: {
+        type: "activate_client";
+        targetInstanceId: string;
+        cursorX: number;
+        cursorY: number;
+    }): void {
+        // Check if this activation is for us
+        if (message.targetInstanceId !== this.#config.instanceId) {
+            // Not for us - deactivate if we were active
+            if (this.#isActiveInstance) {
+                verbose(`Deactivating - another client (${message.targetInstanceId}) is now active`);
+                this.#isActiveInstance = false;
+            }
+            return;
+        }
+
+        log(`Activating client at cursor position (${message.cursorX}, ${message.cursorY})`);
+        this.#isActiveInstance = true;
+
+        // Move cursor to the specified position using a mouse move event
+        try {
+            this.#native.sendMouseEvent({
+                type: "mouseMove",
+                x: message.cursorX,
+                y: message.cursorY,
+                timestamp: Date.now(),
+                keyboardModifiers: 0,
+                mouseButtons: 0,
+                dx: 0,
+                dy: 0
+            });
+            verbose(`Moved cursor to (${message.cursorX}, ${message.cursorY})`);
+        } catch (err) {
+            error(`Failed to move cursor: ${err}`);
         }
     }
 
@@ -727,6 +825,11 @@ export class Konflikt {
 
         if (!this.#shouldProcessInputEvent()) {
             return;
+        }
+
+        // Check if cursor should transition to another screen
+        if (this.#checkScreenTransition(event.x, event.y)) {
+            return; // Transition handled, don't broadcast
         }
 
         verbose("Mouse moved (active source):", event);
