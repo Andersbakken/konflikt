@@ -397,7 +397,11 @@ export class Konflikt {
 
         if (!edge) {
             // Cursor is not at an edge - clear any previous activation
-            this.#activatedClientId = null;
+            // BUT only if we don't have a virtual cursor (remote screen active)
+            if (this.#virtualCursorPosition === null && this.#activatedClientId !== null) {
+                verbose(`Clearing activatedClientId (was ${this.#activatedClientId}) - cursor not at edge`);
+                this.#activatedClientId = null;
+            }
             return false;
         }
 
@@ -417,7 +421,6 @@ export class Konflikt {
 
         // Send activation message to the target client
         this.#activateClient(transition.targetScreen.instanceId, transition.newX, transition.newY);
-        this.#activatedClientId = transition.targetScreen.instanceId;
 
         return true;
     }
@@ -426,6 +429,9 @@ export class Konflikt {
      * Send activation message to a client to make it the active input receiver
      */
     #activateClient(targetInstanceId: string, cursorX: number, cursorY: number): void {
+        // Set this FIRST before anything else to avoid race conditions
+        this.#activatedClientId = targetInstanceId;
+
         const message = {
             type: "activate_client",
             targetInstanceId,
@@ -435,7 +441,7 @@ export class Konflikt {
         };
 
         this.#server.broadcastToClients(JSON.stringify(message));
-        log(`Sent activation to ${targetInstanceId} at (${cursorX}, ${cursorY})`);
+        log(`Sent activation to ${targetInstanceId} at (${cursorX}, ${cursorY}), activatedClientId=${this.#activatedClientId}`);
 
         // Initialize virtual cursor for the remote screen
         this.#virtualCursorPosition = { x: cursorX, y: cursorY };
