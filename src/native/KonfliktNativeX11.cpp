@@ -145,6 +145,12 @@ public:
     {
         stopEventLoop();
 
+        // Ungrab pointer if we have it grabbed
+        if (!mCursorVisible && mConnection) {
+            xcb_ungrab_pointer(mConnection, XCB_CURRENT_TIME);
+            xcb_flush(mConnection);
+        }
+
         if (mBlankCursor != XCB_NONE) {
             xcb_free_cursor(mConnection, mBlankCursor);
             mBlankCursor = XCB_NONE;
@@ -300,9 +306,11 @@ public:
             return;
         }
 
-        xcb_change_window_attributes(mConnection, mScreen->root, XCB_CW_CURSOR, nullptr);
+        // Ungrab the pointer to show the cursor again
+        xcb_ungrab_pointer(mConnection, XCB_CURRENT_TIME);
         xcb_flush(mConnection);
         mCursorVisible = true;
+        mLogger.debug("Cursor shown (pointer ungrabbed)");
     }
 
     virtual void hideCursor() override
@@ -316,10 +324,34 @@ public:
         }
 
         if (mBlankCursor != XCB_NONE) {
-            uint32_t values[] = { mBlankCursor };
-            xcb_change_window_attributes(mConnection, mScreen->root, XCB_CW_CURSOR, values);
+            // Grab the pointer with a blank cursor to hide it system-wide
+            // owner_events=1 means events are reported normally (so XInput2 raw events work)
+            // but the cursor image is still the grabbed cursor (blank)
+            xcb_grab_pointer_cookie_t cookie = xcb_grab_pointer(
+                mConnection,
+                1,  // owner_events: true - events reported normally, but cursor is blank
+                mScreen->root,
+                XCB_EVENT_MASK_POINTER_MOTION | XCB_EVENT_MASK_BUTTON_PRESS | XCB_EVENT_MASK_BUTTON_RELEASE,
+                XCB_GRAB_MODE_ASYNC,  // pointer_mode
+                XCB_GRAB_MODE_ASYNC,  // keyboard_mode
+                XCB_NONE,             // confine_to: don't confine
+                mBlankCursor,         // cursor: blank cursor
+                XCB_CURRENT_TIME
+            );
+
+            xcb_grab_pointer_reply_t *reply = xcb_grab_pointer_reply(mConnection, cookie, nullptr);
+            if (reply) {
+                if (reply->status == XCB_GRAB_STATUS_SUCCESS) {
+                    mCursorVisible = false;
+                    mLogger.debug("Cursor hidden (pointer grabbed)");
+                } else {
+                    mLogger.error("Failed to grab pointer, status: " + std::to_string(reply->status));
+                }
+                free(reply);
+            } else {
+                mLogger.error("Failed to get grab pointer reply");
+            }
             xcb_flush(mConnection);
-            mCursorVisible = false;
         }
     }
 

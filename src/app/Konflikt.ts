@@ -459,8 +459,12 @@ export class Konflikt {
 
         // Hide the cursor on the server since we're controlling a remote screen
         log(`Hiding server cursor`);
-        this.#native.hideCursor();
-        log(`Server cursor hidden: ${!this.#native.isCursorVisible()}`);
+        try {
+            this.#native.hideCursor();
+            log(`Server cursor hidden: ${!this.#native.isCursorVisible()}`);
+        } catch (err) {
+            error(`Failed to hide cursor: ${err}`);
+        }
 
         // Server is no longer the active instance
         this.#isActiveInstance = false;
@@ -479,8 +483,12 @@ export class Konflikt {
 
         // Show the cursor on the server again
         log(`Showing server cursor`);
-        this.#native.showCursor();
-        log(`Server cursor visible: ${this.#native.isCursorVisible()}`);
+        try {
+            this.#native.showCursor();
+            log(`Server cursor visible: ${this.#native.isCursorVisible()}`);
+        } catch (err) {
+            error(`Failed to show cursor: ${err}`);
+        }
 
         // Server is now the active instance again
         this.#isActiveInstance = true;
@@ -809,6 +817,10 @@ export class Konflikt {
                     text: eventData.text
                 } as KonfliktKeyPressEvent | KonfliktKeyReleaseEvent);
             } else {
+                // For click events, log the coordinates being used
+                if (eventType === "mousePress" || eventType === "mouseRelease") {
+                    verbose(`Executing ${eventType} at x=${eventData.x}, y=${eventData.y}, button=${eventData.button}`);
+                }
                 this.#native.sendMouseEvent({
                     type: eventType,
                     x: eventData.x,
