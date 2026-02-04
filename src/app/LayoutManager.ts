@@ -59,11 +59,11 @@ export class LayoutManager extends EventEmitter<LayoutManagerEvents> {
         width: number,
         height: number
     ): ScreenEntry {
-        // Check if this client was previously registered (has saved position)
+        // Check if this exact instanceId was previously registered
         const existingEntry = this.#screens.get(instanceId);
 
         if (existingEntry) {
-            // Reconnecting client - preserve position, update online status
+            // Reconnecting client with same instanceId - preserve position, update online status
             existingEntry.displayName = displayName;
             existingEntry.machineId = machineId;
             existingEntry.width = width;
@@ -73,7 +73,34 @@ export class LayoutManager extends EventEmitter<LayoutManagerEvents> {
             return existingEntry;
         }
 
-        // New client - auto-arrange position
+        // Check if there's an offline entry from the same machine (by machineId)
+        // This handles the case where the client restarts with a new instanceId
+        for (const [oldInstanceId, entry] of this.#screens) {
+            if (entry.machineId === machineId && !entry.online && !entry.isServer) {
+                verbose(
+                    `Reusing position from offline entry ${oldInstanceId} for new client ${instanceId} (same machineId: ${machineId})`
+                );
+                // Remove old entry and create new one at same position
+                this.#screens.delete(oldInstanceId);
+                const newEntry: ScreenEntry = {
+                    instanceId,
+                    displayName,
+                    machineId,
+                    x: entry.x,
+                    y: entry.y,
+                    width,
+                    height,
+                    isServer: false,
+                    online: true
+                };
+                this.#screens.set(instanceId, newEntry);
+                this.persistToConfig();
+                this.#emitLayoutChanged();
+                return newEntry;
+            }
+        }
+
+        // Truly new client - auto-arrange position
         const position = this.autoArrangeNewClient(width, height);
 
         const entry: ScreenEntry = {
