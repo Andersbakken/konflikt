@@ -27,10 +27,13 @@ interface PeerManagerEvents {
 
 export class PeerManager extends EventEmitter<PeerManagerEvents> {
     #clients = new Map<string, WebSocketClient>();
+    #pendingReconnects = new Map<string, { service: DiscoveredService; screenGeometry: Rect | undefined; attempts: number }>();
+    #reconnectTimers = new Map<string, NodeJS.Timeout>();
     #instanceId: string;
     #instanceName: string;
     #version: string;
     #capabilities: string[];
+    #isDestroyed = false;
 
     constructor(
         instanceId: string,
@@ -93,6 +96,11 @@ export class PeerManager extends EventEmitter<PeerManagerEvents> {
             log(`Disconnected from peer: ${connectedService.name}`);
             this.#clients.delete(serviceKey);
             this.emit("peer_disconnected", connectedService);
+
+            // Schedule reconnection if not destroyed
+            if (!this.#isDestroyed) {
+                this.#scheduleReconnect(serviceKey, service, screenGeometry);
+            }
         });
 
         client.on("message", (message: Message, from: DiscoveredService) => {
@@ -275,5 +283,82 @@ export class PeerManager extends EventEmitter<PeerManagerEvents> {
                 // Treat unknown message types as errors
                 error(`Unknown message type from ${from.name}:`, JSON.stringify(message, null, 4));
         }
+    }
+
+    /**
+     * Schedule a reconnection attempt with exponential backoff
+     */
+    #scheduleReconnect(serviceKey: string, service: DiscoveredService, screenGeometry?: Rect): void {
+        // Get or initialize reconnect info
+        const existing = this.#pendingReconnects.get(serviceKey);
+        const reconnectInfo = existing ?? { service, screenGeometry, attempts: 0 };
+        if (!existing) {
+            this.#pendingReconnects.set(serviceKey, reconnectInfo);
+        }
+        reconnectInfo.attempts++;
+
+        // Calculate delay with exponential backoff (1s, 2s, 4s, 8s, max 30s)
+        const delay = Math.min(1000 * Math.pow(2, reconnectInfo.attempts - 1), 30000);
+
+        log(`Scheduling reconnect to ${service.name} in ${delay / 1000}s (attempt ${reconnectInfo.attempts})`);
+
+        // Clear any existing timer
+        const existingTimer = this.#reconnectTimers.get(serviceKey);
+        if (existingTimer) {
+            clearTimeout(existingTimer);
+        }
+
+        // Schedule reconnection
+        const timer = setTimeout(() => {
+            this.#reconnectTimers.delete(serviceKey);
+
+            if (this.#isDestroyed) {
+                return;
+            }
+
+            // Don't reconnect if already connected
+            if (this.#clients.has(serviceKey)) {
+                this.#pendingReconnects.delete(serviceKey);
+                return;
+            }
+
+            log(`Attempting reconnect to ${service.name}...`);
+
+            this.connectToPeer(service, screenGeometry)
+                .then(() => {
+                    // Clear reconnect info on success
+                    this.#pendingReconnects.delete(serviceKey);
+                    log(`Reconnected to ${service.name}`);
+                })
+                .catch((err: Error) => {
+                    verbose(`Reconnect to ${service.name} failed: ${err.message}`);
+                    // Schedule another reconnect attempt
+                    if (!this.#isDestroyed) {
+                        this.#scheduleReconnect(serviceKey, service, screenGeometry);
+                    }
+                });
+        }, delay);
+
+        this.#reconnectTimers.set(serviceKey, timer);
+    }
+
+    /**
+     * Destroy the peer manager and clean up all connections
+     */
+    destroy(): void {
+        this.#isDestroyed = true;
+
+        // Clear all reconnect timers
+        for (const timer of this.#reconnectTimers.values()) {
+            clearTimeout(timer);
+        }
+        this.#reconnectTimers.clear();
+        this.#pendingReconnects.clear();
+
+        // Disconnect all clients
+        for (const [, client] of this.#clients) {
+            client.destroy();
+        }
+        this.#clients.clear();
     }
 }
