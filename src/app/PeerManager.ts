@@ -13,6 +13,7 @@ import type { Message } from "./Message";
 import type { MouseMoveEvent } from "./MouseMoveEvent";
 import type { MousePressEvent } from "./MousePressEvent";
 import type { MouseReleaseEvent } from "./MouseReleaseEvent";
+import type { PendingReconnect } from "./PendingReconnect";
 import type { Rect } from "./Rect";
 
 interface PeerManagerEvents {
@@ -27,7 +28,7 @@ interface PeerManagerEvents {
 
 export class PeerManager extends EventEmitter<PeerManagerEvents> {
     #clients = new Map<string, WebSocketClient>();
-    #pendingReconnects = new Map<string, { service: DiscoveredService; screenGeometry: Rect | undefined; attempts: number }>();
+    #pendingReconnects = new Map<string, PendingReconnect>();
     #reconnectTimers = new Map<string, NodeJS.Timeout>();
     #instanceId: string;
     #instanceName: string;
