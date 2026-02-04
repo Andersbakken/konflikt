@@ -213,6 +213,7 @@ main() {
 
     log_info "Starting konflikt-autoupdate"
     log_info "  Project dir: $PROJECT_DIR"
+    log_info "  Git SHA: $(git -C "$PROJECT_DIR" rev-parse --short HEAD)"
     log_info "  Check interval: ${CHECK_INTERVAL}s"
     log_info "  Track branch: ${TRACK_BRANCH:-<current>}"
     log_info "  Konflikt args: ${KONFLIKT_ARGS[*]:-<none>}"
