@@ -38,6 +38,7 @@ import type {
 } from "../native/KonfliktNative";
 import type { LayoutAssignmentMessage } from "./LayoutAssignmentMessage";
 import type { LayoutUpdateMessage } from "./LayoutUpdateMessage";
+import type { Message } from "./Message";
 import type { MouseMoveEvent } from "./MouseMoveEvent";
 import type { MousePressEvent } from "./MousePressEvent";
 import type { MouseReleaseEvent } from "./MouseReleaseEvent";
@@ -886,6 +887,12 @@ export class Konflikt {
                 // TODO: Execute the input event locally
             }
         );
+
+        this.#peerManager.on("message", (message: Message, from: DiscoveredService) => {
+            verbose(`Received message from server ${from.name}: ${message.type}`);
+            // Cast to NetworkMessage - the types that PeerManager emits are all NetworkMessage compatible
+            this.handleNetworkMessage(message as NetworkMessage);
+        });
 
         this.#peerManager.on("error", (err: Error, service?: DiscoveredService) => {
             verbose(`Peer connection error${service ? ` with ${service.name}` : ""}: ${err.message}`);

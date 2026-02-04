@@ -23,6 +23,7 @@ interface PeerManagerEvents {
         event: MouseMoveEvent | MousePressEvent | MouseReleaseEvent | KeyPressEvent | KeyReleaseEvent,
         from: DiscoveredService
     ];
+    message: [message: Message, from: DiscoveredService];
     error: [error: Error, service?: DiscoveredService];
 }
 
@@ -276,8 +277,9 @@ export class PeerManager extends EventEmitter<PeerManagerEvents> {
             case "activate_client":
             case "client_registration":
             case "instance_info":
-                // These are handled by the application layer (Konflikt.ts)
+                // Forward to application layer (Konflikt.ts)
                 verbose(`Received ${message.type} message from ${from.name}`);
+                this.emit("message", message, from);
                 break;
 
             default:
