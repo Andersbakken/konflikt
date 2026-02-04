@@ -105,6 +105,9 @@ public:
 
         switch (event.type) {
             case EventType::MouseMove: {
+                // Use CGWarpMouseCursorPosition to actually move the cursor
+                CGWarpMouseCursorPosition(pos);
+                // Also post the mouse moved event for applications to receive it
                 cgEvent = CGEventCreateMouseEvent(source, kCGEventMouseMoved, pos, kCGMouseButtonLeft);
                 break;
             }
