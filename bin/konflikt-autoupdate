@@ -217,8 +217,13 @@ main() {
     log_info "  Track branch: ${TRACK_BRANCH:-<current>}"
     log_info "  Konflikt args: ${KONFLIKT_ARGS[*]:-<none>}"
 
-    # Initial build check - ensure the project is built
-    if [[ ! -f "$PROJECT_DIR/dist/app/index.js" ]]; then
+    # Check for updates on startup
+    log_info "Checking for updates on startup..."
+    if check_for_updates; then
+        log_info "Updates found, updating before starting..."
+        perform_update
+    elif [[ ! -f "$PROJECT_DIR/dist/app/index.js" ]]; then
+        # No updates but no build exists - do initial build
         log_info "No build found, building project..."
         cd "$PROJECT_DIR"
         npm install
