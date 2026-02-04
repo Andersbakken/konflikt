@@ -25,6 +25,7 @@ interface PeerManagerEvents {
     ];
     message: [message: Message, from: DiscoveredService];
     error: [error: Error, service?: DiscoveredService];
+    update_required: [serverCommit: string, clientCommit: string];
 }
 
 export class PeerManager extends EventEmitter<PeerManagerEvents> {
@@ -112,6 +113,10 @@ export class PeerManager extends EventEmitter<PeerManagerEvents> {
         client.on("error", (err: Error, connectedService: DiscoveredService) => {
             error(`Error with peer ${connectedService.name}:`, err);
             this.emit("error", err, connectedService);
+        });
+
+        client.on("update_required", (serverCommit: string, clientCommit: string) => {
+            this.emit("update_required", serverCommit, clientCommit);
         });
 
         this.#clients.set(serviceKey, client);

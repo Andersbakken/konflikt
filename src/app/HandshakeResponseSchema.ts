@@ -8,5 +8,6 @@ export const HandshakeResponseSchema = BaseMessageSchema.extend({
     instanceName: z.string(),
     version: z.string(),
     capabilities: z.array(z.string()),
-    reason: z.string().optional() // If rejected
+    reason: z.string().optional(), // If rejected
+    gitCommit: z.string().optional()
 });

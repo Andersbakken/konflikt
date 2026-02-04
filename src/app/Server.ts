@@ -4,6 +4,7 @@ import { createBaseMessage } from "./createBaseMessage";
 import { debug } from "./debug";
 import { error } from "./error";
 import { existsSync } from "fs";
+import { getGitCommit } from "./getGitCommit";
 import { isClientRegistrationMessage } from "./isClientRegistrationMessage";
 import { isEADDRINUSE } from "./isEADDRINUSE";
 import { isInputEventMessage } from "./isInputEventMessage";
@@ -340,7 +341,8 @@ export class Server {
                 // Handle handshake request
                 if (parsed.type === "handshake_request") {
                     const request = parsed as HandshakeRequest;
-                    log(`Received handshake request from ${request.instanceName} (${request.instanceId})`);
+                    const serverCommit = getGitCommit();
+                    log(`Received handshake request from ${request.instanceName} (${request.instanceId}), client commit: ${request.gitCommit || "unknown"}, server commit: ${serverCommit || "unknown"}`);
 
                     const response: HandshakeResponse = {
                         ...createBaseMessage(this.#instanceId),
@@ -349,12 +351,31 @@ export class Server {
                         instanceId: this.#instanceId,
                         instanceName: this.#instanceName,
                         version: this.#version,
-                        capabilities: this.#capabilities
+                        capabilities: this.#capabilities,
+                        gitCommit: serverCommit
                     };
 
                     socket.send(JSON.stringify(response));
                     log(`Sent handshake response to ${request.instanceName}`);
+
+                    // Check if client needs to update
+                    if (serverCommit && request.gitCommit && request.gitCommit !== serverCommit) {
+                        log(`Client ${request.instanceName} has different commit (${request.gitCommit}), sending update_required`);
+                        const updateMessage = {
+                            type: "update_required",
+                            serverCommit,
+                            clientCommit: request.gitCommit,
+                            timestamp: Date.now()
+                        };
+                        socket.send(JSON.stringify(updateMessage));
+                    }
                     return;
+                }
+
+                // Handle restart request (client is asking server to restart for update)
+                if (typeof parsed === "object" && parsed !== null && "type" in parsed && parsed.type === "restart_request") {
+                    log(`Received restart request from client - exiting with code 43 for update`);
+                    process.exit(43);
                 }
 
                 // Handle input event, client registration, and deactivation messages

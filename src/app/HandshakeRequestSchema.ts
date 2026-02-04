@@ -14,5 +14,6 @@ export const HandshakeRequestSchema = BaseMessageSchema.extend({
     instanceName: z.string(),
     version: z.string(),
     capabilities: z.array(z.string()),
-    screenGeometry: ScreenGeometrySchema.optional()
+    screenGeometry: ScreenGeometrySchema.optional(),
+    gitCommit: z.string().optional()
 });

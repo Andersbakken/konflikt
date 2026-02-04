@@ -3,6 +3,7 @@ import { createBaseMessage } from "./createBaseMessage";
 import { createErrorMessage } from "./createErrorMessage";
 import { debug } from "./debug";
 import { error } from "./error";
+import { getGitCommit } from "./getGitCommit";
 import { log } from "./log";
 import { validateMessage } from "./validateMessage";
 import { verbose } from "./verbose";
@@ -18,6 +19,7 @@ interface WebSocketClientEvents {
     disconnected: [service: DiscoveredService, reason?: string];
     handshake_completed: [service: DiscoveredService, response: HandshakeResponse];
     handshake_failed: [service: DiscoveredService, reason: string];
+    update_required: [serverCommit: string, clientCommit: string];
     message: [message: Message, service: DiscoveredService];
     error: [error: Error, service: DiscoveredService];
 }
@@ -186,6 +188,16 @@ export class WebSocketClient extends EventEmitter<WebSocketClientEvents> {
                 this.#sendError("INVALID_JSON", "Message is not valid JSON");
                 return;
             }
+
+            // Handle update_required before standard message validation (it's a special message type)
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const rawParsed = rawMessage as any;
+            if (rawParsed && rawParsed.type === "update_required") {
+                log(`Server requires update: server commit ${rawParsed.serverCommit}, client commit ${rawParsed.clientCommit}`);
+                this.emit("update_required", rawParsed.serverCommit, rawParsed.clientCommit);
+                return;
+            }
+
             const message = validateMessage(rawMessage);
 
             if (!message) {
@@ -281,7 +293,8 @@ export class WebSocketClient extends EventEmitter<WebSocketClientEvents> {
             instanceName: this.#instanceName,
             version: this.#version,
             capabilities: this.#capabilities,
-            screenGeometry: this.#screenGeometry
+            screenGeometry: this.#screenGeometry,
+            gitCommit: getGitCommit()
         };
 
         this.send(handshakeRequest);

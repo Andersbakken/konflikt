@@ -1070,6 +1070,26 @@ export class Konflikt {
         this.#peerManager.on("error", (err: Error, service?: DiscoveredService) => {
             verbose(`Peer connection error${service ? ` with ${service.name}` : ""}: ${err.message}`);
         });
+
+        this.#peerManager.on("update_required", (serverCommit: string, clientCommit: string) => {
+            log(`Server requires update: server at ${serverCommit}, client at ${clientCommit}`);
+            log(`Sending restart request to server, then exiting with code 42`);
+
+            // Tell server to restart too so both sides update together
+            const restartMessage = {
+                type: "restart_request",
+                reason: "version_mismatch",
+                clientCommit,
+                serverCommit,
+                timestamp: Date.now()
+            };
+            this.#peerManager?.broadcast(JSON.stringify(restartMessage));
+
+            // Give the message time to be sent before exiting
+            setTimeout(() => {
+                process.exit(42);
+            }, 100);
+        });
     }
 
     #connectToServer(service: DiscoveredService): void {
