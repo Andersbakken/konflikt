@@ -26,6 +26,7 @@
     "clang-format": "find src/native -name '*.cpp' -o -name '*.h' | xargs clang-format -i",
     "start": "node dist/app/index.js",
     "start:debug": "KONFLIKT_BUILD=debug node dist/app/index.js",
+    "start:autoupdate": "./bin/konflikt-autoupdate --",
     "clean": "del-cli dist/*",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
