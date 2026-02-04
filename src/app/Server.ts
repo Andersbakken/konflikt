@@ -5,6 +5,7 @@ import { debug } from "./debug";
 import { error } from "./error";
 import { existsSync } from "fs";
 import { isEADDRINUSE } from "./isEADDRINUSE";
+import { isClientRegistrationMessage } from "./isClientRegistrationMessage";
 import { isInputEventMessage } from "./isInputEventMessage";
 import { isInstanceInfoMessage } from "./isInstanceInfoMessage";
 import { join } from "path";
@@ -21,6 +22,7 @@ import type { Duplex } from "stream";
 import type { FastifyInstance, FastifyListenOptions, FastifyReply, FastifyRequest } from "fastify";
 import type { HandshakeRequest } from "./HandshakeRequest";
 import type { HandshakeResponse } from "./HandshakeResponse";
+import type { ClientRegistrationMessage } from "./ClientRegistrationMessage";
 import type { IncomingMessage } from "http";
 import type { InputEventMessage } from "./InputEventMessage";
 import type { InstanceInfoMessage } from "./InstanceInfoMessage";
@@ -43,8 +45,8 @@ export class Server {
     // Regular WebSocket connections (non-console)
     #regularConnections: Set<WebSocket> = new Set();
 
-    // Message handler callback for input events
-    #messageHandler?: (message: InputEventMessage | InstanceInfoMessage) => void;
+    // Message handler callback for input events and client registration
+    #messageHandler?: (message: InputEventMessage | InstanceInfoMessage | ClientRegistrationMessage) => void;
 
     // Layout manager for server-side layout management
     #layoutManager: LayoutManager | null = null;
@@ -164,7 +166,7 @@ export class Server {
     }
 
     /** Set message handler for input events and instance info */
-    setMessageHandler(handler: (message: InputEventMessage | InstanceInfoMessage) => void): void {
+    setMessageHandler(handler: (message: InputEventMessage | InstanceInfoMessage | ClientRegistrationMessage) => void): void {
         this.#messageHandler = handler;
     }
 
@@ -353,8 +355,8 @@ export class Server {
                     return;
                 }
 
-                // Handle input event messages
-                if (isInputEventMessage(parsed) || isInstanceInfoMessage(parsed)) {
+                // Handle input event and client registration messages
+                if (isInputEventMessage(parsed) || isInstanceInfoMessage(parsed) || isClientRegistrationMessage(parsed)) {
                     if (this.#messageHandler) {
                         this.#messageHandler(parsed);
                     } else {
