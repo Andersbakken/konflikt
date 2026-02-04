@@ -777,9 +777,9 @@ export class Konflikt {
             return;
         }
 
-        verbose(`Attempting to connect to server ${service.name} at ${service.host}:${service.port}`);
+        log(`Attempting to connect to server ${service.name} at ${service.host}:${service.port}`);
         this.#peerManager.connectToPeer(service, this.#screenBounds).catch((err: Error) => {
-            verbose(`Failed to connect to server ${service.name}: ${err.message}`);
+            error(`Failed to connect to server ${service.name}: ${err.message}`);
         });
     }
 
