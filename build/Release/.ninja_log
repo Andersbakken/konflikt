@@ -1,6 +1,0 @@
-# ninja log v5
-3	67	1759528721872284006	/home/abakken/dev/konflikt/src/build/Release/konflikt_native.node	d2b78a737538433b
-1	1900	1759528702584426167	CMakeFiles/konflikt_native.dir/src/konflikt_native.cpp.o	1b07cf168afd9d71
-1	1015	1759528701699417531	CMakeFiles/konflikt_native.dir/src/platform_x11.cpp.o	56a2a6835311fdac
-1	66	1759528784916326220	build.ninja	52fb69e74e24eeb
-2	64	1759528784984619285	konflikt_native.node	86aa6c0f389bb0b0
