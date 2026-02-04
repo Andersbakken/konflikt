@@ -268,8 +268,9 @@ export class PeerManager extends EventEmitter<PeerManagerEvents> {
                 break;
 
             case "input_event":
-                // Wrapper format - will be handled by application layer
+                // Forward to application layer for execution
                 verbose(`Received wrapped input_event: ${message.eventType}`);
+                this.emit("message", message, from);
                 break;
 
             case "layout_update":
