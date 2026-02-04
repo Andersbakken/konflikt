@@ -7,6 +7,7 @@ export class Console {
     #readline: ReturnType<typeof createInterface>;
     #konflikt: Konflikt;
     #commands: Map<string, ConsoleCommand>;
+    #closed = false;
 
     constructor(konflikt: Konflikt) {
         this.#konflikt = konflikt;
@@ -41,6 +42,7 @@ export class Console {
     stop(): void {
         // Unregister the prompt handler
         setConsolePromptHandler(undefined);
+        this.#closed = true;
         this.#readline.close();
     }
 
@@ -50,8 +52,10 @@ export class Console {
         process.stdout.clearLine(0);
         process.stdout.cursorTo(0);
         console.log(...args);
-        // Restore the prompt
-        this.#readline.prompt(true);
+        // Restore the prompt (but not if we're closed)
+        if (!this.#closed) {
+            this.#readline.prompt(true);
+        }
     }
 
     #setupEventHandlers(): void {
@@ -64,24 +68,28 @@ export class Console {
         });
 
         this.#readline.on("close", () => {
-            this.#consoleLog("\nConsole closed");
+            this.#closed = true;
+            console.log("\nConsole closed");
             process.exit(0);
         });
 
         // Handle stdin being closed externally
         process.stdin.on("end", () => {
-            this.#consoleLog("\nStdin closed, shutting down...");
+            this.#closed = true;
+            console.log("\nStdin closed, shutting down...");
             process.exit(0);
         });
 
         process.stdin.on("error", (err: Error) => {
-            this.#consoleLog(`\nStdin error: ${err.message}`);
+            this.#closed = true;
+            console.log(`\nStdin error: ${err.message}`);
             process.exit(1);
         });
 
         // Handle process signals gracefully
         process.on("SIGPIPE", () => {
-            this.#consoleLog("\nBroken pipe, shutting down...");
+            this.#closed = true;
+            console.log("\nBroken pipe, shutting down...");
             process.exit(0);
         });
     }
