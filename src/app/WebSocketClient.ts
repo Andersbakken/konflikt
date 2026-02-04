@@ -164,13 +164,10 @@ export class WebSocketClient extends EventEmitter<WebSocketClientEvents> {
         this.#startHandshake();
     }
 
-    #onMessage(text: WebSocket.RawData): void {
+    #onMessage(data: WebSocket.RawData): void {
         try {
-            // We only expect string messages
-            if (typeof text !== "string") {
-                this.#sendError("INVALID_MESSAGE_FORMAT", "Only string messages are supported");
-                return;
-            }
+            // Convert Buffer/ArrayBuffer to string
+            const text = typeof data === "string" ? data : data.toString();
 
             let rawMessage: unknown;
             try {
