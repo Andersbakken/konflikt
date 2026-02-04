@@ -911,15 +911,19 @@ export class Konflikt {
 
         // Check if a remote screen is active (virtual cursor mode)
         if (this.#virtualCursorPosition !== null && this.#activeRemoteScreenBounds !== null) {
+            // Store previous position before update
+            const prevX = this.#virtualCursorPosition.x;
+
             // Update virtual cursor position using deltas
             const newX = this.#virtualCursorPosition.x + event.dx;
             const newY = this.#virtualCursorPosition.y + event.dy;
 
             // Check if cursor should transition back to server:
-            // Only transition when cursor is AT the left edge (x=0) AND user is moving left (dx < 0)
-            if (this.#virtualCursorPosition.x === 0 && event.dx < 0) {
-                // Transitioning back to server (at left edge and moving further left)
-                verbose(`Virtual cursor at left edge moving left (dx=${event.dx}), transitioning back to server`);
+            // Only transition when cursor WAS at the left edge (prevX=0) AND calculated position goes negative
+            // This prevents deactivation during a fast swipe that just reached the edge
+            if (prevX === 0 && newX < 0) {
+                // Transitioning back to server (was at left edge and trying to go further left)
+                verbose(`Virtual cursor at left edge moving left (prevX=${prevX}, newX=${newX}), transitioning back to server`);
                 this.#deactivateRemoteScreen();
                 return;
             }
