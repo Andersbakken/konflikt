@@ -199,8 +199,9 @@ export class WebSocketClient extends EventEmitter<WebSocketClientEvents> {
             }
 
             // For other messages, ensure handshake is complete
+            // Just ignore messages before handshake instead of sending errors
             if (!this.#isHandshakeCompleted && message.type !== "error" && message.type !== "disconnect") {
-                this.#sendError("HANDSHAKE_REQUIRED", "Handshake must be completed first");
+                verbose(`Ignoring ${message.type} message before handshake complete`);
                 return;
             }
 
