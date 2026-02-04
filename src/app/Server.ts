@@ -2,21 +2,26 @@ import { ServerConsole } from "./ServerConsole";
 import { ServiceDiscovery } from "./ServiceDiscovery";
 import { debug } from "./debug";
 import { error } from "./error";
+import { existsSync } from "fs";
 import { isEADDRINUSE } from "./isEADDRINUSE";
 import { isInputEventMessage } from "./isInputEventMessage";
 import { isInstanceInfoMessage } from "./isInstanceInfoMessage";
+import { join } from "path";
 import { log } from "./log";
+import { registerApiRoutes } from "./registerApiRoutes";
 import { textFromWebSocketMessage } from "./textFromWebSocketMessage";
 import { verbose } from "./verbose";
 import Fastify from "fastify";
 import WebSocket from "ws";
+import fastifyStatic from "@fastify/static";
 import type { Config } from "./Config";
 import type { DiscoveredService } from "./DiscoveredService";
 import type { Duplex } from "stream";
-import type { FastifyInstance, FastifyListenOptions } from "fastify";
+import type { FastifyInstance, FastifyListenOptions, FastifyReply, FastifyRequest } from "fastify";
 import type { IncomingMessage } from "http";
 import type { InputEventMessage } from "./InputEventMessage";
 import type { InstanceInfoMessage } from "./InstanceInfoMessage";
+import type { LayoutManager } from "./LayoutManager";
 
 export class Server {
     #fastify: FastifyInstance;
@@ -37,6 +42,9 @@ export class Server {
 
     // Message handler callback for input events
     #messageHandler?: (message: InputEventMessage | InstanceInfoMessage) => void;
+
+    // Layout manager for server-side layout management
+    #layoutManager: LayoutManager | null = null;
 
     #role: string;
     readonly startTime: number;
@@ -129,6 +137,16 @@ export class Server {
         this.#config = config;
     }
 
+    /** Set layout manager (for server role) */
+    set layoutManager(layoutManager: LayoutManager | null) {
+        this.#layoutManager = layoutManager;
+    }
+
+    /** Get layout manager */
+    get layoutManager(): LayoutManager | null {
+        return this.#layoutManager;
+    }
+
     /** Get console instance for log broadcasting */
     get console(): ServerConsole {
         if (!this.#console) {
@@ -163,6 +181,35 @@ export class Server {
     /** Start server */
     async start(): Promise<void> {
         // this.#startHeartbeat();
+
+        // Register API routes if config is available
+        if (this.#config) {
+            registerApiRoutes(this.#fastify, {
+                config: this.#config,
+                layoutManager: this.#layoutManager,
+                role: this.#role,
+                instanceId: this.#instanceId,
+                startTime: this.startTime
+            });
+        }
+
+        // Register static file serving for UI
+        const uiPath = join(__dirname, "..", "ui");
+        if (existsSync(uiPath)) {
+            await this.#fastify.register(fastifyStatic, {
+                root: uiPath,
+                prefix: "/ui/"
+            });
+
+            // Redirect root to UI
+            this.#fastify.get("/", async (_: FastifyRequest, reply: FastifyReply) => {
+                return reply.redirect("/ui/");
+            });
+
+            verbose(`Serving UI from ${uiPath}`);
+        } else {
+            verbose(`UI not found at ${uiPath} - run 'npm run build:ui' to build it`);
+        }
 
         let port = this.#port || 3000;
 

@@ -13,7 +13,6 @@ import type { Message } from "./Message";
 import type { MouseMoveEvent } from "./MouseMoveEvent";
 import type { MousePressEvent } from "./MousePressEvent";
 import type { MouseReleaseEvent } from "./MouseReleaseEvent";
-import type { PreferredPosition } from "./PreferredPosition";
 import type { Rect } from "./Rect";
 
 interface PeerManagerEvents {
@@ -49,11 +48,7 @@ export class PeerManager extends EventEmitter<PeerManagerEvents> {
     /**
      * Connect to a discovered peer service
      */
-    async connectToPeer(
-        service: DiscoveredService,
-        screenGeometry?: Rect,
-        preferredPosition?: PreferredPosition
-    ): Promise<void> {
+    async connectToPeer(service: DiscoveredService, screenGeometry?: Rect): Promise<void> {
         const serviceKey = `${service.host}:${service.port}`;
 
         // Don't connect to ourselves
@@ -76,7 +71,6 @@ export class PeerManager extends EventEmitter<PeerManagerEvents> {
             this.#instanceName,
             this.#version,
             screenGeometry,
-            preferredPosition,
             this.#capabilities
         );
 
@@ -143,6 +137,21 @@ export class PeerManager extends EventEmitter<PeerManagerEvents> {
             client.disconnect(reason);
         }
         this.#clients.clear();
+    }
+
+    /**
+     * Broadcast a raw message to all connected peers
+     */
+    broadcast(message: string): void {
+        let sentCount = 0;
+        for (const client of this.#clients.values()) {
+            if (client.isConnected && client.isHandshakeComplete) {
+                if (client.sendRaw(message)) {
+                    sentCount++;
+                }
+            }
+        }
+        verbose(`Broadcasted message to ${sentCount} peers`);
     }
 
     /**

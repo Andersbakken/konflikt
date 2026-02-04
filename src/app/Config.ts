@@ -507,7 +507,7 @@ export class Config {
             },
             console: {
                 log: debug,
-                error: error,
+                error,
                 warn: debug,
                 info: debug
             },

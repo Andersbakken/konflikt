@@ -1,7 +1,7 @@
-import { debug } from "./debug";
-import { error } from "./error";
-import { log } from "./log";
-import { verbose } from "./verbose";
+import { debug } from "../app/debug";
+import { error } from "../app/error";
+import { log } from "../app/log";
+import { verbose } from "../app/verbose";
 import type { NativeLoggerCallbacks } from "./KonfliktNative";
 
 export function createNativeLogger(): NativeLoggerCallbacks {

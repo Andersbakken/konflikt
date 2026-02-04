@@ -28,7 +28,7 @@ export class ServiceDiscovery extends EventEmitter {
         this.#advertisedService = this.#bonjour.publish({
             name: serviceName,
             type: "konflikt",
-            port: port,
+            port,
             txt: {
                 version: "1.0.0",
                 pid: process.pid.toString(),

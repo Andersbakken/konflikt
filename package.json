@@ -2,14 +2,16 @@
   "name": "konflikt",
   "version": "1.0.0",
   "description": "",
-  "main": "dist/index.js",
+  "main": "dist/app/index.js",
   "bin": {
     "konflikt": "./bin/konflikt"
   },
   "scripts": {
-    "build": "npm run lint && run-p build:native:all build:ts",
+    "build": "npm run lint && run-p build:native:all build:ts && npm run build:ui",
     "build:ts": "tsc",
-    "postbuild": "chmod +x dist/index.js && mkdir -p bin && ln -sf ../dist/index.js bin/konflikt",
+    "build:ui": "cd src/webpage && npm install && npm run build",
+    "dev:ui": "cd src/webpage && npm run dev",
+    "postbuild": "chmod +x dist/app/index.js && mkdir -p bin && ln -sf ../dist/app/index.js bin/konflikt",
     "build:native:all": "npm run build:native:release && npm run build:native:debug",
     "build:native": "npm run build:native:all",
     "build:native:release": "cmake-js compile -l error --directory src/native --out dist/native/Release --config Release",
@@ -17,13 +19,13 @@
     "rebuild:native": "npm run rebuild:native:release && npm run rebuild:native:debug",
     "rebuild:native:release": "cmake-js rebuild -l error --directory src/native --out dist/native/Release --config Release",
     "rebuild:native:debug": "cmake-js rebuild -l error --directory src/native --out dist/native/Debug --config Debug",
-    "lint": "eslint src --ext .ts --format unix",
-    "lint:fix": "eslint src --ext .ts --fix",
+    "lint": "eslint src/app src/native --ext .ts --format unix",
+    "lint:fix": "eslint src/app src/native --ext .ts --fix",
     "prettier-write": "prettier --write . --ignore-path .prettierignore",
     "prettier-check": "prettier --check . --ignore-path .prettierignore",
     "clang-format": "find src/native -name '*.cpp' -o -name '*.h' | xargs clang-format -i",
-    "start": "node dist/index.js",
-    "start:debug": "KONFLIKT_BUILD=debug node dist/index.js",
+    "start": "node dist/app/index.js",
+    "start:debug": "KONFLIKT_BUILD=debug node dist/app/index.js",
     "clean": "del-cli dist/*",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
@@ -49,6 +51,7 @@
     "typescript": "^5.9.3"
   },
   "dependencies": {
+    "@fastify/static": "^8.3.0",
     "bonjour-service": "^1.3.0",
     "convict": "^6.2.4",
     "convict-format-with-validator": "^6.2.0",

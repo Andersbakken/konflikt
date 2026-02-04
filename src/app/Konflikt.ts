@@ -1,17 +1,22 @@
 import { Console } from "./Console";
 import { InstanceRole } from "./InstanceRole";
-import { KonfliktNative as KonfliktNativeConstructor } from "./native";
+import { KonfliktNative as KonfliktNativeConstructor } from "../native/native";
+import { LayoutManager } from "./LayoutManager";
 import { PeerManager } from "./PeerManager";
 import { Rect } from "./Rect";
 import { Server } from "./Server";
 import { createHash } from "crypto";
-import { createNativeLogger } from "./createNativeLogger";
+import { createNativeLogger } from "../native/createNativeLogger";
 import { createPromise } from "./createPromise";
 import { error } from "./error";
 import { hostname, platform } from "os";
+import { isClientRegistrationMessage } from "./isClientRegistrationMessage";
+import { isLayoutAssignmentMessage } from "./isLayoutAssignmentMessage";
+import { isLayoutUpdateMessage } from "./isLayoutUpdateMessage";
 import { log } from "./log";
 import { setLogBroadcaster } from "./logBroadcaster";
 import { verbose } from "./verbose";
+import type { ClientRegistrationMessage } from "./ClientRegistrationMessage";
 import type { Config } from "./Config";
 import type { ConnectedInstanceInfo } from "./ConnectedInstanceInfo";
 import type { DiscoveredService } from "./DiscoveredService";
@@ -29,7 +34,9 @@ import type {
     KonfliktMouseButtonReleaseEvent,
     KonfliktMouseMoveEvent,
     KonfliktNative
-} from "./KonfliktNative";
+} from "../native/KonfliktNative";
+import type { LayoutAssignmentMessage } from "./LayoutAssignmentMessage";
+import type { LayoutUpdateMessage } from "./LayoutUpdateMessage";
 import type { MouseMoveEvent } from "./MouseMoveEvent";
 import type { MousePressEvent } from "./MousePressEvent";
 import type { MouseReleaseEvent } from "./MouseReleaseEvent";
@@ -37,7 +44,8 @@ import type { NetworkMessage } from "./NetworkMessage";
 import type { Point } from "./Point";
 import type { PreferredPosition } from "./PreferredPosition";
 import type { PromiseData } from "./PromiseData";
-import type { Side } from "./Side";
+import type { ScreenEntry } from "./ScreenEntry";
+import type { ScreenInfo } from "./ScreenInfo";
 
 export class Konflikt {
     #config: Config;
@@ -45,6 +53,7 @@ export class Konflikt {
     #server: Server;
     #peerManager: PeerManager | undefined;
     #console: Console | undefined;
+    #layoutManager: LayoutManager | undefined;
 
     // Role-based behavior
     #role: InstanceRole;
@@ -73,6 +82,12 @@ export class Konflikt {
 
         // Generate machine identifier
         this.#machineId = Konflikt.#generateMachineId();
+
+        // Create LayoutManager for servers
+        if (this.#role === InstanceRole.Server) {
+            this.#layoutManager = new LayoutManager();
+            this.#server.layoutManager = this.#layoutManager;
+        }
 
         // Calculate screen bounds from config
         const desktop = this.#native.desktop;
@@ -226,6 +241,36 @@ export class Konflikt {
             verbose(`Server ${this.#config.instanceId} is now ready to capture input events`);
             verbose(`Screen bounds: ${JSON.stringify(this.#screenBounds)}`);
 
+            // Register server's own screen in layout manager
+            if (this.#layoutManager) {
+                this.#layoutManager.setServerScreen(
+                    this.#config.instanceId,
+                    this.#config.instanceName,
+                    this.#machineId,
+                    this.#screenBounds.width,
+                    this.#screenBounds.height
+                );
+
+                // Listen for layout changes to broadcast to clients
+                this.#layoutManager.on("layoutChanged", (screens: ScreenEntry[]) => {
+                    const layoutUpdate: LayoutUpdateMessage = {
+                        type: "layout_update",
+                        screens: screens.map((s: ScreenEntry) => ({
+                            instanceId: s.instanceId,
+                            displayName: s.displayName,
+                            x: s.x,
+                            y: s.y,
+                            width: s.width,
+                            height: s.height,
+                            isServer: s.isServer,
+                            online: s.online
+                        })),
+                        timestamp: Date.now()
+                    };
+                    this.#server.broadcastToClients(JSON.stringify(layoutUpdate));
+                });
+            }
+
             const adjacency = this.#config.adjacency;
             if (Object.keys(adjacency).length > 0) {
                 verbose(`Screen adjacency configuration: ${JSON.stringify(adjacency, null, 2)}`);
@@ -310,11 +355,86 @@ export class Konflikt {
     handleNetworkMessage(message: NetworkMessage): void {
         if (message.type === "input_event") {
             this.#handleInputEvent(message);
-            // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-        } else if (message.type !== "instance_info") {
-            throw new Error(`Unknown message type: ${JSON.stringify(message)}`);
-        } else {
+        } else if (message.type === "instance_info") {
             this.#handleInstanceInfo(message);
+        } else if (isClientRegistrationMessage(message)) {
+            this.#handleClientRegistration(message);
+        } else if (isLayoutAssignmentMessage(message)) {
+            this.#handleLayoutAssignment(message);
+        } else if (isLayoutUpdateMessage(message)) {
+            this.#handleLayoutUpdate(message);
+        } else {
+            verbose(`Unknown message type: ${JSON.stringify(message)}`);
+        }
+    }
+
+    #handleClientRegistration(message: ClientRegistrationMessage): void {
+        if (this.#role !== InstanceRole.Server || !this.#layoutManager) {
+            return;
+        }
+
+        verbose(
+            `Received client registration: ${message.displayName} (${message.instanceId}) - ${message.screenWidth}x${message.screenHeight}`
+        );
+
+        // Register the client in the layout manager
+        const entry = this.#layoutManager.registerClient(
+            message.instanceId,
+            message.displayName,
+            message.machineId,
+            message.screenWidth,
+            message.screenHeight
+        );
+
+        // Send layout assignment back to the client
+        const layoutAssignment: LayoutAssignmentMessage = {
+            type: "layout_assignment",
+            position: { x: entry.x, y: entry.y },
+            adjacency: this.#layoutManager.getAdjacencyFor(message.instanceId),
+            fullLayout: this.#layoutManager.getLayout().map((s: ScreenEntry) => ({
+                instanceId: s.instanceId,
+                displayName: s.displayName,
+                x: s.x,
+                y: s.y,
+                width: s.width,
+                height: s.height,
+                isServer: s.isServer,
+                online: s.online
+            }))
+        };
+
+        // TODO: Send to specific client - for now broadcast
+        this.#server.broadcastToClients(JSON.stringify(layoutAssignment));
+    }
+
+    #handleLayoutAssignment(message: LayoutAssignmentMessage): void {
+        if (this.#role !== InstanceRole.Client) {
+            return;
+        }
+
+        verbose(`Received layout assignment: position (${message.position.x}, ${message.position.y})`);
+        verbose(`Layout has ${message.fullLayout.length} screens`);
+
+        // Update local screen position
+        this.#screenBounds = new Rect(
+            message.position.x,
+            message.position.y,
+            this.#screenBounds.width,
+            this.#screenBounds.height
+        );
+    }
+
+    #handleLayoutUpdate(message: LayoutUpdateMessage): void {
+        if (this.#role !== InstanceRole.Client) {
+            return;
+        }
+
+        verbose(`Received layout update with ${message.screens.length} screens`);
+
+        // Find our screen in the layout and update position
+        const ourScreen = message.screens.find((s: ScreenInfo) => s.instanceId === this.#config.instanceId);
+        if (ourScreen) {
+            this.#screenBounds = new Rect(ourScreen.x, ourScreen.y, ourScreen.width, ourScreen.height);
         }
     }
 
@@ -643,26 +763,30 @@ export class Konflikt {
         }
 
         verbose(`Attempting to connect to server ${service.name} at ${service.host}:${service.port}`);
-        this.#peerManager
-            .connectToPeer(
-                service,
-                this.#screenBounds,
-                { side: "right" as Side } // Default positioning to right side of server
-            )
-            .catch((err: Error) => {
-                verbose(`Failed to connect to server ${service.name}: ${err.message}`);
-            });
+        this.#peerManager.connectToPeer(service, this.#screenBounds).catch((err: Error) => {
+            verbose(`Failed to connect to server ${service.name}: ${err.message}`);
+        });
     }
 
     #sendClientHandshake(service: DiscoveredService): void {
         // The handshake is already handled by the PeerManager/WebSocketClient
-        // But we can provide additional client-specific information via events
+        // Now send the ClientRegistration message with screen info
         verbose(`Client ${this.#config.instanceId} handshake completed with server ${service.name}`);
         verbose(`Client screen geometry: ${JSON.stringify(this.#screenBounds)}`);
 
-        // Send additional screen positioning information to the server
-        // This could be done via a separate message after handshake
-        // For now, the handshake includes the screen geometry
+        // Send ClientRegistration message to server
+        const registration: ClientRegistrationMessage = {
+            type: "client_registration",
+            instanceId: this.#config.instanceId,
+            displayName: this.#config.instanceName,
+            machineId: this.#machineId,
+            screenWidth: this.#screenBounds.width,
+            screenHeight: this.#screenBounds.height
+        };
+
+        if (this.#peerManager) {
+            this.#peerManager.broadcast(JSON.stringify(registration));
+        }
     }
 
     // Server quit request method

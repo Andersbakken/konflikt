@@ -11,7 +11,6 @@ import type { DiscoveredService } from "./DiscoveredService";
 import type { HandshakeRequest } from "./HandshakeRequest";
 import type { HandshakeResponse } from "./HandshakeResponse";
 import type { Message } from "./Message";
-import type { PreferredPosition } from "./PreferredPosition";
 import type { Rect } from "./Rect";
 
 interface WebSocketClientEvents {
@@ -31,7 +30,6 @@ export class WebSocketClient extends EventEmitter<WebSocketClientEvents> {
     #version: string;
     #capabilities: string[];
     #screenGeometry: Rect | undefined;
-    #preferredPosition: PreferredPosition | undefined;
     #heartbeatInterval: NodeJS.Timeout | null = null;
     #reconnectTimeout: NodeJS.Timeout | null = null;
     #isHandshakeCompleted = false;
@@ -44,7 +42,6 @@ export class WebSocketClient extends EventEmitter<WebSocketClientEvents> {
         instanceName: string,
         version: string,
         screenGeometry?: Rect,
-        preferredPosition?: PreferredPosition,
         capabilities: string[] = []
     ) {
         super();
@@ -54,7 +51,6 @@ export class WebSocketClient extends EventEmitter<WebSocketClientEvents> {
         this.#version = version;
         this.#capabilities = capabilities;
         this.#screenGeometry = screenGeometry ?? undefined;
-        this.#preferredPosition = preferredPosition ?? undefined;
     }
 
     get isConnected(): boolean {
@@ -140,6 +136,22 @@ export class WebSocketClient extends EventEmitter<WebSocketClientEvents> {
             return true;
         } catch (err) {
             error(`Failed to send message to ${this.#service.name}:`, err);
+            return false;
+        }
+    }
+
+    sendRaw(data: string): boolean {
+        if (!this.isConnected || this.#isDestroyed) {
+            debug(`Cannot send raw data - not connected to ${this.#service.name}`);
+            return false;
+        }
+
+        try {
+            this.#ws!.send(data);
+            verbose(`Sent raw data to ${this.#service.name}`);
+            return true;
+        } catch (err) {
+            error(`Failed to send raw data to ${this.#service.name}:`, err);
             return false;
         }
     }
@@ -255,8 +267,7 @@ export class WebSocketClient extends EventEmitter<WebSocketClientEvents> {
             instanceName: this.#instanceName,
             version: this.#version,
             capabilities: this.#capabilities,
-            screenGeometry: this.#screenGeometry,
-            preferredPosition: this.#preferredPosition
+            screenGeometry: this.#screenGeometry
         };
 
         this.send(handshakeRequest);

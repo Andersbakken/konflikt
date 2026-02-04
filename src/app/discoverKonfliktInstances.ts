@@ -20,7 +20,7 @@ export async function discoverKonfliktInstances(timeoutMs: number = 3000): Promi
             );
             discoveredServices.push(service);
             if (discoveredServices.length === 1) {
-                setTimeout(resolve, 500);
+                setTimeout(() => void resolve(), 500);
             }
         });
 
@@ -29,7 +29,7 @@ export async function discoverKonfliktInstances(timeoutMs: number = 3000): Promi
         // Set timeout to resolve with discovered services
         setTimeout(() => {
             verbose(`Discovery timeout reached, found ${discoveredServices.length} instances`);
-            resolve();
+            void resolve();
         }, 3000);
     });
 }
