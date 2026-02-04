@@ -220,7 +220,10 @@ export class Server {
                 debug(`HTTP listening at ${addr}, WS at ws://localhost:${port}/ws`);
 
                 // Start service discovery after server is running
-                this.#serviceDiscovery.advertise(port, this.#instanceName, this.#role, this.startTime);
+                // Only servers advertise themselves; clients just discover
+                if (this.#role === "server") {
+                    this.#serviceDiscovery.advertise(port, this.#instanceName, this.#role, this.startTime);
+                }
                 this.#serviceDiscovery.startDiscovery();
                 break;
             } catch (err: unknown) {
