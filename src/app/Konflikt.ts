@@ -61,6 +61,8 @@ export class Konflikt {
     #role: InstanceRole;
     #isActiveInstance: boolean = false;
     #lastCursorPosition: Point = { x: 0, y: 0 };
+    #virtualCursorPosition: Point | null = null; // Virtual cursor for remote screen
+    #activeRemoteScreenBounds: Rect | null = null; // Bounds of the currently active remote screen
     #screenBounds: Rect;
     #activatedClientId: string | null = null; // Track which client we've activated at the edge
     #run: PromiseData<void>;
@@ -434,8 +436,35 @@ export class Konflikt {
         this.#server.broadcastToClients(JSON.stringify(message));
         log(`Sent activation to ${targetInstanceId} at (${cursorX}, ${cursorY})`);
 
+        // Initialize virtual cursor for the remote screen
+        this.#virtualCursorPosition = { x: cursorX, y: cursorY };
+
+        // Store the remote screen bounds for clamping
+        const targetScreen = this.#layoutManager?.getScreen(targetInstanceId);
+        if (targetScreen) {
+            this.#activeRemoteScreenBounds = new Rect(0, 0, targetScreen.width, targetScreen.height);
+            verbose(`Activated remote screen ${targetInstanceId}, bounds: ${targetScreen.width}x${targetScreen.height}`);
+        }
+
         // Server is no longer the active instance
         this.#isActiveInstance = false;
+    }
+
+    /**
+     * Deactivate the remote screen and return control to the server
+     */
+    #deactivateRemoteScreen(): void {
+        log(`Deactivating remote screen, returning to server`);
+
+        // Clear virtual cursor state
+        this.#virtualCursorPosition = null;
+        this.#activeRemoteScreenBounds = null;
+        this.#activatedClientId = null;
+
+        // Server is now the active instance again
+        this.#isActiveInstance = true;
+
+        // TODO: Send deactivation message to the client so it knows to stop showing cursor
     }
 
     // Method to be called by Server when receiving network messages
@@ -587,10 +616,15 @@ export class Konflikt {
     #checkIfShouldBeActive(): void {
         const wasPreviouslyActive = this.#isActiveInstance;
         verbose(
-            `checkIfShouldBeActive: role=${this.#role === InstanceRole.Server ? "server" : "client"}, wasPreviouslyActive=${wasPreviouslyActive}`
+            `checkIfShouldBeActive: role=${this.#role === InstanceRole.Server ? "server" : "client"}, wasPreviouslyActive=${wasPreviouslyActive}, hasVirtualCursor=${this.#virtualCursorPosition !== null}`
         );
 
         if (this.#role === InstanceRole.Server) {
+            // If we have a virtual cursor, a remote screen is active - don't override
+            if (this.#virtualCursorPosition !== null) {
+                verbose(`Server keeping remote screen active, virtual cursor at (${this.#virtualCursorPosition.x}, ${this.#virtualCursorPosition.y})`);
+                return;
+            }
             // Servers capture input events and send them to the current client
             this.#isActiveInstance = true;
             verbose(`Server set to active: ${this.#isActiveInstance}`);
@@ -775,14 +809,17 @@ export class Konflikt {
         // Update cursor position from event
         this.#updateCursorPosition(event.x, event.y);
 
-        if (!this.#shouldProcessInputEvent()) {
+        // Use virtual cursor position if remote screen is active
+        const cursorPos = this.#virtualCursorPosition ?? { x: event.x, y: event.y };
+
+        if (!this.#shouldProcessInputEvent() && this.#virtualCursorPosition === null) {
             return;
         }
 
         verbose("Key pressed (active source):", event);
         this.#broadcastInputEvent("keyPress", {
-            x: event.x,
-            y: event.y,
+            x: cursorPos.x,
+            y: cursorPos.y,
             timestamp: event.timestamp,
             keyboardModifiers: event.keyboardModifiers,
             mouseButtons: event.mouseButtons,
@@ -795,14 +832,17 @@ export class Konflikt {
         // Update cursor position from event
         this.#updateCursorPosition(event.x, event.y);
 
-        if (!this.#shouldProcessInputEvent()) {
+        // Use virtual cursor position if remote screen is active
+        const cursorPos = this.#virtualCursorPosition ?? { x: event.x, y: event.y };
+
+        if (!this.#shouldProcessInputEvent() && this.#virtualCursorPosition === null) {
             return;
         }
 
         verbose("Key released (active source):", event);
         this.#broadcastInputEvent("keyRelease", {
-            x: event.x,
-            y: event.y,
+            x: cursorPos.x,
+            y: cursorPos.y,
             timestamp: event.timestamp,
             keyboardModifiers: event.keyboardModifiers,
             mouseButtons: event.mouseButtons,
@@ -815,14 +855,17 @@ export class Konflikt {
         // Update cursor position from event
         this.#updateCursorPosition(event.x, event.y);
 
-        if (!this.#shouldProcessInputEvent()) {
+        // Use virtual cursor position if remote screen is active
+        const cursorPos = this.#virtualCursorPosition ?? { x: event.x, y: event.y };
+
+        if (!this.#shouldProcessInputEvent() && this.#virtualCursorPosition === null) {
             return;
         }
 
         verbose("Mouse button pressed (active source):", event);
         this.#broadcastInputEvent("mousePress", {
-            x: event.x,
-            y: event.y,
+            x: cursorPos.x,
+            y: cursorPos.y,
             timestamp: event.timestamp,
             keyboardModifiers: event.keyboardModifiers,
             mouseButtons: event.mouseButtons,
@@ -834,14 +877,17 @@ export class Konflikt {
         // Update cursor position from event
         this.#updateCursorPosition(event.x, event.y);
 
-        if (!this.#shouldProcessInputEvent()) {
+        // Use virtual cursor position if remote screen is active
+        const cursorPos = this.#virtualCursorPosition ?? { x: event.x, y: event.y };
+
+        if (!this.#shouldProcessInputEvent() && this.#virtualCursorPosition === null) {
             return;
         }
 
         verbose("Mouse button released (active source):", event);
         this.#broadcastInputEvent("mouseRelease", {
-            x: event.x,
-            y: event.y,
+            x: cursorPos.x,
+            y: cursorPos.y,
             timestamp: event.timestamp,
             keyboardModifiers: event.keyboardModifiers,
             mouseButtons: event.mouseButtons,
@@ -852,6 +898,41 @@ export class Konflikt {
     #onMouseMove(event: KonfliktMouseMoveEvent): void {
         // Update cursor position from event - this is the primary cursor tracking mechanism
         this.#updateCursorPosition(event.x, event.y);
+
+        // Check if a remote screen is active (virtual cursor mode)
+        if (this.#virtualCursorPosition !== null && this.#activeRemoteScreenBounds !== null) {
+            // Update virtual cursor position using deltas
+            const newX = this.#virtualCursorPosition.x + event.dx;
+            const newY = this.#virtualCursorPosition.y + event.dy;
+
+            // Check if cursor should transition back to server
+            if (newX < 0) {
+                // Transitioning back to server (left edge of remote screen)
+                verbose(`Virtual cursor at left edge (${newX}), transitioning back to server`);
+                this.#deactivateRemoteScreen();
+                return;
+            }
+
+            // Clamp to remote screen bounds
+            this.#virtualCursorPosition = {
+                x: Math.max(0, Math.min(this.#activeRemoteScreenBounds.width - 1, newX)),
+                y: Math.max(0, Math.min(this.#activeRemoteScreenBounds.height - 1, newY))
+            };
+
+            verbose(`Virtual cursor moved to (${this.#virtualCursorPosition.x}, ${this.#virtualCursorPosition.y})`);
+
+            // Broadcast the input event with virtual cursor position
+            this.#broadcastInputEvent("mouseMove", {
+                x: this.#virtualCursorPosition.x,
+                y: this.#virtualCursorPosition.y,
+                dx: event.dx,
+                dy: event.dy,
+                timestamp: event.timestamp,
+                keyboardModifiers: event.keyboardModifiers,
+                mouseButtons: event.mouseButtons
+            });
+            return;
+        }
 
         if (!this.#shouldProcessInputEvent()) {
             return;
@@ -866,6 +947,8 @@ export class Konflikt {
         this.#broadcastInputEvent("mouseMove", {
             x: event.x,
             y: event.y,
+            dx: event.dx,
+            dy: event.dy,
             timestamp: event.timestamp,
             keyboardModifiers: event.keyboardModifiers,
             mouseButtons: event.mouseButtons
