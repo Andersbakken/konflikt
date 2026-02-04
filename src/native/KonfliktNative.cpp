@@ -310,9 +310,15 @@ Event eventFromObject(const Napi::Object &obj)
     if (obj.Has("y")) {
         event.state.y = obj.Get("y").As<Napi::Number>().Int32Value();
     }
+    if (obj.Has("dx") && obj.Get("dx").IsNumber()) {
+        event.state.dx = obj.Get("dx").As<Napi::Number>().Int32Value();
+    }
+    if (obj.Has("dy") && obj.Get("dy").IsNumber()) {
+        event.state.dy = obj.Get("dy").As<Napi::Number>().Int32Value();
+    }
 
     // Parse button for mouse events
-    if (obj.Has("button")) {
+    if (obj.Has("button") && obj.Get("button").IsNumber()) {
         uint32_t buttonVal = obj.Get("button").As<Napi::Number>().Uint32Value();
         event.button       = static_cast<MouseButton>(buttonVal);
     }
