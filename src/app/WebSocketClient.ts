@@ -240,6 +240,11 @@ export class WebSocketClient extends EventEmitter<WebSocketClientEvents> {
                 case "mouse_release":
                 case "key_press":
                 case "key_release":
+                case "layout_update":
+                case "layout_assignment":
+                case "activate_client":
+                case "client_registration":
+                case "instance_info":
                     // These will be handled by the message emit below
                     break;
 

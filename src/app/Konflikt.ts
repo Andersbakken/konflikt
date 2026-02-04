@@ -366,25 +366,41 @@ export class Konflikt {
     }
 
     /**
-     * Check if cursor should transition to another screen and handle the transition
+     * Check if cursor should transition to another screen and handle the transition.
+     * The cursor can't actually go outside the screen bounds (OS clamps it),
+     * so we check if it's at an edge instead.
      */
     #checkScreenTransition(x: number, y: number): boolean {
         if (this.#role !== InstanceRole.Server || !this.#layoutManager) {
             return false;
         }
 
-        // Only check transition if cursor is outside our bounds
-        if (this.#screenBounds.contains({ x, y })) {
+        const EDGE_THRESHOLD = 1; // Cursor is at edge if within 1 pixel of boundary
+
+        // Determine which edge (if any) the cursor is at
+        let edge: "left" | "right" | "top" | "bottom" | null = null;
+
+        if (x <= this.#screenBounds.x + EDGE_THRESHOLD) {
+            edge = "left";
+        } else if (x >= this.#screenBounds.x + this.#screenBounds.width - EDGE_THRESHOLD - 1) {
+            edge = "right";
+        } else if (y <= this.#screenBounds.y + EDGE_THRESHOLD) {
+            edge = "top";
+        } else if (y >= this.#screenBounds.y + this.#screenBounds.height - EDGE_THRESHOLD - 1) {
+            edge = "bottom";
+        }
+
+        if (!edge) {
             return false;
         }
 
-        const transition = this.#layoutManager.getTransitionTarget(this.#config.instanceId, x, y);
+        const transition = this.#layoutManager.getTransitionTargetAtEdge(this.#config.instanceId, edge, x, y);
         if (!transition) {
             return false;
         }
 
         log(
-            `Screen transition: cursor at (${x}, ${y}) -> ${transition.targetScreen.displayName} at (${transition.newX}, ${transition.newY})`
+            `Screen transition: cursor at edge '${edge}' (${x}, ${y}) -> ${transition.targetScreen.displayName} at (${transition.newX}, ${transition.newY})`
         );
 
         // Send activation message to the target client

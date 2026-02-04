@@ -375,6 +375,77 @@ export class LayoutManager extends EventEmitter<LayoutManagerEvents> {
         return null;
     }
 
+    /**
+     * Get transition target when cursor is at a specific edge.
+     * This is used when the cursor hits the screen boundary (can't go further).
+     */
+    getTransitionTargetAtEdge(
+        fromInstanceId: string,
+        edge: "left" | "right" | "top" | "bottom",
+        cursorX: number,
+        cursorY: number
+    ): { targetScreen: ScreenEntry; newX: number; newY: number } | null {
+        const fromScreen = this.#screens.get(fromInstanceId);
+        if (!fromScreen) {
+            return null;
+        }
+
+        const adjacency = this.getAdjacencyFor(fromInstanceId);
+
+        switch (edge) {
+            case "right": {
+                if (!adjacency.right) {
+                    return null;
+                }
+                const targetScreen = this.#screens.get(adjacency.right);
+                if (!targetScreen || !targetScreen.online) {
+                    return null;
+                }
+                const relativeY = cursorY - fromScreen.y;
+                const newY = Math.max(0, Math.min(targetScreen.height - 1, relativeY));
+                return { targetScreen, newX: 0, newY };
+            }
+            case "left": {
+                if (!adjacency.left) {
+                    return null;
+                }
+                const targetScreen = this.#screens.get(adjacency.left);
+                if (!targetScreen || !targetScreen.online) {
+                    return null;
+                }
+                const relativeY = cursorY - fromScreen.y;
+                const newY = Math.max(0, Math.min(targetScreen.height - 1, relativeY));
+                return { targetScreen, newX: targetScreen.width - 1, newY };
+            }
+            case "bottom": {
+                if (!adjacency.bottom) {
+                    return null;
+                }
+                const targetScreen = this.#screens.get(adjacency.bottom);
+                if (!targetScreen || !targetScreen.online) {
+                    return null;
+                }
+                const relativeX = cursorX - fromScreen.x;
+                const newX = Math.max(0, Math.min(targetScreen.width - 1, relativeX));
+                return { targetScreen, newX, newY: 0 };
+            }
+            case "top": {
+                if (!adjacency.top) {
+                    return null;
+                }
+                const targetScreen = this.#screens.get(adjacency.top);
+                if (!targetScreen || !targetScreen.online) {
+                    return null;
+                }
+                const relativeX = cursorX - fromScreen.x;
+                const newX = Math.max(0, Math.min(targetScreen.width - 1, relativeX));
+                return { targetScreen, newX, newY: targetScreen.height - 1 };
+            }
+            default:
+                return null;
+        }
+    }
+
     static #edgesTouch(edge1: number, edge2: number): boolean {
         return Math.abs(edge1 - edge2) <= EDGE_TOLERANCE;
     }

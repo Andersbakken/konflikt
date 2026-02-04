@@ -262,6 +262,15 @@ export class PeerManager extends EventEmitter<PeerManagerEvents> {
                 verbose(`Received wrapped input_event: ${message.eventType}`);
                 break;
 
+            case "layout_update":
+            case "layout_assignment":
+            case "activate_client":
+            case "client_registration":
+            case "instance_info":
+                // These are handled by the application layer (Konflikt.ts)
+                verbose(`Received ${message.type} message from ${from.name}`);
+                break;
+
             default:
                 // Treat unknown message types as errors
                 error(`Unknown message type from ${from.name}:`, JSON.stringify(message, null, 4));
