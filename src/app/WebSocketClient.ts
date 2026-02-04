@@ -167,7 +167,17 @@ export class WebSocketClient extends EventEmitter<WebSocketClientEvents> {
     #onMessage(data: WebSocket.RawData): void {
         try {
             // Convert Buffer/ArrayBuffer to string
-            const text = typeof data === "string" ? data : data.toString();
+            let text: string;
+            if (typeof data === "string") {
+                text = data;
+            } else if (data instanceof Buffer) {
+                text = data.toString("utf-8");
+            } else if (data instanceof ArrayBuffer) {
+                text = Buffer.from(data).toString("utf-8");
+            } else {
+                this.#sendError("INVALID_DATA", "Received data in unknown format");
+                return;
+            }
 
             let rawMessage: unknown;
             try {
