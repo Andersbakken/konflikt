@@ -446,6 +446,9 @@ export class Konflikt {
             verbose(`Activated remote screen ${targetInstanceId}, bounds: ${targetScreen.width}x${targetScreen.height}`);
         }
 
+        // Hide the cursor on the server since we're controlling a remote screen
+        this.#native.hideCursor();
+
         // Server is no longer the active instance
         this.#isActiveInstance = false;
     }
@@ -460,6 +463,9 @@ export class Konflikt {
         this.#virtualCursorPosition = null;
         this.#activeRemoteScreenBounds = null;
         this.#activatedClientId = null;
+
+        // Show the cursor on the server again
+        this.#native.showCursor();
 
         // Server is now the active instance again
         this.#isActiveInstance = true;

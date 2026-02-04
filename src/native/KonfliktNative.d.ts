@@ -113,4 +113,8 @@ export declare class KonfliktNative {
     sendMouseEvent(
         event: KonfliktMouseButtonPressEvent | KonfliktMouseButtonReleaseEvent | KonfliktMouseMoveEvent
     ): void;
+
+    showCursor(): void;
+    hideCursor(): void;
+    isCursorVisible(): boolean;
 }

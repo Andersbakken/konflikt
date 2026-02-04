@@ -107,11 +107,30 @@ public:
             case EventType::MouseMove: {
                 // Use CGWarpMouseCursorPosition to actually move the cursor
                 CGWarpMouseCursorPosition(pos);
-                // Also post the mouse moved event for applications to receive it
-                cgEvent = CGEventCreateMouseEvent(source, kCGEventMouseMoved, pos, kCGMouseButtonLeft);
+
+                // Determine event type based on mouse button state (for dragging)
+                CGEventType moveType   = kCGEventMouseMoved;
+                CGMouseButton button   = kCGMouseButtonLeft;
+                uint32_t mouseButtons  = event.state.mouseButtons;
+
+                if (mouseButtons & toUInt32(MouseButton::Left)) {
+                    moveType = kCGEventLeftMouseDragged;
+                    button   = kCGMouseButtonLeft;
+                } else if (mouseButtons & toUInt32(MouseButton::Right)) {
+                    moveType = kCGEventRightMouseDragged;
+                    button   = kCGMouseButtonRight;
+                } else if (mouseButtons & toUInt32(MouseButton::Middle)) {
+                    moveType = kCGEventOtherMouseDragged;
+                    button   = kCGMouseButtonCenter;
+                }
+
+                cgEvent = CGEventCreateMouseEvent(source, moveType, pos, button);
                 break;
             }
             case EventType::MousePress: {
+                // Warp cursor to position first to ensure click happens at right location
+                CGWarpMouseCursorPosition(pos);
+
                 CGEventType type     = kCGEventLeftMouseDown;
                 CGMouseButton button = kCGMouseButtonLeft;
 
@@ -127,6 +146,9 @@ public:
                 break;
             }
             case EventType::MouseRelease: {
+                // Warp cursor to position first to ensure release happens at right location
+                CGWarpMouseCursorPosition(pos);
+
                 CGEventType type     = kCGEventLeftMouseUp;
                 CGMouseButton button = kCGMouseButtonLeft;
 
