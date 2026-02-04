@@ -4,8 +4,8 @@ import { createBaseMessage } from "./createBaseMessage";
 import { debug } from "./debug";
 import { error } from "./error";
 import { existsSync } from "fs";
-import { isEADDRINUSE } from "./isEADDRINUSE";
 import { isClientRegistrationMessage } from "./isClientRegistrationMessage";
+import { isEADDRINUSE } from "./isEADDRINUSE";
 import { isInputEventMessage } from "./isInputEventMessage";
 import { isInstanceInfoMessage } from "./isInstanceInfoMessage";
 import { join } from "path";
@@ -16,13 +16,13 @@ import { verbose } from "./verbose";
 import Fastify from "fastify";
 import WebSocket from "ws";
 import fastifyStatic from "@fastify/static";
+import type { ClientRegistrationMessage } from "./ClientRegistrationMessage";
 import type { Config } from "./Config";
 import type { DiscoveredService } from "./DiscoveredService";
 import type { Duplex } from "stream";
 import type { FastifyInstance, FastifyListenOptions, FastifyReply, FastifyRequest } from "fastify";
 import type { HandshakeRequest } from "./HandshakeRequest";
 import type { HandshakeResponse } from "./HandshakeResponse";
-import type { ClientRegistrationMessage } from "./ClientRegistrationMessage";
 import type { IncomingMessage } from "http";
 import type { InputEventMessage } from "./InputEventMessage";
 import type { InstanceInfoMessage } from "./InstanceInfoMessage";
@@ -166,7 +166,9 @@ export class Server {
     }
 
     /** Set message handler for input events and instance info */
-    setMessageHandler(handler: (message: InputEventMessage | InstanceInfoMessage | ClientRegistrationMessage) => void): void {
+    setMessageHandler(
+        handler: (message: InputEventMessage | InstanceInfoMessage | ClientRegistrationMessage) => void
+    ): void {
         this.#messageHandler = handler;
     }
 
@@ -356,7 +358,11 @@ export class Server {
                 }
 
                 // Handle input event and client registration messages
-                if (isInputEventMessage(parsed) || isInstanceInfoMessage(parsed) || isClientRegistrationMessage(parsed)) {
+                if (
+                    isInputEventMessage(parsed) ||
+                    isInstanceInfoMessage(parsed) ||
+                    isClientRegistrationMessage(parsed)
+                ) {
                     if (this.#messageHandler) {
                         this.#messageHandler(parsed);
                     } else {
