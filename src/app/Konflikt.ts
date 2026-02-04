@@ -778,6 +778,11 @@ export class Konflikt {
             return; // Servers don't execute received input events
         }
 
+        // Only execute events when we're the active client (have been activated by server)
+        if (!this.#isActiveInstance) {
+            return; // Not active, ignore events
+        }
+
         // Don't execute events from the same instance
         if (message.sourceInstanceId === this.#config.instanceId) {
             return;
