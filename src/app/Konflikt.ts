@@ -452,7 +452,9 @@ export class Konflikt {
         }
 
         // Hide the cursor on the server since we're controlling a remote screen
+        log(`Hiding server cursor`);
         this.#native.hideCursor();
+        log(`Server cursor hidden: ${!this.#native.isCursorVisible()}`);
 
         // Server is no longer the active instance
         this.#isActiveInstance = false;
@@ -470,7 +472,9 @@ export class Konflikt {
         this.#activatedClientId = null;
 
         // Show the cursor on the server again
+        log(`Showing server cursor`);
         this.#native.showCursor();
+        log(`Server cursor visible: ${this.#native.isCursorVisible()}`);
 
         // Server is now the active instance again
         this.#isActiveInstance = true;
