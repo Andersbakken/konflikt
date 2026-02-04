@@ -915,10 +915,11 @@ export class Konflikt {
             const newX = this.#virtualCursorPosition.x + event.dx;
             const newY = this.#virtualCursorPosition.y + event.dy;
 
-            // Check if cursor should transition back to server
-            if (newX < 0) {
-                // Transitioning back to server (left edge of remote screen)
-                verbose(`Virtual cursor at left edge (${newX}), transitioning back to server`);
+            // Check if cursor should transition back to server:
+            // Only transition when cursor is AT the left edge (x=0) AND user is moving left (dx < 0)
+            if (this.#virtualCursorPosition.x === 0 && event.dx < 0) {
+                // Transitioning back to server (at left edge and moving further left)
+                verbose(`Virtual cursor at left edge moving left (dx=${event.dx}), transitioning back to server`);
                 this.#deactivateRemoteScreen();
                 return;
             }
