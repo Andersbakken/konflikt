@@ -37,5 +37,5 @@
         "moduleDetection": "force",
         "skipLibCheck": true
     },
-    "exclude": ["src/webpage"]
+    "exclude": ["src/webpage", "dist"]
 }

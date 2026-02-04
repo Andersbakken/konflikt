@@ -6,7 +6,7 @@ export default defineConfig({
     base: "/ui/",
     build: {
         outDir: "../../dist/ui",
-        emptyDirBeforeWrite: true
+        emptyOutDir: true
     },
     server: {
         port: 5173,
