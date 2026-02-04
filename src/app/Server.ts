@@ -1,5 +1,6 @@
 import { ServerConsole } from "./ServerConsole";
 import { ServiceDiscovery } from "./ServiceDiscovery";
+import { createBaseMessage } from "./createBaseMessage";
 import { debug } from "./debug";
 import { error } from "./error";
 import { existsSync } from "fs";
@@ -11,6 +12,8 @@ import { log } from "./log";
 import { registerApiRoutes } from "./registerApiRoutes";
 import { textFromWebSocketMessage } from "./textFromWebSocketMessage";
 import { verbose } from "./verbose";
+import type { HandshakeRequest } from "./HandshakeRequest";
+import type { HandshakeResponse } from "./HandshakeResponse";
 import Fastify from "fastify";
 import WebSocket from "ws";
 import fastifyStatic from "@fastify/static";
@@ -329,6 +332,26 @@ export class Server {
 
             try {
                 const parsed = JSON.parse(text);
+
+                // Handle handshake request
+                if (parsed.type === "handshake_request") {
+                    const request = parsed as HandshakeRequest;
+                    log(`Received handshake request from ${request.instanceName} (${request.instanceId})`);
+
+                    const response: HandshakeResponse = {
+                        ...createBaseMessage(this.#instanceId),
+                        type: "handshake_response",
+                        accepted: true,
+                        instanceId: this.#instanceId,
+                        instanceName: this.#instanceName,
+                        version: this.#version,
+                        capabilities: this.#capabilities
+                    };
+
+                    socket.send(JSON.stringify(response));
+                    log(`Sent handshake response to ${request.instanceName}`);
+                    return;
+                }
 
                 // Handle input event messages
                 if (isInputEventMessage(parsed) || isInstanceInfoMessage(parsed)) {
