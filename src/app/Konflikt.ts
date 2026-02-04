@@ -62,6 +62,7 @@ export class Konflikt {
     #isActiveInstance: boolean = false;
     #lastCursorPosition: Point = { x: 0, y: 0 };
     #screenBounds: Rect;
+    #activatedClientId: string | null = null; // Track which client we've activated at the edge
     #run: PromiseData<void>;
     #displayId: string;
     #machineId: string;
@@ -392,6 +393,8 @@ export class Konflikt {
         }
 
         if (!edge) {
+            // Cursor is not at an edge - clear any previous activation
+            this.#activatedClientId = null;
             return false;
         }
 
@@ -400,12 +403,18 @@ export class Konflikt {
             return false;
         }
 
+        // Only send activation once per edge touch
+        if (this.#activatedClientId === transition.targetScreen.instanceId) {
+            return true; // Already activated this client, don't spam
+        }
+
         log(
             `Screen transition: cursor at edge '${edge}' (${x}, ${y}) -> ${transition.targetScreen.displayName} at (${transition.newX}, ${transition.newY})`
         );
 
         // Send activation message to the target client
         this.#activateClient(transition.targetScreen.instanceId, transition.newX, transition.newY);
+        this.#activatedClientId = transition.targetScreen.instanceId;
 
         return true;
     }
