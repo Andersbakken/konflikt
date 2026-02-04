@@ -48,15 +48,9 @@ export function SettingsForm(): JSX.Element {
         <div style={{ maxWidth: "500px" }}>
             <h2>Settings</h2>
 
-            <form
-                onSubmit={(e) => void handleSubmit(e)}
-                style={{ marginTop: "20px" }}
-            >
+            <form onSubmit={(e) => void handleSubmit(e)} style={{ marginTop: "20px" }}>
                 <div style={{ marginBottom: "16px" }}>
-                    <label
-                        htmlFor="displayName"
-                        style={{ display: "block", marginBottom: "8px" }}
-                    >
+                    <label htmlFor="displayName" style={{ display: "block", marginBottom: "8px" }}>
                         Display Name
                     </label>
                     <input

@@ -53,10 +53,7 @@ export function registerApiRoutes(fastify: FastifyInstance, deps: ApiDependencie
 
     fastify.put<{ Body: ConfigUpdateBody }>(
         "/api/config",
-        async (
-            request: FastifyRequest<{ Body: ConfigUpdateBody }>,
-            reply: FastifyReply
-        ) => {
+        async (request: FastifyRequest<{ Body: ConfigUpdateBody }>, reply: FastifyReply) => {
             // Config updates would require modifying the config file
             // For now, just acknowledge the request
             const { displayName } = request.body;
@@ -78,10 +75,7 @@ export function registerApiRoutes(fastify: FastifyInstance, deps: ApiDependencie
 
         fastify.put<{ Body: LayoutUpdateBody }>(
             "/api/layout",
-            async (
-                request: FastifyRequest<{ Body: LayoutUpdateBody }>,
-                _reply: FastifyReply
-            ) => {
+            async (request: FastifyRequest<{ Body: LayoutUpdateBody }>, _reply: FastifyReply) => {
                 const { screens } = request.body;
                 layoutManager.updateLayout(screens);
                 return {
@@ -120,10 +114,7 @@ export function registerApiRoutes(fastify: FastifyInstance, deps: ApiDependencie
         // Remove offline client from layout
         fastify.delete<{ Params: { id: string } }>(
             "/api/layout/:id",
-            async (
-                request: FastifyRequest<{ Params: { id: string } }>,
-                reply: FastifyReply
-            ) => {
+            async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
                 const { id } = request.params;
                 const screen = layoutManager.getScreen(id);
 

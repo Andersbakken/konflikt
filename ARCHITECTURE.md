@@ -5,6 +5,7 @@ This document describes the architecture of Konflikt, a cross-platform KVM (Keyb
 ## Overview
 
 Konflikt uses a **server-client model** where:
+
 - **Server**: Captures input events and manages the screen layout for all connected clients
 - **Clients**: Receive layout assignments from the server and execute forwarded input events
 
@@ -37,6 +38,7 @@ The native addon provides platform-specific functionality:
 - **KonfliktNativeWayland.cpp**: Wayland display server support
 
 TypeScript bindings:
+
 - **native.ts**: Loads the compiled `.node` module
 - **createNativeLogger.ts**: Creates logger callbacks for native code
 - **KonfliktNative.d.ts**: Type definitions for native interface
@@ -44,24 +46,28 @@ TypeScript bindings:
 ### 2. Main Application (`src/app/`)
 
 #### Entry Point
+
 - **index.ts**: CLI entry point, parses args, loads config, starts main
 - **main.ts**: Creates and initializes Konflikt instance
 
 #### Core Classes
 
 **Konflikt.ts** - Main application orchestrator
+
 - Manages role (server/client)
 - Creates Server, PeerManager, LayoutManager
 - Handles input events and message routing
 - Coordinates screen transitions
 
 **Server.ts** - HTTP/WebSocket server using Fastify
+
 - Serves REST API at `/api/*`
 - Serves React UI at `/ui/`
 - Manages WebSocket connections at `/ws`
 - Handles service discovery (mDNS)
 
 **LayoutManager.ts** - Server-side screen layout management
+
 - Tracks all screens (server + clients)
 - Auto-arranges new clients (places right of existing)
 - Calculates adjacency relationships
@@ -69,11 +75,13 @@ TypeScript bindings:
 - Emits `layoutChanged` events
 
 **PeerManager.ts** - Client-side connection management
+
 - Manages WebSocket connections to servers
 - Handles handshake and reconnection
 - Broadcasts messages to all connected peers
 
 **WebSocketClient.ts** - Individual WebSocket connection
+
 - Handles connection lifecycle
 - Manages handshake protocol
 - Sends/receives messages
@@ -81,10 +89,12 @@ TypeScript bindings:
 #### Configuration
 
 **Config.ts** - Configuration manager using convict
+
 - Loads from file, CLI args, environment
 - Validates and provides typed access
 
 **configSchema.ts** - Configuration schema definition
+
 - Instance settings (id, name, role)
 - Network settings (port, host, discovery)
 - Screen settings (position, dimensions)
@@ -98,30 +108,31 @@ TypeScript bindings:
 2. Client sends `HandshakeRequest` with screen geometry
 3. Server responds with `HandshakeResponse`
 4. Client sends `ClientRegistrationMessage`:
-   ```typescript
-   {
-     type: "client_registration",
-     instanceId: string,
-     displayName: string,
-     machineId: string,
-     screenWidth: number,
-     screenHeight: number
-   }
-   ```
+    ```typescript
+    {
+      type: "client_registration",
+      instanceId: string,
+      displayName: string,
+      machineId: string,
+      screenWidth: number,
+      screenHeight: number
+    }
+    ```
 5. Server registers client in LayoutManager
 6. Server sends `LayoutAssignmentMessage`:
-   ```typescript
-   {
-     type: "layout_assignment",
-     position: { x: number, y: number },
-     adjacency: { left?, right?, top?, bottom?: string },
-     fullLayout: ScreenInfo[]
-   }
-   ```
+    ```typescript
+    {
+      type: "layout_assignment",
+      position: { x: number, y: number },
+      adjacency: { left?, right?, top?, bottom?: string },
+      fullLayout: ScreenInfo[]
+    }
+    ```
 
 #### Layout Updates
 
 When layout changes, server broadcasts `LayoutUpdateMessage`:
+
 ```typescript
 {
   type: "layout_update",
@@ -133,6 +144,7 @@ When layout changes, server broadcasts `LayoutUpdateMessage`:
 #### Input Events
 
 Input events are forwarded as `InputEventMessage`:
+
 ```typescript
 {
   type: "input_event",
@@ -145,11 +157,13 @@ Input events are forwarded as `InputEventMessage`:
 ### 4. REST API
 
 **Status & Config** (both roles):
+
 - `GET /api/status` - Instance status (role, uptime, etc)
 - `GET /api/config` - Current configuration
 - `PUT /api/config` - Update configuration
 
 **Layout** (server only):
+
 - `GET /api/layout` - Get all screens
 - `PUT /api/layout` - Update entire layout
 - `PATCH /api/layout/:id` - Update single screen position
@@ -160,6 +174,7 @@ Input events are forwarded as `InputEventMessage`:
 Built with Vite + React, served from `/ui/`.
 
 **Components:**
+
 - **App.tsx**: Router, role detection
 - **LayoutEditor.tsx**: Drag-drop canvas (server)
 - **LayoutView.tsx**: Read-only layout display (client)
@@ -168,11 +183,13 @@ Built with Vite + React, served from `/ui/`.
 - **StatusBar.tsx**: Connection status
 
 **API Client:**
+
 - **api/client.ts**: Typed fetch wrappers for REST API
 
 ## Data Flow
 
 ### Server Startup
+
 ```
 1. Load config
 2. Create Konflikt instance
@@ -186,6 +203,7 @@ Built with Vite + React, served from `/ui/`.
 ```
 
 ### Client Startup
+
 ```
 1. Load config
 2. Create Konflikt instance
@@ -199,6 +217,7 @@ Built with Vite + React, served from `/ui/`.
 ```
 
 ### Layout Change
+
 ```
 1. UI calls PUT /api/layout
 2. LayoutManager.updateLayout() called
@@ -211,47 +230,51 @@ Built with Vite + React, served from `/ui/`.
 ## Key Types
 
 **ScreenEntry** (server-side):
+
 ```typescript
 interface ScreenEntry {
-  instanceId: string;
-  displayName: string;
-  machineId: string;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  isServer: boolean;
-  online: boolean;
+    instanceId: string;
+    displayName: string;
+    machineId: string;
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    isServer: boolean;
+    online: boolean;
 }
 ```
 
 **ScreenInfo** (shared/transferred):
+
 ```typescript
 interface ScreenInfo {
-  instanceId: string;
-  displayName: string;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  isServer: boolean;
-  online: boolean;
+    instanceId: string;
+    displayName: string;
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    isServer: boolean;
+    online: boolean;
 }
 ```
 
 **Adjacency**:
+
 ```typescript
 interface Adjacency {
-  left?: string;   // instanceId of adjacent screen
-  right?: string;
-  top?: string;
-  bottom?: string;
+    left?: string; // instanceId of adjacent screen
+    right?: string;
+    top?: string;
+    bottom?: string;
 }
 ```
 
 ## Build System
 
 **Scripts:**
+
 - `npm run build` - Full build (lint + native + TS + UI)
 - `npm run build:ts` - TypeScript compilation only
 - `npm run build:ui` - React UI build only
@@ -259,6 +282,7 @@ interface Adjacency {
 - `npm run dev:ui` - Vite dev server with hot reload
 
 **Output:**
+
 - TypeScript compiles `src/app/` → `dist/app/`
 - TypeScript compiles `src/native/` → `dist/native/`
 - Native builds to `dist/native/Debug/` and `dist/native/Release/`
@@ -267,6 +291,7 @@ interface Adjacency {
 ## Service Discovery
 
 Uses mDNS/Bonjour via `bonjour-service`:
+
 - Service type: `_konflikt._tcp`
 - TXT records: `version`, `pid`, `started`, `role`
 - Clients discover servers automatically
@@ -275,6 +300,7 @@ Uses mDNS/Bonjour via `bonjour-service`:
 ## Configuration Files
 
 **Runtime config** (searched in order):
+
 1. `--config` CLI argument
 2. `./konflikt.config.js`
 3. `./konflikt.config.json`
@@ -282,6 +308,7 @@ Uses mDNS/Bonjour via `bonjour-service`:
 5. `~/.config/konflikt/config.json`
 
 **Layout persistence:**
+
 - `~/.config/konflikt/layout.json`
 - Stores client positions (not server)
 - Clients reconnect to saved positions

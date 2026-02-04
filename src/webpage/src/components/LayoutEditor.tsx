@@ -30,9 +30,7 @@ export function LayoutEditor(): JSX.Element {
     const handleDrag = useCallback((instanceId: string, deltaX: number, deltaY: number) => {
         setScreens((prev) =>
             prev.map((s) =>
-                s.instanceId === instanceId
-                    ? { ...s, x: Math.round(s.x + deltaX), y: Math.round(s.y + deltaY) }
-                    : s
+                s.instanceId === instanceId ? { ...s, x: Math.round(s.x + deltaX), y: Math.round(s.y + deltaY) } : s
             )
         );
         setDirty(true);
@@ -165,13 +163,24 @@ export function LayoutEditor(): JSX.Element {
                         const selected = screens.find((s) => s.instanceId === selectedId);
                         if (!selected) return null;
                         return (
-                            <div style={{ display: "grid", gridTemplateColumns: "120px 1fr", gap: "8px", marginTop: "12px" }}>
+                            <div
+                                style={{
+                                    display: "grid",
+                                    gridTemplateColumns: "120px 1fr",
+                                    gap: "8px",
+                                    marginTop: "12px"
+                                }}
+                            >
                                 <span>Name:</span>
                                 <span>{selected.displayName}</span>
                                 <span>Position:</span>
-                                <span>({selected.x}, {selected.y})</span>
+                                <span>
+                                    ({selected.x}, {selected.y})
+                                </span>
                                 <span>Size:</span>
-                                <span>{selected.width} x {selected.height}</span>
+                                <span>
+                                    {selected.width} x {selected.height}
+                                </span>
                                 <span>Status:</span>
                                 <span style={{ color: selected.online ? "#0f8" : "#f55" }}>
                                     {selected.online ? "Online" : "Offline"}

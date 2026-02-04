@@ -297,65 +297,65 @@ export class Config {
 
         // Parse arguments with yargs for better handling
         const argv = yargs(args)
-            .option('verbose', {
-                alias: 'v',
-                type: 'count',
-                description: 'Enable verbose logging (use -v for debug, -vv for verbose)'
+            .option("verbose", {
+                alias: "v",
+                type: "count",
+                description: "Enable verbose logging (use -v for debug, -vv for verbose)"
             })
-            .option('port', {
-                alias: 'p',
-                type: 'number',
-                description: 'WebSocket server port'
+            .option("port", {
+                alias: "p",
+                type: "number",
+                description: "WebSocket server port"
             })
-            .option('host', {
-                alias: 'H',
-                type: 'string',
-                description: 'Host to bind server to'
+            .option("host", {
+                alias: "H",
+                type: "string",
+                description: "Host to bind server to"
             })
-            .option('role', {
-                alias: 'r',
-                type: 'string',
-                choices: ['server', 'client'],
-                description: 'Instance role'
+            .option("role", {
+                alias: "r",
+                type: "string",
+                choices: ["server", "client"],
+                description: "Instance role"
             })
-            .option('log-level', {
-                alias: 'l',
-                type: 'string',
-                choices: ['silent', 'error', 'log', 'debug', 'verbose'],
-                description: 'Logging level'
+            .option("log-level", {
+                alias: "l",
+                type: "string",
+                choices: ["silent", "error", "log", "debug", "verbose"],
+                description: "Logging level"
             })
-            .option('log-file', {
-                alias: 'f',
-                type: 'string',
-                description: 'Log file path'
+            .option("log-file", {
+                alias: "f",
+                type: "string",
+                description: "Log file path"
             })
-            .option('dev', {
-                alias: 'd',
-                type: 'boolean',
-                description: 'Enable development mode'
+            .option("dev", {
+                alias: "d",
+                type: "boolean",
+                description: "Enable development mode"
             })
-            .option('console', {
-                type: 'string',
-                description: 'Enable console mode or specify remote console host'
+            .option("console", {
+                type: "string",
+                description: "Enable console mode or specify remote console host"
             })
-            .option('no-console', {
-                type: 'boolean',
-                description: 'Disable console mode'
+            .option("no-console", {
+                type: "boolean",
+                description: "Disable console mode"
             })
-            .option('server', {
-                type: 'string',
-                description: 'Server to connect to (host or host:port)'
+            .option("server", {
+                type: "string",
+                description: "Server to connect to (host or host:port)"
             })
-            .option('server-port', {
-                type: 'number',
-                description: 'Server port (overrides port from --server)'
+            .option("server-port", {
+                type: "number",
+                description: "Server port (overrides port from --server)"
             })
             .help(false) // Disable automatic help to avoid conflicts
             .strict() // Error on unknown arguments
             .parseSync();
 
         // Apply yargs-parsed values to config
-        if (typeof argv.verbose === 'number' && argv.verbose > 0) {
+        if (typeof argv.verbose === "number" && argv.verbose > 0) {
             if (argv.verbose === 1) {
                 this.#set("logging.level", "debug");
                 debug(`CLI override: ${argv.verbose} verbose flag - log-level = debug`);
@@ -365,37 +365,37 @@ export class Config {
             }
         }
 
-        if (typeof argv.port === 'number') {
+        if (typeof argv.port === "number") {
             this.#set("network.port", argv.port);
             debug(`CLI override: port = ${argv.port}`);
         }
 
-        if (typeof argv.host === 'string') {
+        if (typeof argv.host === "string") {
             this.#set("network.host", argv.host);
             debug(`CLI override: host = ${argv.host}`);
         }
 
-        if (typeof argv.role === 'string') {
+        if (typeof argv.role === "string") {
             this.#set("instance.role", argv.role);
             debug(`CLI override: role = ${argv.role}`);
         }
 
-        if (typeof argv['log-level'] === 'string') {
-            this.#set("logging.level", argv['log-level']);
-            debug(`CLI override: log-level = ${argv['log-level']}`);
+        if (typeof argv["log-level"] === "string") {
+            this.#set("logging.level", argv["log-level"]);
+            debug(`CLI override: log-level = ${argv["log-level"]}`);
         }
 
-        if (typeof argv['log-file'] === 'string') {
-            this.#set("logging.file", argv['log-file']);
-            debug(`CLI override: log-file = ${argv['log-file']}`);
+        if (typeof argv["log-file"] === "string") {
+            this.#set("logging.file", argv["log-file"]);
+            debug(`CLI override: log-file = ${argv["log-file"]}`);
         }
 
-        if (typeof argv.dev === 'boolean' && argv.dev) {
+        if (typeof argv.dev === "boolean" && argv.dev) {
             this.#set("development.enabled", true);
             debug(`CLI override: development.enabled = true`);
         }
 
-        if (typeof argv.console === 'string') {
+        if (typeof argv.console === "string") {
             if (argv.console !== "true") {
                 this.#set("console.enabled", argv.console);
                 debug(`CLI override: console = ${argv.console}`);
@@ -405,18 +405,18 @@ export class Config {
             }
         }
 
-        if (typeof argv['no-console'] === 'boolean' && argv['no-console']) {
+        if (typeof argv["no-console"] === "boolean" && argv["no-console"]) {
             this.#set("console.enabled", "false");
             debug(`CLI override: no-console = true`);
         }
 
         // Handle --server with optional :port suffix
-        if (typeof argv.server === 'string') {
+        if (typeof argv.server === "string") {
             const serverArg = argv.server;
-            const colonIndex = serverArg.lastIndexOf(':');
+            const colonIndex = serverArg.lastIndexOf(":");
 
             // Check if there's a port in the string (handle IPv6 by checking for brackets)
-            if (colonIndex > 0 && !serverArg.includes('[')) {
+            if (colonIndex > 0 && !serverArg.includes("[")) {
                 // Simple host:port format
                 const host = serverArg.substring(0, colonIndex);
                 const port = parseInt(serverArg.substring(colonIndex + 1), 10);
@@ -436,12 +436,11 @@ export class Config {
         }
 
         // --server-port overrides any port from --server
-        if (typeof argv['server-port'] === 'number') {
-            this.#set("cluster.server.port", argv['server-port']);
-            debug(`CLI override: server-port = ${argv['server-port']}`);
+        if (typeof argv["server-port"] === "number") {
+            this.#set("cluster.server.port", argv["server-port"]);
+            debug(`CLI override: server-port = ${argv["server-port"]}`);
         }
     }
-
 
     #validate(): void {
         try {
@@ -526,8 +525,6 @@ export class Config {
     }
 
     // Typed getters for all configuration values with defaults
-
-
 
     static #executeJsConfig(jsCode: string, configPath: string): unknown {
         debug(`Executing JavaScript config in sandbox: ${configPath}`);

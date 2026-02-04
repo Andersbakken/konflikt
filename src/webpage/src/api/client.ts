@@ -57,9 +57,7 @@ export async function fetchConfig(): Promise<ConfigResponse> {
     return fetchJson<ConfigResponse>(`${API_BASE}/config`);
 }
 
-export async function updateConfig(
-    config: Partial<ConfigResponse>
-): Promise<{ success: boolean; message?: string }> {
+export async function updateConfig(config: Partial<ConfigResponse>): Promise<{ success: boolean; message?: string }> {
     return fetchJson(`${API_BASE}/config`, {
         method: "PUT",
         body: JSON.stringify(config)

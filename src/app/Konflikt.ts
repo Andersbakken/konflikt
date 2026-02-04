@@ -8,6 +8,7 @@ import { Server } from "./Server";
 import { createHash } from "crypto";
 import { createNativeLogger } from "../native/createNativeLogger";
 import { createPromise } from "./createPromise";
+import { debug } from "./debug";
 import { error } from "./error";
 import { hostname, platform } from "os";
 import { isClientRegistrationMessage } from "./isClientRegistrationMessage";
@@ -618,7 +619,7 @@ export class Konflikt {
         };
 
         this.#server.broadcastToClients(JSON.stringify(message));
-        verbose(`Sent instance info from ${this.#config.instanceId}`);
+        debug(`Sent instance info from ${this.#config.instanceId}`);
     }
 
     #handleInstanceInfo(message: InstanceInfoMessage): void {

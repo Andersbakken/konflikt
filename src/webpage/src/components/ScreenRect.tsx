@@ -9,14 +9,7 @@ interface ScreenRectProps {
     draggable: boolean;
 }
 
-export function ScreenRect({
-    screen,
-    scale,
-    selected,
-    onSelect,
-    onDrag,
-    draggable
-}: ScreenRectProps): JSX.Element {
+export function ScreenRect({ screen, scale, selected, onSelect, onDrag, draggable }: ScreenRectProps): JSX.Element {
     const handleMouseDown = (e: React.MouseEvent): void => {
         if (!draggable || !onDrag) return;
 
@@ -71,11 +64,7 @@ export function ScreenRect({
             <div style={{ fontSize: "0.8em", opacity: 0.7 }}>
                 {screen.width} x {screen.height}
             </div>
-            {!screen.online && (
-                <div style={{ fontSize: "0.7em", color: "#f55", marginTop: "4px" }}>
-                    OFFLINE
-                </div>
-            )}
+            {!screen.online && <div style={{ fontSize: "0.7em", color: "#f55", marginTop: "4px" }}>OFFLINE</div>}
             {screen.isServer && (
                 <div
                     style={{

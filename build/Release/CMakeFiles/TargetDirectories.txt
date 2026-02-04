@@ -1,0 +1,3 @@
+/home/abakken/dev/konflikt/build/Release/CMakeFiles/konflikt_native.dir
+/home/abakken/dev/konflikt/build/Release/CMakeFiles/edit_cache.dir
+/home/abakken/dev/konflikt/build/Release/CMakeFiles/rebuild_cache.dir

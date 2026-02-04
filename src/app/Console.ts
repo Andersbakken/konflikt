@@ -35,7 +35,7 @@ export class Console {
         });
 
         // Clear any existing output and show console startup message
-        process.stdout.write('\n');
+        process.stdout.write("\n");
         this.#consoleLog("Interactive console started. Type 'help' for available commands.");
     }
 
@@ -366,11 +366,11 @@ export class Console {
         this.#consoleLog(`ID: ${config.screenId}`);
         this.#consoleLog(`Position: (${config.screenX}, ${config.screenY})`);
         this.#consoleLog(`Dimensions: ${config.screenWidth || "auto"} x ${config.screenHeight || "auto"}`);
-        const activeEdges = config.screenEdges 
+        const activeEdges = config.screenEdges
             ? Object.entries(config.screenEdges)
-                .filter(([, enabled]: [string, boolean]) => enabled)
-                .map(([edge]: [string, boolean]) => edge)
-                .join(", ")
+                  .filter(([, enabled]: [string, boolean]) => enabled)
+                  .map(([edge]: [string, boolean]) => edge)
+                  .join(", ")
             : "";
         this.#consoleLog(`Active Edges: ${activeEdges || "none"}`);
     }

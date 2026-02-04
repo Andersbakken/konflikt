@@ -43,10 +43,7 @@ export function App(): JSX.Element {
                 <StatusBar status={status} />
                 <main style={{ flex: 1, padding: "20px" }}>
                     <Routes>
-                        <Route
-                            path="/"
-                            element={isServer ? <LayoutEditor /> : <LayoutView />}
-                        />
+                        <Route path="/" element={isServer ? <LayoutEditor /> : <LayoutView />} />
                         <Route path="/settings" element={<SettingsForm />} />
                         <Route path="*" element={<Navigate to="/" replace />} />
                     </Routes>

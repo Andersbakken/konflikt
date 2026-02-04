@@ -161,22 +161,34 @@ export class LayoutManager extends EventEmitter<LayoutManagerEvents> {
             }
 
             // Check left adjacency: other's right edge touches this screen's left edge
-            if (LayoutManager.#edgesTouch(other.x + other.width, screen.x) && LayoutManager.#verticalOverlap(screen, other)) {
+            if (
+                LayoutManager.#edgesTouch(other.x + other.width, screen.x) &&
+                LayoutManager.#verticalOverlap(screen, other)
+            ) {
                 adjacency.left = otherId;
             }
 
             // Check right adjacency: other's left edge touches this screen's right edge
-            if (LayoutManager.#edgesTouch(screen.x + screen.width, other.x) && LayoutManager.#verticalOverlap(screen, other)) {
+            if (
+                LayoutManager.#edgesTouch(screen.x + screen.width, other.x) &&
+                LayoutManager.#verticalOverlap(screen, other)
+            ) {
                 adjacency.right = otherId;
             }
 
             // Check top adjacency: other's bottom edge touches this screen's top edge
-            if (LayoutManager.#edgesTouch(other.y + other.height, screen.y) && LayoutManager.#horizontalOverlap(screen, other)) {
+            if (
+                LayoutManager.#edgesTouch(other.y + other.height, screen.y) &&
+                LayoutManager.#horizontalOverlap(screen, other)
+            ) {
                 adjacency.top = otherId;
             }
 
             // Check bottom adjacency: other's top edge touches this screen's bottom edge
-            if (LayoutManager.#edgesTouch(screen.y + screen.height, other.y) && LayoutManager.#horizontalOverlap(screen, other)) {
+            if (
+                LayoutManager.#edgesTouch(screen.y + screen.height, other.y) &&
+                LayoutManager.#horizontalOverlap(screen, other)
+            ) {
                 adjacency.bottom = otherId;
             }
         }
