@@ -1,6 +1,8 @@
 export interface InputEventData {
     x: number;
     y: number;
+    dx?: number | undefined;
+    dy?: number | undefined;
     timestamp: number;
     keyboardModifiers: number;
     mouseButtons: number;
