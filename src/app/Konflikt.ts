@@ -63,8 +63,8 @@ export class Konflikt {
     #lastCursorPosition: Point = { x: 0, y: 0 };
     #virtualCursorPosition: Point | null = null; // Virtual cursor for remote screen
     #activeRemoteScreenBounds: Rect | null = null; // Bounds of the currently active remote screen
-    #edgeHitCount: number = 0; // Count consecutive events at left edge for transition back
     #screenBounds: Rect;
+    #lastDeactivationRequest: number = 0; // Debounce for deactivation requests
     #activatedClientId: string | null = null; // Track which client we've activated at the edge
     #run: PromiseData<void>;
     #displayId: string;
@@ -439,7 +439,6 @@ export class Konflikt {
 
         // Initialize virtual cursor for the remote screen
         this.#virtualCursorPosition = { x: cursorX, y: cursorY };
-        this.#edgeHitCount = 0;
 
         // Store the remote screen bounds for clamping
         const targetScreen = this.#layoutManager?.getScreen(targetInstanceId);
@@ -493,9 +492,39 @@ export class Konflikt {
             this.#handleLayoutUpdate(message);
         } else if (Konflikt.#isActivateClientMessage(message)) {
             this.#handleActivateClient(message);
+        } else if (Konflikt.#isDeactivationRequestMessage(message)) {
+            this.#handleDeactivationRequest(message);
         } else {
             verbose(`Unknown message type: ${JSON.stringify(message)}`);
         }
+    }
+
+    static #isDeactivationRequestMessage(
+        message: unknown
+    ): message is { type: "deactivation_request"; instanceId: string } {
+        return (
+            typeof message === "object" &&
+            message !== null &&
+            "type" in message &&
+            message.type === "deactivation_request" &&
+            "instanceId" in message
+        );
+    }
+
+    #handleDeactivationRequest(message: { type: "deactivation_request"; instanceId: string }): void {
+        // Only servers handle deactivation requests
+        if (this.#role !== InstanceRole.Server) {
+            return;
+        }
+
+        // Verify this is from the currently active client
+        if (message.instanceId !== this.#activatedClientId) {
+            verbose(`Ignoring deactivation request from ${message.instanceId} - active client is ${this.#activatedClientId}`);
+            return;
+        }
+
+        log(`Received deactivation request from client ${message.instanceId}`);
+        this.#deactivateRemoteScreen();
     }
 
     static #isActivateClientMessage(
@@ -776,10 +805,48 @@ export class Konflikt {
                     mouseButtons: eventData.mouseButtons,
                     button: eventData.button
                 } as KonfliktMouseButtonPressEvent | KonfliktMouseButtonReleaseEvent | KonfliktMouseMoveEvent);
+
+                // After executing a mouse move, check if cursor is at left edge trying to go further left
+                // The client knows the actual cursor position - use it to decide when to transition back
+                // Only clients need to do this check (role check instead of isActiveInstance flag)
+                if (eventType === "mouseMove" && this.#role === InstanceRole.Client) {
+                    const actualState = this.#native.state;
+                    const dx = eventData.dx ?? 0;
+
+                    verbose(`Client mouse move: actualX=${actualState.x}, dx=${dx}`);
+
+                    // If cursor is at left edge (x <= 1) and user is moving left, request deactivation
+                    if (actualState.x <= 1 && dx < 0) {
+                        verbose(`Client at left edge (x=${actualState.x}) with dx=${dx}, requesting deactivation`);
+                        this.#requestDeactivation();
+                    }
+                }
             }
         } catch (err) {
             verbose(`Failed to execute ${eventType} event:`, err);
         }
+    }
+
+    #requestDeactivation(): void {
+        if (!this.#peerManager) {
+            return;
+        }
+
+        // Debounce: only send one request per 500ms
+        const now = Date.now();
+        if (now - this.#lastDeactivationRequest < 500) {
+            return;
+        }
+        this.#lastDeactivationRequest = now;
+
+        const message = {
+            type: "deactivation_request",
+            instanceId: this.#config.instanceId,
+            timestamp: now
+        };
+
+        this.#peerManager.broadcast(JSON.stringify(message));
+        log(`Sent deactivation request to server`);
     }
 
     #sendInstanceInfo(): void {
@@ -917,26 +984,9 @@ export class Konflikt {
             const newX = this.#virtualCursorPosition.x + event.dx;
             const newY = this.#virtualCursorPosition.y + event.dy;
 
-            // Track consecutive events at left edge trying to go further left
-            // This prevents accidental deactivation during fast swipes
-            const EDGE_HIT_THRESHOLD = 5; // Require 5 consecutive edge hits (~40ms at 8ms/event)
-
-            if (newX < 0) {
-                this.#edgeHitCount++;
-                verbose(`Edge hit count: ${this.#edgeHitCount}/${EDGE_HIT_THRESHOLD}`);
-
-                if (this.#edgeHitCount >= EDGE_HIT_THRESHOLD) {
-                    // Transitioning back to server after sustained edge contact
-                    verbose(`Virtual cursor at left edge for ${this.#edgeHitCount} events, transitioning back to server`);
-                    this.#deactivateRemoteScreen();
-                    return;
-                }
-            } else {
-                // Reset counter if cursor moves away from edge
-                this.#edgeHitCount = 0;
-            }
-
             // Clamp to remote screen bounds
+            // The client will send a deactivation_request when it detects
+            // that the cursor is at the left edge and user is moving left
             this.#virtualCursorPosition = {
                 x: Math.max(0, Math.min(this.#activeRemoteScreenBounds.width - 1, newX)),
                 y: Math.max(0, Math.min(this.#activeRemoteScreenBounds.height - 1, newY))
