@@ -3,6 +3,7 @@ import { configSchema } from "./configSchema";
 import { debug } from "./debug";
 import { error } from "./error";
 import { existsSync, readFileSync } from "fs";
+import { getPersistentClientId } from "./getPersistentClientId";
 import { homedir, hostname } from "os";
 import { runInNewContext } from "vm";
 import path from "path";
@@ -25,7 +26,7 @@ export class Config {
 
     // Instance configuration
     get instanceId(): string {
-        return this.#string("instance.id") || `konflikt-${process.pid}-${Date.now()}`;
+        return this.#string("instance.id") || getPersistentClientId();
     }
 
     get instanceName(): string {
@@ -453,9 +454,10 @@ export class Config {
 
     #generateDefaults(): void {
         // Generate instance ID if not provided
+        // Use persistent client ID (stored in ~/.config/konflikt/client-id)
         const instanceId = this.#get("instance.id");
         if (!instanceId) {
-            this.#set("instance.id", `konflikt-${process.pid}-${Date.now()}`);
+            this.#set("instance.id", getPersistentClientId());
         }
 
         // Generate instance name if not provided
