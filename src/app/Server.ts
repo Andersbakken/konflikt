@@ -357,11 +357,12 @@ export class Server {
                     return;
                 }
 
-                // Handle input event and client registration messages
+                // Handle input event, client registration, and deactivation messages
                 if (
                     isInputEventMessage(parsed) ||
                     isInstanceInfoMessage(parsed) ||
-                    isClientRegistrationMessage(parsed)
+                    isClientRegistrationMessage(parsed) ||
+                    (typeof parsed === "object" && parsed !== null && "type" in parsed && parsed.type === "deactivation_request")
                 ) {
                     if (this.#messageHandler) {
                         this.#messageHandler(parsed);
