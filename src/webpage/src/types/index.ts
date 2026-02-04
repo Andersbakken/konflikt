@@ -1,39 +1,12 @@
-export interface ScreenInfo {
-    instanceId: string;
-    displayName: string;
-    machineId: string;
-    x: number;
-    y: number;
-    width: number;
-    height: number;
-    isServer: boolean;
-    online: boolean;
-}
-
-export interface Adjacency {
-    left?: string;
-    right?: string;
-    top?: string;
-    bottom?: string;
-}
-
-export interface StatusResponse {
-    role: string;
-    instanceId: string;
-    instanceName: string;
-    startTime: number;
-    uptime: number;
-    port: number | null;
-    version: string;
-}
-
-export interface LayoutResponse {
-    screens: ScreenInfo[];
-}
-
-export interface ConfigResponse {
-    displayName: string;
-    role: string;
-    logLevel: string;
-    discoveryEnabled: boolean;
-}
+export type { Adjacency } from "./Adjacency";
+export type { ConfigResponse } from "./ConfigResponse";
+export type { LayoutResponse } from "./LayoutResponse";
+export type { ScreenInfo } from "./ScreenInfo";
+export type { ScreenPositionUpdate } from "./ScreenPositionUpdate";
+export type { ScreenRectProps } from "./ScreenRectProps";
+export type { StatusBarProps } from "./StatusBarProps";
+export type { StatusResponse } from "./StatusResponse";
+export type { SuccessResponse } from "./SuccessResponse";
+export type { UpdateConfigResponse } from "./UpdateConfigResponse";
+export type { UpdateLayoutResponse } from "./UpdateLayoutResponse";
+export type { UpdateScreenResponse } from "./UpdateScreenResponse";

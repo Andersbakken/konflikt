@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { ScreenRect } from "./ScreenRect";
 import { fetchLayout, updateLayout } from "../api/client";
-import type { ScreenInfo } from "../types";
+import type { ScreenInfo } from "../types/ScreenInfo";
 
 export function LayoutEditor(): JSX.Element {
     const [screens, setScreens] = useState<ScreenInfo[]>([]);

@@ -1,4 +1,11 @@
-import type { ConfigResponse, LayoutResponse, ScreenInfo, StatusResponse } from "../types";
+import type { ConfigResponse } from "../types/ConfigResponse";
+import type { LayoutResponse } from "../types/LayoutResponse";
+import type { ScreenPositionUpdate } from "../types/ScreenPositionUpdate";
+import type { StatusResponse } from "../types/StatusResponse";
+import type { SuccessResponse } from "../types/SuccessResponse";
+import type { UpdateConfigResponse } from "../types/UpdateConfigResponse";
+import type { UpdateLayoutResponse } from "../types/UpdateLayoutResponse";
+import type { UpdateScreenResponse } from "../types/UpdateScreenResponse";
 
 const API_BASE = "/api";
 
@@ -27,27 +34,21 @@ export async function fetchLayout(): Promise<LayoutResponse> {
     return fetchJson<LayoutResponse>(`${API_BASE}/layout`);
 }
 
-export async function updateLayout(
-    screens: Array<{ instanceId: string; x: number; y: number }>
-): Promise<{ success: boolean; screens: ScreenInfo[] }> {
+export async function updateLayout(screens: ScreenPositionUpdate[]): Promise<UpdateLayoutResponse> {
     return fetchJson(`${API_BASE}/layout`, {
         method: "PUT",
         body: JSON.stringify({ screens })
     });
 }
 
-export async function updateScreenPosition(
-    instanceId: string,
-    x: number,
-    y: number
-): Promise<{ success: boolean; screen: ScreenInfo }> {
+export async function updateScreenPosition(instanceId: string, x: number, y: number): Promise<UpdateScreenResponse> {
     return fetchJson(`${API_BASE}/layout/${instanceId}`, {
         method: "PATCH",
         body: JSON.stringify({ x, y })
     });
 }
 
-export async function removeScreen(instanceId: string): Promise<{ success: boolean }> {
+export async function removeScreen(instanceId: string): Promise<SuccessResponse> {
     return fetchJson(`${API_BASE}/layout/${instanceId}`, {
         method: "DELETE"
     });
@@ -57,7 +58,7 @@ export async function fetchConfig(): Promise<ConfigResponse> {
     return fetchJson<ConfigResponse>(`${API_BASE}/config`);
 }
 
-export async function updateConfig(config: Partial<ConfigResponse>): Promise<{ success: boolean; message?: string }> {
+export async function updateConfig(config: Partial<ConfigResponse>): Promise<UpdateConfigResponse> {
     return fetchJson(`${API_BASE}/config`, {
         method: "PUT",
         body: JSON.stringify(config)

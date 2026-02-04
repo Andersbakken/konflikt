@@ -1,13 +1,4 @@
-import type { ScreenInfo } from "../types";
-
-interface ScreenRectProps {
-    screen: ScreenInfo;
-    scale: number;
-    selected: boolean;
-    onSelect: () => void;
-    onDrag?: (deltaX: number, deltaY: number) => void;
-    draggable: boolean;
-}
+import type { ScreenRectProps } from "../types/ScreenRectProps";
 
 export function ScreenRect({ screen, scale, selected, onSelect, onDrag, draggable }: ScreenRectProps): JSX.Element {
     const handleMouseDown = (e: React.MouseEvent): void => {

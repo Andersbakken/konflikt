@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { fetchConfig, updateConfig } from "../api/client";
-import type { ConfigResponse } from "../types";
+import type { ConfigResponse } from "../types/ConfigResponse";
 
 export function SettingsForm(): JSX.Element {
     const [config, setConfig] = useState<ConfigResponse | null>(null);

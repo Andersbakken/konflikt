@@ -1,9 +1,5 @@
 import { Link } from "react-router-dom";
-import type { StatusResponse } from "../types";
-
-interface StatusBarProps {
-    status: StatusResponse;
-}
+import type { StatusBarProps } from "../types/StatusBarProps";
 
 export function StatusBar({ status }: StatusBarProps): JSX.Element {
     const isServer = status.role === "server";

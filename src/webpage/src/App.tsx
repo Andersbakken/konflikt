@@ -5,7 +5,7 @@ import { LayoutView } from "./components/LayoutView";
 import { SettingsForm } from "./components/SettingsForm";
 import { StatusBar } from "./components/StatusBar";
 import { fetchStatus } from "./api/client";
-import type { StatusResponse } from "./types";
+import type { StatusResponse } from "./types/StatusResponse";
 
 export function App(): JSX.Element {
     const [status, setStatus] = useState<StatusResponse | null>(null);
