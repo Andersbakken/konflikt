@@ -257,6 +257,11 @@ export class PeerManager extends EventEmitter<PeerManagerEvents> {
                 // These are handled by WebSocketClient
                 break;
 
+            case "input_event":
+                // Wrapper format - will be handled by application layer
+                verbose(`Received wrapped input_event: ${message.eventType}`);
+                break;
+
             default:
                 // Treat unknown message types as errors
                 error(`Unknown message type from ${from.name}:`, JSON.stringify(message, null, 4));
