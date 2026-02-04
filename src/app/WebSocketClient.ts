@@ -305,6 +305,7 @@ export class WebSocketClient extends EventEmitter<WebSocketClientEvents> {
     }
 
     #sendError(code: string, message: string, details?: unknown): void {
+        error(`Sending error to ${this.#service.name}: ${code} - ${message}`);
         this.send(createErrorMessage(this.#instanceId, code, message, details));
     }
 
