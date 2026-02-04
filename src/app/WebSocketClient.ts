@@ -234,6 +234,7 @@ export class WebSocketClient extends EventEmitter<WebSocketClientEvents> {
                     error(`Error from peer ${this.#service.name}:`, message.message);
                     break;
 
+                case "input_event":
                 case "mouse_move":
                 case "mouse_press":
                 case "mouse_release":

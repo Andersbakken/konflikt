@@ -6,6 +6,7 @@ import { ErrorMessageSchema } from "./ErrorMessageSchema";
 import { HandshakeRequestSchema } from "./HandshakeRequestSchema";
 import { HandshakeResponseSchema } from "./HandshakeResponseSchema";
 import { HeartbeatSchema } from "./HeartbeatSchema";
+import { InputEventMessageSchema } from "./InputEventMessageSchema";
 import { KeyPressEventSchema } from "./KeyPressEventSchema";
 import { KeyReleaseEventSchema } from "./KeyReleaseEventSchema";
 import { MouseMoveEventSchema } from "./MouseMoveEventSchema";
@@ -19,6 +20,7 @@ export const MessageSchema = z.discriminatedUnion("type", [
     HeartbeatSchema,
     DisconnectSchema,
     ErrorMessageSchema,
+    InputEventMessageSchema,
     MouseMoveEventSchema,
     MousePressEventSchema,
     MouseReleaseEventSchema,
