@@ -444,6 +444,10 @@ export class Konflikt {
         if (targetScreen) {
             this.#activeRemoteScreenBounds = new Rect(0, 0, targetScreen.width, targetScreen.height);
             verbose(`Activated remote screen ${targetInstanceId}, bounds: ${targetScreen.width}x${targetScreen.height}`);
+        } else {
+            // Fallback to a reasonable default if screen info not available
+            error(`No screen info for ${targetInstanceId}, using default bounds`);
+            this.#activeRemoteScreenBounds = new Rect(0, 0, 1920, 1080);
         }
 
         // Hide the cursor on the server since we're controlling a remote screen
