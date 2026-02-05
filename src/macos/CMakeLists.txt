@@ -1,4 +1,11 @@
 # Konflikt macOS Application
+#
+# NOTE: CMake's Swift/Ninja integration uses a combined compile+link rule,
+# which causes Swift files to be recompiled whenever link dependencies change.
+# This is a known CMake limitation. For faster incremental builds during
+# development, use the Xcode generator instead:
+#   cmake .. -G Xcode -DBUILD_UI=OFF
+#   open Konflikt.xcodeproj
 
 # Enable Swift language support
 set(CMAKE_Swift_LANGUAGE_VERSION 5)
@@ -35,7 +42,6 @@ configure_file(
 )
 
 # Swift application
-# Note: Swift/CMake integration is limited, so this may need adjustment
 add_executable(KonfliktApp MACOSX_BUNDLE
     Konflikt/main.swift
     Konflikt/AppDelegate.swift

@@ -73,14 +73,23 @@ brew install cmake ninja
 
 The macOS build includes both the C++ library and a Swift menu bar application.
 
+**Using Ninja (recommended for CI/release builds):**
 ```bash
 mkdir build && cd build
-cmake .. -G Ninja
+cmake .. -G Ninja -DBUILD_UI=OFF
 ninja
 ```
 
-**Note:** The Swift app may require building with Xcode for full functionality.
-You can open the generated Xcode project or use the CMake build.
+**Using Xcode (recommended for development):**
+```bash
+mkdir xcode && cd xcode
+cmake .. -G Xcode -DBUILD_UI=OFF
+open Konflikt.xcodeproj
+```
+
+**Note:** CMake's Swift/Ninja integration uses a combined compile+link rule,
+which causes Swift files to be recompiled whenever C++ library dependencies change.
+For faster incremental builds during development, use the Xcode generator.
 
 ## Building the React UI
 
