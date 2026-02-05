@@ -39,6 +39,31 @@ struct StatsJson
     LatencyStatsJson latency;
 };
 
+struct RuntimeConfigJson
+{
+    bool edgeLeft;
+    bool edgeRight;
+    bool edgeTop;
+    bool edgeBottom;
+    bool lockCursorToScreen;
+    uint32_t lockCursorHotkey;
+    bool verbose;
+    bool logKeycodes;
+    std::map<std::string, uint32_t> keyRemap;
+};
+
+struct LogEntryJson
+{
+    std::string timestamp;
+    std::string level;
+    std::string message;
+};
+
+struct LogResponseJson
+{
+    std::vector<LogEntryJson> logs;
+};
+
 } // namespace konflikt
 
 template <>
@@ -63,6 +88,39 @@ struct glz::meta<konflikt::StatsJson>
         "scrollEvents", &T::scrollEvents,
         "eventsPerSecond", &T::eventsPerSecond,
         "latency", &T::latency);
+};
+
+template <>
+struct glz::meta<konflikt::RuntimeConfigJson>
+{
+    using T = konflikt::RuntimeConfigJson;
+    static constexpr auto value = object(
+        "edgeLeft", &T::edgeLeft,
+        "edgeRight", &T::edgeRight,
+        "edgeTop", &T::edgeTop,
+        "edgeBottom", &T::edgeBottom,
+        "lockCursorToScreen", &T::lockCursorToScreen,
+        "lockCursorHotkey", &T::lockCursorHotkey,
+        "verbose", &T::verbose,
+        "logKeycodes", &T::logKeycodes,
+        "keyRemap", &T::keyRemap);
+};
+
+template <>
+struct glz::meta<konflikt::LogEntryJson>
+{
+    using T = konflikt::LogEntryJson;
+    static constexpr auto value = object(
+        "timestamp", &T::timestamp,
+        "level", &T::level,
+        "message", &T::message);
+};
+
+template <>
+struct glz::meta<konflikt::LogResponseJson>
+{
+    using T = konflikt::LogResponseJson;
+    static constexpr auto value = object("logs", &T::logs);
 };
 
 namespace konflikt {
@@ -255,74 +313,62 @@ bool Konflikt::init()
 
     // API endpoint for recent logs (only if debug API is enabled)
     if (mConfig.enableDebugApi) {
-        mHttpServer->route("GET", "/api/log", [this](const HttpRequest &) {
+        mHttpServer->route("GET", "/api/log", [this](const HttpRequest &req) {
             HttpResponse response;
             response.contentType = "application/json";
 
-            std::stringstream ss;
-            ss << "{\"logs\":[";
-
+            LogResponseJson logResponse;
             {
                 std::lock_guard<std::mutex> lock(mLogBufferMutex);
-                bool first = true;
                 for (const auto &entry : mLogBuffer) {
-                    if (!first) {
-                        ss << ",";
-                    }
-                    first = false;
-                    ss << "{\"timestamp\":\"" << entry.timestamp << "\",";
-                    ss << "\"level\":\"" << entry.level << "\",";
-                    // Escape quotes in message
-                    ss << "\"message\":\"";
-                    for (char c : entry.message) {
-                        if (c == '"') {
-                            ss << "\\\"";
-                        } else if (c == '\\') {
-                            ss << "\\\\";
-                        } else if (c == '\n') {
-                            ss << "\\n";
-                        } else {
-                            ss << c;
-                        }
-                    }
-                    ss << "\"}";
+                    logResponse.logs.push_back({entry.timestamp, entry.level, entry.message});
                 }
             }
 
-            ss << "]}";
-            response.body = ss.str();
+            auto json = glz::write_json(logResponse);
+            if (json) {
+                if (req.path.find("pretty") != std::string::npos) {
+                    response.body = glz::prettify_json(*json);
+                } else {
+                    response.body = *json;
+                }
+            } else {
+                response.body = "{\"logs\":[]}";
+            }
             return response;
         });
         log("log", "Debug API enabled at /api/log");
     }
 
     // API endpoint for getting runtime config
-    mHttpServer->route("GET", "/api/config", [this](const HttpRequest &) {
+    mHttpServer->route("GET", "/api/config", [this](const HttpRequest &req) {
         HttpResponse response;
         response.contentType = "application/json";
 
-        std::stringstream ss;
-        ss << "{";
-        ss << "\"edgeLeft\":" << (mConfig.edgeLeft ? "true" : "false") << ",";
-        ss << "\"edgeRight\":" << (mConfig.edgeRight ? "true" : "false") << ",";
-        ss << "\"edgeTop\":" << (mConfig.edgeTop ? "true" : "false") << ",";
-        ss << "\"edgeBottom\":" << (mConfig.edgeBottom ? "true" : "false") << ",";
-        ss << "\"lockCursorToScreen\":" << (mConfig.lockCursorToScreen ? "true" : "false") << ",";
-        ss << "\"lockCursorHotkey\":" << mConfig.lockCursorHotkey << ",";
-        ss << "\"verbose\":" << (mConfig.verbose ? "true" : "false") << ",";
-        ss << "\"logKeycodes\":" << (mConfig.logKeycodes ? "true" : "false") << ",";
-        ss << "\"keyRemap\":{";
-        bool first = true;
-        for (const auto &[from, to] : mConfig.keyRemap) {
-            if (!first) {
-                ss << ",";
-            }
-            first = false;
-            ss << "\"" << from << "\":" << to;
-        }
-        ss << "}}";
+        RuntimeConfigJson config;
+        config.edgeLeft = mConfig.edgeLeft;
+        config.edgeRight = mConfig.edgeRight;
+        config.edgeTop = mConfig.edgeTop;
+        config.edgeBottom = mConfig.edgeBottom;
+        config.lockCursorToScreen = mConfig.lockCursorToScreen;
+        config.lockCursorHotkey = mConfig.lockCursorHotkey;
+        config.verbose = mConfig.verbose;
+        config.logKeycodes = mConfig.logKeycodes;
 
-        response.body = ss.str();
+        for (const auto &[from, to] : mConfig.keyRemap) {
+            config.keyRemap[std::to_string(from)] = to;
+        }
+
+        auto json = glz::write_json(config);
+        if (json) {
+            if (req.path.find("pretty") != std::string::npos) {
+                response.body = glz::prettify_json(*json);
+            } else {
+                response.body = *json;
+            }
+        } else {
+            response.body = "{}";
+        }
         return response;
     });
 
