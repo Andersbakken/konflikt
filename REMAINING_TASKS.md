@@ -105,8 +105,9 @@ The native C++ rewrite is largely functional. The macOS Swift app builds and run
 - [x] Linux: Debian packaging files (packaging/debian/)
 - [x] Linux: Systemd user service (packaging/konflikt.service)
 - [x] Linux: AppImage build script (packaging/appimage/)
-- [ ] macOS: Create signed .dmg
-- [ ] macOS: Notarization for Gatekeeper
+- [x] macOS: DMG build script (packaging/macos/build-dmg.sh)
+- [x] macOS: Entitlements file for code signing
+- [ ] macOS: Notarization for Gatekeeper (requires Apple Developer account)
 
 ## File Reference
 

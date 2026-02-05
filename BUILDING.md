@@ -91,6 +91,31 @@ open Konflikt.xcodeproj
 which causes Swift files to be recompiled whenever C++ library dependencies change.
 For faster incremental builds during development, use the Xcode generator.
 
+### Creating a DMG
+
+Create a distributable disk image:
+
+```bash
+./packaging/macos/build-dmg.sh
+```
+
+This creates `Konflikt-VERSION.dmg` in the `dist/` directory.
+
+**Code Signing (for distribution):**
+```bash
+# Sign the app bundle
+codesign --deep --force --options runtime \
+    --entitlements packaging/macos/Konflikt.entitlements \
+    --sign "Developer ID Application: Your Name" \
+    dist/Konflikt.app
+
+# Notarize for Gatekeeper
+xcrun notarytool submit dist/Konflikt-*.dmg \
+    --apple-id YOUR_APPLE_ID \
+    --team-id YOUR_TEAM_ID \
+    --password YOUR_APP_PASSWORD --wait
+```
+
 ## Building the React UI
 
 The React UI needs to be built separately:
@@ -169,6 +194,7 @@ konflikt/
 ├── packaging/
 │   ├── appimage/            # AppImage build scripts
 │   ├── debian/              # Debian package files
+│   ├── macos/               # macOS DMG and code signing
 │   └── konflikt.service     # Systemd user service
 └── dist/
     └── ui/                  # Built React UI
