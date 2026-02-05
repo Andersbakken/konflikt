@@ -122,6 +122,55 @@ struct ScreenLayoutJson
     std::vector<ScreenLayoutEntryJson> screens;
 };
 
+// For GET /api/displays (local monitor info)
+struct DisplayInfoJson
+{
+    uint32_t id;
+    int32_t x;
+    int32_t y;
+    int32_t width;
+    int32_t height;
+    bool isPrimary;
+};
+
+struct DisplaysJson
+{
+    int32_t desktopWidth;
+    int32_t desktopHeight;
+    std::vector<DisplayInfoJson> displays;
+};
+
+// For GET/POST /api/display-edges
+struct DisplayEdgesEntryJson
+{
+    uint32_t displayId;
+    bool left;
+    bool right;
+    bool top;
+    bool bottom;
+};
+
+struct DisplayEdgesJson
+{
+    std::vector<DisplayEdgesEntryJson> edges;
+};
+
+// For POST /api/display-edges (single display update)
+struct DisplayEdgesUpdateJson
+{
+    uint32_t displayId;
+    std::optional<bool> left;
+    std::optional<bool> right;
+    std::optional<bool> top;
+    std::optional<bool> bottom;
+};
+
+// For DELETE /api/display-edges
+struct DisplayEdgesDeleteJson
+{
+    uint32_t displayId;
+};
+
 struct LogEntryJson
 {
     std::string timestamp;
@@ -308,6 +357,67 @@ struct glz::meta<konflikt::ScreenLayoutJson>
 {
     using T = konflikt::ScreenLayoutJson;
     static constexpr auto value = object("screens", &T::screens);
+};
+
+template <>
+struct glz::meta<konflikt::DisplayInfoJson>
+{
+    using T = konflikt::DisplayInfoJson;
+    static constexpr auto value = object(
+        "id", &T::id,
+        "x", &T::x,
+        "y", &T::y,
+        "width", &T::width,
+        "height", &T::height,
+        "isPrimary", &T::isPrimary);
+};
+
+template <>
+struct glz::meta<konflikt::DisplaysJson>
+{
+    using T = konflikt::DisplaysJson;
+    static constexpr auto value = object(
+        "desktopWidth", &T::desktopWidth,
+        "desktopHeight", &T::desktopHeight,
+        "displays", &T::displays);
+};
+
+template <>
+struct glz::meta<konflikt::DisplayEdgesEntryJson>
+{
+    using T = konflikt::DisplayEdgesEntryJson;
+    static constexpr auto value = object(
+        "displayId", &T::displayId,
+        "left", &T::left,
+        "right", &T::right,
+        "top", &T::top,
+        "bottom", &T::bottom);
+};
+
+template <>
+struct glz::meta<konflikt::DisplayEdgesJson>
+{
+    using T = konflikt::DisplayEdgesJson;
+    static constexpr auto value = object("edges", &T::edges);
+};
+
+template <>
+struct glz::meta<konflikt::DisplayEdgesUpdateJson>
+{
+    using T = konflikt::DisplayEdgesUpdateJson;
+    static constexpr auto value = object(
+        "displayId", &T::displayId,
+        "left", &T::left,
+        "right", &T::right,
+        "top", &T::top,
+        "bottom", &T::bottom);
+};
+
+template <>
+struct glz::meta<konflikt::DisplayEdgesDeleteJson>
+{
+    using T = konflikt::DisplayEdgesDeleteJson;
+    static constexpr auto value = object("displayId", &T::displayId);
 };
 
 template <>
@@ -680,6 +790,165 @@ bool Konflikt::init()
         } else {
             response.body = "{\"screens\":[]}";
         }
+        return response;
+    });
+
+    // API endpoint for local displays (monitors)
+    mHttpServer->route("GET", "/api/displays", [this](const HttpRequest &req) {
+        HttpResponse response;
+        response.contentType = "application/json";
+
+        DisplaysJson result;
+        if (mPlatform) {
+            Desktop desktop = mPlatform->getDesktop();
+            result.desktopWidth = desktop.width;
+            result.desktopHeight = desktop.height;
+            for (const auto &display : desktop.displays) {
+                result.displays.push_back({
+                    display.id,
+                    display.x,
+                    display.y,
+                    display.width,
+                    display.height,
+                    display.isPrimary
+                });
+            }
+        }
+
+        auto json = glz::write_json(result);
+        if (json) {
+            if (req.path.find("pretty") != std::string::npos) {
+                response.body = glz::prettify_json(*json);
+            } else {
+                response.body = *json;
+            }
+        } else {
+            response.body = "{\"desktopWidth\":0,\"desktopHeight\":0,\"displays\":[]}";
+        }
+        return response;
+    });
+
+    // API endpoint to get per-display edge settings
+    mHttpServer->route("GET", "/api/display-edges", [this](const HttpRequest &req) {
+        HttpResponse response;
+        response.contentType = "application/json";
+
+        DisplayEdgesJson result;
+
+        // Include all displays with their current edge settings
+        if (mPlatform) {
+            Desktop desktop = mPlatform->getDesktop();
+            for (const auto &display : desktop.displays) {
+                Config::DisplayEdges edges;
+                auto it = mConfig.displayEdges.find(display.id);
+                if (it != mConfig.displayEdges.end()) {
+                    edges = it->second;
+                } else {
+                    // Use global settings as default
+                    edges.left = mConfig.edgeLeft;
+                    edges.right = mConfig.edgeRight;
+                    edges.top = mConfig.edgeTop;
+                    edges.bottom = mConfig.edgeBottom;
+                }
+                result.edges.push_back({
+                    display.id,
+                    edges.left,
+                    edges.right,
+                    edges.top,
+                    edges.bottom
+                });
+            }
+        }
+
+        auto json = glz::write_json(result);
+        if (json) {
+            if (req.path.find("pretty") != std::string::npos) {
+                response.body = glz::prettify_json(*json);
+            } else {
+                response.body = *json;
+            }
+        } else {
+            response.body = "{\"edges\":[]}";
+        }
+        return response;
+    });
+
+    // API endpoint to set per-display edge settings
+    mHttpServer->route("POST", "/api/display-edges", [this](const HttpRequest &req) {
+        HttpResponse response;
+        response.contentType = "application/json";
+
+        DisplayEdgesUpdateJson update;
+        auto error = glz::read_json(update, req.body);
+        if (error) {
+            response.statusCode = 400;
+            response.statusMessage = "Bad Request";
+            response.body = "{\"success\":false,\"message\":\"Invalid JSON\"}";
+            return response;
+        }
+
+        // Get or create entry for this display
+        auto &edges = mConfig.displayEdges[update.displayId];
+        bool changed = false;
+
+        // Initialize with global defaults if this is a new entry
+        if (mConfig.displayEdges.find(update.displayId) == mConfig.displayEdges.end()) {
+            edges.left = mConfig.edgeLeft;
+            edges.right = mConfig.edgeRight;
+            edges.top = mConfig.edgeTop;
+            edges.bottom = mConfig.edgeBottom;
+        }
+
+        if (update.left.has_value()) {
+            edges.left = *update.left;
+            changed = true;
+        }
+        if (update.right.has_value()) {
+            edges.right = *update.right;
+            changed = true;
+        }
+        if (update.top.has_value()) {
+            edges.top = *update.top;
+            changed = true;
+        }
+        if (update.bottom.has_value()) {
+            edges.bottom = *update.bottom;
+            changed = true;
+        }
+
+        if (changed) {
+            response.body = "{\"success\":true,\"message\":\"Display edge settings updated\"}";
+            log("log", "Display edge settings updated for display " + std::to_string(update.displayId) + " via API");
+        } else {
+            response.body = "{\"success\":false,\"message\":\"No valid edge options found\"}";
+        }
+
+        return response;
+    });
+
+    // API endpoint to delete per-display edge settings (revert to global)
+    mHttpServer->route("DELETE", "/api/display-edges", [this](const HttpRequest &req) {
+        HttpResponse response;
+        response.contentType = "application/json";
+
+        DisplayEdgesDeleteJson delReq;
+        auto error = glz::read_json(delReq, req.body);
+        if (error) {
+            response.statusCode = 400;
+            response.statusMessage = "Bad Request";
+            response.body = "{\"success\":false,\"message\":\"Invalid JSON or missing displayId\"}";
+            return response;
+        }
+
+        auto it = mConfig.displayEdges.find(delReq.displayId);
+        if (it != mConfig.displayEdges.end()) {
+            mConfig.displayEdges.erase(it);
+            response.body = "{\"success\":true,\"message\":\"Display edge settings removed, using global defaults\"}";
+            log("log", "Display edge settings removed for display " + std::to_string(delReq.displayId));
+        } else {
+            response.body = "{\"success\":false,\"message\":\"No custom edge settings for this display\"}";
+        }
+
         return response;
     });
 
@@ -1182,6 +1451,33 @@ uint32_t Konflikt::remapKeycode(uint32_t keycode) const
     return keycode;
 }
 
+Config::DisplayEdges Konflikt::getEdgeSettingsForPoint(int32_t x, int32_t y) const
+{
+    // Find which display contains this point
+    if (mPlatform) {
+        Desktop desktop = mPlatform->getDesktop();
+        for (const auto &display : desktop.displays) {
+            if (x >= display.x && x < display.x + display.width &&
+                y >= display.y && y < display.y + display.height) {
+                // Check if we have per-display settings for this display
+                auto it = mConfig.displayEdges.find(display.id);
+                if (it != mConfig.displayEdges.end()) {
+                    return it->second;
+                }
+                break;
+            }
+        }
+    }
+
+    // Fall back to global edge settings
+    Config::DisplayEdges edges;
+    edges.left = mConfig.edgeLeft;
+    edges.right = mConfig.edgeRight;
+    edges.top = mConfig.edgeTop;
+    edges.bottom = mConfig.edgeBottom;
+    return edges;
+}
+
 void Konflikt::updateInputStats(const std::string &eventType)
 {
     mInputStats.totalEvents++;
@@ -1634,20 +1930,23 @@ bool Konflikt::checkScreenTransition(int32_t x, int32_t y)
         return false;
     }
 
+    // Get edge settings for the display containing this point
+    Config::DisplayEdges edges = getEdgeSettingsForPoint(x, y);
+
     const int32_t EDGE_THRESHOLD = 1;
     Side edge;
     bool atEdge = false;
 
-    if (x <= mScreenBounds.x + EDGE_THRESHOLD && mConfig.edgeLeft) {
+    if (x <= mScreenBounds.x + EDGE_THRESHOLD && edges.left) {
         edge = Side::Left;
         atEdge = true;
-    } else if (x >= mScreenBounds.x + mScreenBounds.width - EDGE_THRESHOLD - 1 && mConfig.edgeRight) {
+    } else if (x >= mScreenBounds.x + mScreenBounds.width - EDGE_THRESHOLD - 1 && edges.right) {
         edge = Side::Right;
         atEdge = true;
-    } else if (y <= mScreenBounds.y + EDGE_THRESHOLD && mConfig.edgeTop) {
+    } else if (y <= mScreenBounds.y + EDGE_THRESHOLD && edges.top) {
         edge = Side::Top;
         atEdge = true;
-    } else if (y >= mScreenBounds.y + mScreenBounds.height - EDGE_THRESHOLD - 1 && mConfig.edgeBottom) {
+    } else if (y >= mScreenBounds.y + mScreenBounds.height - EDGE_THRESHOLD - 1 && edges.bottom) {
         edge = Side::Bottom;
         atEdge = true;
     }

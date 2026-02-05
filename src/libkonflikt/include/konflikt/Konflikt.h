@@ -49,10 +49,22 @@ struct Config
     int32_t screenHeight { 0 }; // 0 = auto-detect
 
     // Screen edge transition settings (which edges trigger screen transitions)
+    // These are the default/global settings
     bool edgeLeft { true };
     bool edgeRight { true };
     bool edgeTop { true };
     bool edgeBottom { true };
+
+    // Per-display edge settings (display ID -> edges)
+    // If a display ID is not in this map, the global edge settings are used
+    struct DisplayEdges
+    {
+        bool left { true };
+        bool right { true };
+        bool top { true };
+        bool bottom { true };
+    };
+    std::unordered_map<uint32_t, DisplayEdges> displayEdges;
 
     // Lock cursor to current screen (disable transitions)
     bool lockCursorToScreen { false };
@@ -217,6 +229,7 @@ private:
     std::string generateMachineId();
     std::string generateDisplayId();
     uint32_t remapKeycode(uint32_t keycode) const;
+    Config::DisplayEdges getEdgeSettingsForPoint(int32_t x, int32_t y) const;
 
     // Configuration
     Config mConfig;

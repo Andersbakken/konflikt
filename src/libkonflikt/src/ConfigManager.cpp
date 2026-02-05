@@ -8,6 +8,15 @@
 
 namespace konflikt {
 
+// Display edge settings for JSON
+struct DisplayEdgesJson
+{
+    bool left { true };
+    bool right { true };
+    bool top { true };
+    bool bottom { true };
+};
+
 // Glaze metadata for Config serialization
 struct ConfigJson
 {
@@ -37,9 +46,21 @@ struct ConfigJson
     bool enableDebugApi { false };
     std::map<std::string, int> keyRemap;  // String keys for JSON compatibility
     bool logKeycodes { false };
+    std::map<std::string, DisplayEdgesJson> displayEdges;  // Display ID -> edge settings
 };
 
 } // namespace konflikt
+
+template <>
+struct glz::meta<konflikt::DisplayEdgesJson>
+{
+    using T = konflikt::DisplayEdgesJson;
+    static constexpr auto value = object(
+        "left", &T::left,
+        "right", &T::right,
+        "top", &T::top,
+        "bottom", &T::bottom);
+};
 
 template <>
 struct glz::meta<konflikt::ConfigJson>
@@ -71,7 +92,8 @@ struct glz::meta<konflikt::ConfigJson>
         "logFile", &T::logFile,
         "enableDebugApi", &T::enableDebugApi,
         "keyRemap", &T::keyRemap,
-        "logKeycodes", &T::logKeycodes);
+        "logKeycodes", &T::logKeycodes,
+        "displayEdges", &T::displayEdges);
 };
 
 namespace konflikt {
@@ -215,6 +237,21 @@ std::optional<Config> ConfigManager::load(const std::string &path)
 
     config.logKeycodes = jsonConfig.logKeycodes;
 
+    // Convert string keys to uint32_t for displayEdges
+    for (const auto &[key, edges] : jsonConfig.displayEdges) {
+        try {
+            uint32_t displayId = static_cast<uint32_t>(std::stoul(key));
+            Config::DisplayEdges de;
+            de.left = edges.left;
+            de.right = edges.right;
+            de.top = edges.top;
+            de.bottom = edges.bottom;
+            config.displayEdges[displayId] = de;
+        } catch (...) {
+            // Skip invalid entries
+        }
+    }
+
     return config;
 }
 
@@ -268,6 +305,16 @@ bool ConfigManager::save(const Config &config, const std::string &path)
     }
 
     jsonConfig.logKeycodes = config.logKeycodes;
+
+    // Convert uint32_t keys to string for displayEdges
+    for (const auto &[displayId, edges] : config.displayEdges) {
+        DisplayEdgesJson de;
+        de.left = edges.left;
+        de.right = edges.right;
+        de.top = edges.top;
+        de.bottom = edges.bottom;
+        jsonConfig.displayEdges[std::to_string(displayId)] = de;
+    }
 
     auto json = glz::write_json(jsonConfig);
     if (!json) {

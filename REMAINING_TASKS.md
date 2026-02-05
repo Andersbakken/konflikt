@@ -98,7 +98,7 @@ The native C++ rewrite is largely functional. The macOS Swift app builds and run
 #### 8. Additional Features
 - [ ] Drag & drop file transfer
 - [x] Screen edge switching configuration (edgeLeft/Right/Top/Bottom in config)
-- [ ] Multi-monitor awareness (per-display screen edges)
+- [x] Multi-monitor awareness (per-display screen edges via displayEdges config and API)
 - [x] Lock cursor to screen option (lockCursorToScreen config + setLockCursorToScreen API)
 
 #### 10. Security (Optional)
@@ -200,6 +200,10 @@ Example config (all options):
     "54": 134,
     "58": 64,
     "61": 108
+  },
+  "displayEdges": {
+    "1": {"left": true, "right": true, "top": true, "bottom": true},
+    "2": {"left": false, "right": true, "top": true, "bottom": true}
   }
 }
 ```
@@ -230,6 +234,10 @@ All endpoints support `?pretty` query parameter for formatted JSON output.
 - `GET /api/status` - Instance status, connection info, client details
 - `GET /api/servers` - List of discovered servers via mDNS auto-discovery
 - `GET /api/layout` - Current screen layout/arrangement (server only)
+- `GET /api/displays` - Local display/monitor information
+- `GET /api/display-edges` - Per-display edge transition settings
+- `POST /api/display-edges` - Set per-display edge settings: `{"displayId": 1, "left": false, "right": true}`
+- `DELETE /api/display-edges` - Remove per-display settings (revert to global): `{"displayId": 1}`
 - `GET /api/config` - Get current runtime configuration
 - `POST /api/config` - Update runtime config (JSON body with edgeLeft, edgeRight, edgeTop, edgeBottom, lockCursorToScreen, verbose, logKeycodes)
 - `POST /api/config/save` - Save current config to file
