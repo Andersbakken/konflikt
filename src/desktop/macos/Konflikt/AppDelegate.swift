@@ -55,7 +55,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 role: prefs.role,
                 serverAddress: prefs.serverAddress,
                 port: prefs.serverPort > 0 ? prefs.serverPort : nil,
-                verbose: prefs.verboseLogging
+                verbose: prefs.verboseLogging,
+                logFilePath: prefs.logFilePath.isEmpty ? nil : prefs.logFilePath
             )
         } else {
             print("Could not find backend path")

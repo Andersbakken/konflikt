@@ -15,6 +15,7 @@ class Preferences {
         static let launchAtLogin = "launchAtLogin"
         static let showNotifications = "showNotifications"
         static let verboseLogging = "verboseLogging"
+        static let logFilePath = "logFilePath"
     }
 
     // MARK: - Server Settings
@@ -66,6 +67,12 @@ class Preferences {
         set { defaults.set(newValue, forKey: Keys.verboseLogging) }
     }
 
+    /// Path to log file (empty = no file logging)
+    var logFilePath: String {
+        get { defaults.string(forKey: Keys.logFilePath) ?? "" }
+        set { defaults.set(newValue, forKey: Keys.logFilePath) }
+    }
+
     // MARK: - Computed Properties
 
     /// Get command line arguments based on current preferences
@@ -84,6 +91,11 @@ class Preferences {
 
         if verboseLogging {
             args.append("-vv")
+        }
+
+        if !logFilePath.isEmpty {
+            let expandedPath = NSString(string: logFilePath).expandingTildeInPath
+            args.append("--log-file=\(expandedPath)")
         }
 
         return args

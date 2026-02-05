@@ -27,7 +27,7 @@ class ProcessManager {
         "~/.nvm/versions/node/*/bin/node"  // NVM installations
     ]
 
-    func startProcess(backendPath: String, role: String, serverAddress: String? = nil, port: Int? = nil, verbose: Bool = false) {
+    func startProcess(backendPath: String, role: String, serverAddress: String? = nil, port: Int? = nil, verbose: Bool = false, logFilePath: String? = nil) {
         guard process == nil else {
             print("Process already running")
             return
@@ -54,6 +54,11 @@ class ProcessManager {
 
         if verbose {
             arguments.append("-vv")
+        }
+
+        if let logFile = logFilePath, !logFile.isEmpty {
+            let expandedPath = NSString(string: logFile).expandingTildeInPath
+            arguments.append("--log-file=\(expandedPath)")
         }
 
         process?.arguments = arguments

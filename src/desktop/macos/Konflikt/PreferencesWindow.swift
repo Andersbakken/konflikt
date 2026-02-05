@@ -8,12 +8,13 @@ class PreferencesWindow: NSWindow {
     private var launchAtLoginCheckbox: NSButton!
     private var notificationsCheckbox: NSButton!
     private var verboseCheckbox: NSButton!
+    private var logFileField: NSTextField!
 
     weak var preferencesDelegate: PreferencesWindowDelegate?
 
     init() {
         super.init(
-            contentRect: NSRect(x: 0, y: 0, width: 400, height: 320),
+            contentRect: NSRect(x: 0, y: 0, width: 450, height: 380),
             styleMask: [.titled, .closable],
             backing: .buffered,
             defer: false
@@ -31,7 +32,7 @@ class PreferencesWindow: NSWindow {
         let contentView = NSView(frame: self.contentRect(forFrameRect: self.frame))
         self.contentView = contentView
 
-        var yOffset: CGFloat = 280
+        var yOffset: CGFloat = 340
 
         // Title
         let titleLabel = NSTextField(labelWithString: "Konflikt Settings")
@@ -115,17 +116,33 @@ class PreferencesWindow: NSWindow {
         verboseCheckbox.frame = NSRect(x: 20, y: yOffset, width: 300, height: 22)
         contentView.addSubview(verboseCheckbox)
 
+        yOffset -= 35
+
+        // Log file path
+        let logFileLabel = NSTextField(labelWithString: "Log File:")
+        logFileLabel.frame = NSRect(x: 20, y: yOffset, width: 100, height: 22)
+        contentView.addSubview(logFileLabel)
+
+        logFileField = NSTextField(frame: NSRect(x: 130, y: yOffset - 2, width: 220, height: 24))
+        logFileField.placeholderString = "~/konflikt.log"
+        contentView.addSubview(logFileField)
+
+        let browseButton = NSButton(title: "Browse...", target: self, action: #selector(browseLogFileClicked(_:)))
+        browseButton.frame = NSRect(x: 360, y: yOffset - 3, width: 70, height: 26)
+        browseButton.bezelStyle = .rounded
+        contentView.addSubview(browseButton)
+
         yOffset -= 40
 
         // Buttons
         let cancelButton = NSButton(title: "Cancel", target: self, action: #selector(cancelClicked(_:)))
-        cancelButton.frame = NSRect(x: 200, y: 15, width: 80, height: 32)
+        cancelButton.frame = NSRect(x: 250, y: 15, width: 80, height: 32)
         cancelButton.bezelStyle = .rounded
         cancelButton.keyEquivalent = "\u{1b}"  // Escape
         contentView.addSubview(cancelButton)
 
         let saveButton = NSButton(title: "Save", target: self, action: #selector(saveClicked(_:)))
-        saveButton.frame = NSRect(x: 290, y: 15, width: 80, height: 32)
+        saveButton.frame = NSRect(x: 340, y: 15, width: 80, height: 32)
         saveButton.bezelStyle = .rounded
         saveButton.keyEquivalent = "\r"  // Enter
         contentView.addSubview(saveButton)
@@ -141,6 +158,7 @@ class PreferencesWindow: NSWindow {
         launchAtLoginCheckbox.state = prefs.launchAtLogin ? .on : .off
         notificationsCheckbox.state = prefs.showNotifications ? .on : .off
         verboseCheckbox.state = prefs.verboseLogging ? .on : .off
+        logFileField.stringValue = prefs.logFilePath
 
         updateUIForRole()
     }
@@ -168,9 +186,21 @@ class PreferencesWindow: NSWindow {
         prefs.launchAtLogin = launchAtLoginCheckbox.state == .on
         prefs.showNotifications = notificationsCheckbox.state == .on
         prefs.verboseLogging = verboseCheckbox.state == .on
+        prefs.logFilePath = logFileField.stringValue
 
         preferencesDelegate?.preferencesDidChange()
         self.close()
+    }
+
+    @objc private func browseLogFileClicked(_ sender: NSButton) {
+        let savePanel = NSSavePanel()
+        savePanel.title = "Choose Log File Location"
+        savePanel.nameFieldStringValue = "konflikt.log"
+        savePanel.canCreateDirectories = true
+
+        if savePanel.runModal() == .OK, let url = savePanel.url {
+            logFileField.stringValue = url.path
+        }
     }
 }
 
