@@ -102,10 +102,11 @@ The native C++ rewrite is largely functional. The macOS Swift app builds and run
 - [x] Lock cursor to screen option (lockCursorToScreen config + setLockCursorToScreen API)
 
 #### 10. Security (Optional)
-- [ ] WSS (WebSocket Secure) support for client-server communication
-  - Generate self-signed certs with OpenSSL during install/first run
-  - TLS encryption for all network traffic between machines
-  - Config option to enable/disable (off by default for simplicity)
+- [x] WSS (WebSocket Secure) server-side support
+  - TLS config options: useTLS, tlsCertFile, tlsKeyFile, tlsKeyPassphrase
+  - CLI options: --tls, --tls-cert, --tls-key, --tls-passphrase
+  - Certificate generation script: scripts/generate-cert.sh
+- [ ] WSS client-side support (connect to wss:// servers)
 - [ ] Config file signing or encryption (optional)
   - Prevent tampering with config files
   - Could use simple HMAC or full encryption

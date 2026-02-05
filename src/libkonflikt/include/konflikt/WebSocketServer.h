@@ -15,11 +15,24 @@ struct WebSocketServerCallbacks
     std::function<void(const std::string &message, void *connection)> onMessage;
 };
 
+/// SSL/TLS configuration for WebSocket server
+struct WebSocketServerSSLConfig
+{
+    std::string certFile;       // Path to certificate file (PEM)
+    std::string keyFile;        // Path to private key file (PEM)
+    std::string passphrase;     // Passphrase for encrypted key (optional)
+};
+
 /// WebSocket server using uWebSockets
 class WebSocketServer
 {
 public:
+    /// Create non-SSL server
     explicit WebSocketServer(int port);
+
+    /// Create SSL server
+    WebSocketServer(int port, const WebSocketServerSSLConfig &sslConfig);
+
     ~WebSocketServer();
 
     // Non-copyable
@@ -50,12 +63,17 @@ public:
     /// Get number of connected clients
     size_t clientCount() const;
 
+    /// Check if SSL is enabled
+    bool isSSL() const { return mSSLEnabled; }
+
 private:
     struct Impl;
     std::unique_ptr<Impl> mImpl;
 
     int mPort;
     bool mRunning { false };
+    bool mSSLEnabled { false };
+    WebSocketServerSSLConfig mSSLConfig;
     WebSocketServerCallbacks mCallbacks;
 };
 

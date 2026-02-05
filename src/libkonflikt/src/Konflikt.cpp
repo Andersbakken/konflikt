@@ -63,8 +63,17 @@ bool Konflikt::init()
 
     log("log", "Screen bounds: " + std::to_string(mScreenBounds.width) + "x" + std::to_string(mScreenBounds.height));
 
-    // Create WebSocket server
-    mWsServer = std::make_unique<WebSocketServer>(mConfig.port);
+    // Create WebSocket server (with optional TLS)
+    if (mConfig.useTLS && !mConfig.tlsCertFile.empty() && !mConfig.tlsKeyFile.empty()) {
+        WebSocketServerSSLConfig sslConfig;
+        sslConfig.certFile = mConfig.tlsCertFile;
+        sslConfig.keyFile = mConfig.tlsKeyFile;
+        sslConfig.passphrase = mConfig.tlsKeyPassphrase;
+        mWsServer = std::make_unique<WebSocketServer>(mConfig.port, sslConfig);
+        log("log", "TLS enabled for WebSocket server");
+    } else {
+        mWsServer = std::make_unique<WebSocketServer>(mConfig.port);
+    }
     mWsServer->setCallbacks({ .onConnect = [this](void *conn) {
         onClientConnected(conn);
     }, .onDisconnect = [this](void *conn) {

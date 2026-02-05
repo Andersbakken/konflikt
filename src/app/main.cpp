@@ -43,6 +43,10 @@ void printUsage(const char *programName)
               << "  --no-edge-top         Disable top edge screen transition\n"
               << "  --no-edge-bottom      Disable bottom edge screen transition\n"
               << "  --lock-cursor         Lock cursor to current screen\n"
+              << "  --tls                 Enable TLS/WSS for secure connections\n"
+              << "  --tls-cert=PATH       Path to TLS certificate file (PEM)\n"
+              << "  --tls-key=PATH        Path to TLS private key file (PEM)\n"
+              << "  --tls-passphrase=PASS Passphrase for encrypted key (optional)\n"
               << "  --verbose             Enable verbose logging\n"
               << "  -v, --version         Show version information\n"
               << "  -h, --help            Show this help message\n"
@@ -156,6 +160,16 @@ int main(int argc, char *argv[])
             config.edgeBottom = false;
         } else if (arg == "--lock-cursor") {
             config.lockCursorToScreen = true;
+        } else if (arg == "--tls") {
+            config.useTLS = true;
+        } else if (arg.rfind("--tls-cert=", 0) == 0) {
+            config.tlsCertFile = arg.substr(11);
+            config.useTLS = true;
+        } else if (arg.rfind("--tls-key=", 0) == 0) {
+            config.tlsKeyFile = arg.substr(10);
+            config.useTLS = true;
+        } else if (arg.rfind("--tls-passphrase=", 0) == 0) {
+            config.tlsKeyPassphrase = arg.substr(17);
         } else {
             std::cerr << "Error: Unknown option '" << arg << "'" << std::endl;
             printUsage(argv[0]);

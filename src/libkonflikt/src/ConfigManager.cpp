@@ -27,6 +27,10 @@ struct ConfigJson
     bool lockCursorToScreen { false };
     int lockCursorHotkey { 107 };  // Default: Scroll Lock
     std::string uiPath;
+    bool useTLS { false };
+    std::string tlsCertFile;
+    std::string tlsKeyFile;
+    std::string tlsKeyPassphrase;
     bool verbose { false };
     std::string logFile;
 };
@@ -55,6 +59,10 @@ struct glz::meta<konflikt::ConfigJson>
         "lockCursorToScreen", &T::lockCursorToScreen,
         "lockCursorHotkey", &T::lockCursorHotkey,
         "uiPath", &T::uiPath,
+        "useTLS", &T::useTLS,
+        "tlsCertFile", &T::tlsCertFile,
+        "tlsKeyFile", &T::tlsKeyFile,
+        "tlsKeyPassphrase", &T::tlsKeyPassphrase,
         "verbose", &T::verbose,
         "logFile", &T::logFile);
 };
@@ -131,6 +139,10 @@ std::optional<Config> ConfigManager::load(const std::string &path)
     config.lockCursorToScreen = jsonConfig.lockCursorToScreen;
     config.lockCursorHotkey = static_cast<uint32_t>(jsonConfig.lockCursorHotkey);
     config.uiPath = jsonConfig.uiPath;
+    config.useTLS = jsonConfig.useTLS;
+    config.tlsCertFile = jsonConfig.tlsCertFile;
+    config.tlsKeyFile = jsonConfig.tlsKeyFile;
+    config.tlsKeyPassphrase = jsonConfig.tlsKeyPassphrase;
     config.verbose = jsonConfig.verbose;
     config.logFile = jsonConfig.logFile;
 
@@ -173,6 +185,10 @@ bool ConfigManager::save(const Config &config, const std::string &path)
     jsonConfig.lockCursorToScreen = config.lockCursorToScreen;
     jsonConfig.lockCursorHotkey = static_cast<int>(config.lockCursorHotkey);
     jsonConfig.uiPath = config.uiPath;
+    jsonConfig.useTLS = config.useTLS;
+    jsonConfig.tlsCertFile = config.tlsCertFile;
+    jsonConfig.tlsKeyFile = config.tlsKeyFile;
+    jsonConfig.tlsKeyPassphrase = config.tlsKeyPassphrase;
     jsonConfig.verbose = config.verbose;
     jsonConfig.logFile = config.logFile;
 

@@ -62,6 +62,12 @@ struct Config
     // UI settings
     std::string uiPath;      // Path to React UI files
 
+    // Security/TLS settings
+    bool useTLS { false };           // Enable WSS (WebSocket Secure)
+    std::string tlsCertFile;         // Path to TLS certificate file (PEM)
+    std::string tlsKeyFile;          // Path to TLS private key file (PEM)
+    std::string tlsKeyPassphrase;    // Passphrase for encrypted key (optional)
+
     // Logging
     bool verbose { false };
     std::string logFile;
