@@ -227,6 +227,8 @@ CLI presets:
 - `GET /api/status` - Instance status, connection info, client details
 - `GET /api/config` - Get current runtime configuration
 - `POST /api/config` - Update runtime config (JSON body with edgeLeft, edgeRight, edgeTop, edgeBottom, lockCursorToScreen, verbose, logKeycodes)
+- `POST /api/config/save` - Save current config to file
+- `GET /api/stats` - Input event statistics (totalEvents, mouseEvents, keyEvents, scrollEvents, eventsPerSecond)
 - `GET /api/cert` - Download server TLS certificate (if TLS enabled)
 - `GET /api/log` - Recent logs with key data filtered (if `enableDebugApi` enabled)
 

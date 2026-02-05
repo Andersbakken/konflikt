@@ -298,6 +298,20 @@ private:
     std::vector<LogEntry> mLogBuffer;
     static constexpr size_t MAX_LOG_ENTRIES = 500;
     mutable std::mutex mLogBufferMutex;
+
+    // Input event statistics
+    struct InputStats
+    {
+        uint64_t totalEvents { 0 };
+        uint64_t mouseEvents { 0 };
+        uint64_t keyEvents { 0 };
+        uint64_t scrollEvents { 0 };
+        uint64_t windowStartTime { 0 };
+        uint64_t eventsInWindow { 0 };
+        double eventsPerSecond { 0.0 };
+    };
+    InputStats mInputStats;
+    void updateInputStats(const std::string &eventType);
 };
 
 } // namespace konflikt

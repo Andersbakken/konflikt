@@ -11,6 +11,7 @@
 #include <filesystem>
 #include <fstream>
 #include <functional>
+#include <iomanip>
 #include <openssl/sha.h>
 #include <sstream>
 #include <thread>
@@ -349,6 +350,40 @@ bool Konflikt::init()
         return response;
     });
 
+    // API endpoint to save current config to file
+    mHttpServer->route("POST", "/api/config/save", [this](const HttpRequest &) {
+        HttpResponse response;
+        response.contentType = "application/json";
+
+        if (saveConfig()) {
+            response.body = "{\"success\":true,\"message\":\"Config saved\"}";
+        } else {
+            response.statusCode = 500;
+            response.statusMessage = "Internal Server Error";
+            response.body = "{\"success\":false,\"message\":\"Failed to save config\"}";
+        }
+
+        return response;
+    });
+
+    // API endpoint for input event statistics
+    mHttpServer->route("GET", "/api/stats", [this](const HttpRequest &) {
+        HttpResponse response;
+        response.contentType = "application/json";
+
+        std::stringstream ss;
+        ss << "{";
+        ss << "\"totalEvents\":" << mInputStats.totalEvents << ",";
+        ss << "\"mouseEvents\":" << mInputStats.mouseEvents << ",";
+        ss << "\"keyEvents\":" << mInputStats.keyEvents << ",";
+        ss << "\"scrollEvents\":" << mInputStats.scrollEvents << ",";
+        ss << "\"eventsPerSecond\":" << std::fixed << std::setprecision(1) << mInputStats.eventsPerSecond;
+        ss << "}";
+
+        response.body = ss.str();
+        return response;
+    });
+
     // Set up platform event handler for server role
     if (mConfig.role == InstanceRole::Server) {
         mLayoutManager = std::make_unique<LayoutManager>();
@@ -552,6 +587,34 @@ uint32_t Konflikt::remapKeycode(uint32_t keycode) const
         return it->second;
     }
     return keycode;
+}
+
+void Konflikt::updateInputStats(const std::string &eventType)
+{
+    mInputStats.totalEvents++;
+
+    if (eventType == "mouseMove" || eventType == "mousePress" || eventType == "mouseRelease") {
+        mInputStats.mouseEvents++;
+    } else if (eventType == "keyPress" || eventType == "keyRelease") {
+        mInputStats.keyEvents++;
+    } else if (eventType == "scroll") {
+        mInputStats.scrollEvents++;
+    }
+
+    // Calculate events per second over a 1-second window
+    uint64_t now = timestamp();
+    if (mInputStats.windowStartTime == 0) {
+        mInputStats.windowStartTime = now;
+    }
+
+    mInputStats.eventsInWindow++;
+
+    uint64_t elapsed = now - mInputStats.windowStartTime;
+    if (elapsed >= 1000) {
+        mInputStats.eventsPerSecond = static_cast<double>(mInputStats.eventsInWindow) * 1000.0 / static_cast<double>(elapsed);
+        mInputStats.windowStartTime = now;
+        mInputStats.eventsInWindow = 0;
+    }
 }
 
 void Konflikt::onPlatformEvent(const Event &event)
@@ -1083,6 +1146,8 @@ void Konflikt::requestDeactivation()
 
 void Konflikt::broadcastInputEvent(const std::string &eventType, const InputEventData &data)
 {
+    updateInputStats(eventType);
+
     InputEventMessage msg;
     msg.sourceInstanceId = mConfig.instanceId;
     msg.sourceDisplayId = mDisplayId;
