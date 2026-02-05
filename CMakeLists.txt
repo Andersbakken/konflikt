@@ -6,10 +6,10 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-# Output directories
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/dist)
-set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/dist)
-set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/dist)
+# Output directories (use binary dir for out-of-source builds)
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/dist)
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/dist)
+set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/dist)
 
 # Options
 option(BUILD_MACOS_APP "Build macOS application" OFF)
@@ -82,16 +82,47 @@ if(BUILD_MACOS_APP AND APPLE)
 endif()
 
 # ============================================================================
-# React UI build
+# React UI build (out-of-source)
 # ============================================================================
 
 if(BUILD_UI)
-    # Check if npm is available
     find_program(NPM_EXECUTABLE npm)
     if(NPM_EXECUTABLE)
+        set(UI_SOURCE_DIR ${CMAKE_SOURCE_DIR}/src/webpage)
+        set(UI_BUILD_DIR ${CMAKE_BINARY_DIR}/webpage)
+        set(UI_OUTPUT_DIR ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/ui)
+
+        # Create build directory and symlinks/copies of source files
+        file(MAKE_DIRECTORY ${UI_BUILD_DIR})
+
+        # Symlink source directory (contains actual code)
+        if(NOT EXISTS ${UI_BUILD_DIR}/src)
+            file(CREATE_LINK ${UI_SOURCE_DIR}/src ${UI_BUILD_DIR}/src SYMBOLIC)
+        endif()
+
+        # Copy files that vite needs in the build directory
+        # (index.html must be copied, not symlinked, for vite's output path handling)
+        configure_file(${UI_SOURCE_DIR}/index.html ${UI_BUILD_DIR}/index.html COPYONLY)
+        configure_file(${UI_SOURCE_DIR}/tsconfig.json ${UI_BUILD_DIR}/tsconfig.json COPYONLY)
+        configure_file(${UI_SOURCE_DIR}/vite.config.ts ${UI_BUILD_DIR}/vite.config.ts COPYONLY)
+        configure_file(${UI_SOURCE_DIR}/package.json ${UI_BUILD_DIR}/package.json COPYONLY)
+        configure_file(${UI_SOURCE_DIR}/package-lock.json ${UI_BUILD_DIR}/package-lock.json COPYONLY)
+
+        # npm install target - only runs if node_modules doesn't exist
+        add_custom_command(
+            OUTPUT ${UI_BUILD_DIR}/node_modules/.package-lock.json
+            COMMAND ${NPM_EXECUTABLE} ci
+            WORKING_DIRECTORY ${UI_BUILD_DIR}
+            DEPENDS ${UI_BUILD_DIR}/package.json ${UI_BUILD_DIR}/package-lock.json
+            COMMENT "Installing npm dependencies"
+            VERBATIM
+        )
+
+        # Build target - depends on npm install
         add_custom_target(ui ALL
-            COMMAND ${NPM_EXECUTABLE} run build
-            WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/src/webpage
+            COMMAND ${NPM_EXECUTABLE} run build -- --outDir ${UI_OUTPUT_DIR} --emptyOutDir
+            WORKING_DIRECTORY ${UI_BUILD_DIR}
+            DEPENDS ${UI_BUILD_DIR}/node_modules/.package-lock.json
             COMMENT "Building React UI"
             VERBATIM
         )
