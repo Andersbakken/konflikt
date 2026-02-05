@@ -621,6 +621,11 @@ bool Konflikt::checkScreenTransition(int32_t x, int32_t y)
         return false;
     }
 
+    // Check if cursor is locked to screen
+    if (mConfig.lockCursorToScreen) {
+        return false;
+    }
+
     // Cooldown after deactivation
     if (timestamp() - mLastDeactivationTime < 500) {
         return false;
@@ -874,6 +879,12 @@ void Konflikt::notifyShutdown(const std::string &reason, int32_t delayMs)
 
     broadcastToClients(toJson(message));
     log("log", "Sent shutdown notification to clients: " + reason);
+}
+
+void Konflikt::setLockCursorToScreen(bool locked)
+{
+    mConfig.lockCursorToScreen = locked;
+    log("log", locked ? "Cursor locked to screen" : "Cursor unlocked");
 }
 
 void Konflikt::checkClipboardChange()

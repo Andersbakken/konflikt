@@ -52,6 +52,9 @@ struct Config
     bool edgeTop { true };
     bool edgeBottom { true };
 
+    // Lock cursor to current screen (disable transitions)
+    bool lockCursorToScreen { false };
+
     // UI settings
     std::string uiPath;      // Path to React UI files
 
@@ -100,6 +103,10 @@ public:
 
     /// Notify clients of graceful shutdown (server only)
     void notifyShutdown(const std::string &reason = "shutdown", int32_t delayMs = 0);
+
+    /// Lock/unlock cursor to current screen
+    void setLockCursorToScreen(bool locked);
+    bool isLockCursorToScreen() const { return mConfig.lockCursorToScreen; }
 
     /// Get current configuration
     const Config &config() const { return mConfig; }

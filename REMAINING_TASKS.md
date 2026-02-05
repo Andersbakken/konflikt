@@ -99,7 +99,7 @@ The native C++ rewrite is largely functional. The macOS Swift app builds and run
 - [ ] Drag & drop file transfer
 - [x] Screen edge switching configuration (edgeLeft/Right/Top/Bottom in config)
 - [ ] Multi-monitor awareness (per-display screen edges)
-- [ ] Lock cursor to screen option
+- [x] Lock cursor to screen option (lockCursorToScreen config + setLockCursorToScreen API)
 
 #### 9. Packaging & Distribution
 - [ ] Linux: Create .deb package
@@ -157,6 +157,7 @@ Example config:
   "edgeRight": true,
   "edgeTop": true,
   "edgeBottom": true,
+  "lockCursorToScreen": false,
   "verbose": false
 }
 ```

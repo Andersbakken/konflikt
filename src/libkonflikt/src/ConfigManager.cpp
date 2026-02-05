@@ -24,6 +24,7 @@ struct ConfigJson
     bool edgeRight { true };
     bool edgeTop { true };
     bool edgeBottom { true };
+    bool lockCursorToScreen { false };
     std::string uiPath;
     bool verbose { false };
     std::string logFile;
@@ -50,6 +51,7 @@ struct glz::meta<konflikt::ConfigJson>
         "edgeRight", &T::edgeRight,
         "edgeTop", &T::edgeTop,
         "edgeBottom", &T::edgeBottom,
+        "lockCursorToScreen", &T::lockCursorToScreen,
         "uiPath", &T::uiPath,
         "verbose", &T::verbose,
         "logFile", &T::logFile);
@@ -124,6 +126,7 @@ std::optional<Config> ConfigManager::load(const std::string &path)
     config.edgeRight = jsonConfig.edgeRight;
     config.edgeTop = jsonConfig.edgeTop;
     config.edgeBottom = jsonConfig.edgeBottom;
+    config.lockCursorToScreen = jsonConfig.lockCursorToScreen;
     config.uiPath = jsonConfig.uiPath;
     config.verbose = jsonConfig.verbose;
     config.logFile = jsonConfig.logFile;
@@ -164,6 +167,7 @@ bool ConfigManager::save(const Config &config, const std::string &path)
     jsonConfig.edgeRight = config.edgeRight;
     jsonConfig.edgeTop = config.edgeTop;
     jsonConfig.edgeBottom = config.edgeBottom;
+    jsonConfig.lockCursorToScreen = config.lockCursorToScreen;
     jsonConfig.uiPath = config.uiPath;
     jsonConfig.verbose = config.verbose;
     jsonConfig.logFile = config.logFile;
