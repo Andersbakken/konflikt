@@ -1,5 +1,6 @@
 // Konflikt Linux CLI Application
 
+#include <konflikt/ConfigManager.h>
 #include <konflikt/Konflikt.h>
 
 #include <csignal>
@@ -22,16 +23,19 @@ void signalHandler(int signal)
     std::exit(signal == SIGINT ? 0 : 1);
 }
 
+static const char *VERSION = "2.0.0";
+
 void printUsage(const char *programName)
 {
-    std::cout << "Konflikt - Software KVM Switch\n"
+    std::cout << "Konflikt - Software KVM Switch v" << VERSION << "\n"
               << "\n"
               << "Usage: " << programName << " [OPTIONS]\n"
               << "\n"
               << "Options:\n"
               << "  --role=server|client  Run as server or client (default: server)\n"
-              << "  --server=HOST         Server hostname (required for client mode)\n"
+              << "  --server=HOST         Server hostname (client auto-discovers if not set)\n"
               << "  --port=PORT           Port to use (default: 3000)\n"
+              << "  --config=PATH         Path to config file\n"
               << "  --ui-dir=PATH         Directory containing UI files\n"
               << "  --name=NAME           Display name for this machine\n"
               << "  --no-edge-left        Disable left edge screen transition\n"
@@ -40,7 +44,16 @@ void printUsage(const char *programName)
               << "  --no-edge-bottom      Disable bottom edge screen transition\n"
               << "  --lock-cursor         Lock cursor to current screen\n"
               << "  --verbose             Enable verbose logging\n"
+              << "  -v, --version         Show version information\n"
               << "  -h, --help            Show this help message\n"
+              << std::endl;
+}
+
+void printVersion()
+{
+    std::cout << "Konflikt v" << VERSION << "\n"
+              << "Software KVM Switch for Linux and macOS\n"
+              << "https://github.com/Andersbakken/konflikt\n"
               << std::endl;
 }
 
@@ -67,20 +80,50 @@ std::string getDefaultUiDir()
 
 int main(int argc, char *argv[])
 {
-    // Default configuration
-    konflikt::Config config;
-    config.role = konflikt::InstanceRole::Server;
-    config.port = 3000;
-    config.instanceName = "Linux";
-    config.uiPath = getDefaultUiDir();
+    std::string configPath;
+    bool explicitRole = false;
 
-    // Parse command line arguments
+    // First pass: check for --config, --help, --version
     for (int i = 1; i < argc; i++) {
         std::string arg = argv[i];
-
         if (arg == "-h" || arg == "--help") {
             printUsage(argv[0]);
             return 0;
+        } else if (arg == "-v" || arg == "--version") {
+            printVersion();
+            return 0;
+        } else if (arg.rfind("--config=", 0) == 0) {
+            configPath = arg.substr(9);
+        } else if (arg.rfind("--role=", 0) == 0) {
+            explicitRole = true;
+        }
+    }
+
+    // Load config from file (if exists)
+    konflikt::Config config;
+    auto fileConfig = konflikt::ConfigManager::load(configPath);
+    if (fileConfig) {
+        config = *fileConfig;
+        std::cout << "Loaded config from " <<
+            (configPath.empty() ? konflikt::ConfigManager::getDefaultConfigPath() : configPath) << std::endl;
+    }
+
+    // Set defaults for anything not in config
+    if (config.instanceName.empty()) {
+        config.instanceName = "Linux";
+    }
+    if (config.uiPath.empty()) {
+        config.uiPath = getDefaultUiDir();
+    }
+
+    // Parse command line arguments (override config file)
+    for (int i = 1; i < argc; i++) {
+        std::string arg = argv[i];
+
+        if (arg == "-h" || arg == "--help" || arg == "-v" || arg == "--version") {
+            continue; // Already handled
+        } else if (arg.rfind("--config=", 0) == 0) {
+            continue; // Already handled
         } else if (arg == "--verbose") {
             config.verbose = true;
         } else if (arg.rfind("--role=", 0) == 0) {
@@ -120,11 +163,7 @@ int main(int argc, char *argv[])
         }
     }
 
-    // Validate configuration
-    if (config.role == konflikt::InstanceRole::Client && config.serverHost.empty()) {
-        std::cerr << "Error: --server=HOST is required for client mode" << std::endl;
-        return 1;
-    }
+    // Note: Clients without --server will use auto-discovery via mDNS
 
     // Create Konflikt instance
     konflikt::Konflikt konflikt(config);
@@ -164,7 +203,11 @@ int main(int argc, char *argv[])
             std::cout << "UI available at http://localhost:" << konflikt.httpPort() << "/ui/" << std::endl;
         }
     } else {
-        std::cout << "Connecting to " << config.serverHost << ":" << config.serverPort << std::endl;
+        if (config.serverHost.empty()) {
+            std::cout << "Looking for servers via auto-discovery..." << std::endl;
+        } else {
+            std::cout << "Connecting to " << config.serverHost << ":" << config.serverPort << std::endl;
+        }
     }
 
     std::cout << "Press Ctrl+C to exit" << std::endl;
