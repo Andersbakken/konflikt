@@ -246,16 +246,57 @@ public:
 
     bool isCursorVisible() const override { return mCursorVisible; }
 
-    std::string getClipboardText(ClipboardSelection /*selection*/) const override
+    std::string getClipboardText(ClipboardSelection selection) const override
     {
-        // TODO: Implement X11 clipboard
-        return "";
+        // Use xclip or xsel to get clipboard content
+        // xclip is more common, xsel is a fallback
+        const char *selArg = (selection == ClipboardSelection::Primary) ? "-selection primary" : "-selection clipboard";
+
+        // Try xclip first
+        std::string cmd = std::string("xclip -o ") + selArg + " 2>/dev/null";
+        FILE *pipe = popen(cmd.c_str(), "r");
+        if (!pipe) {
+            // Try xsel as fallback
+            selArg = (selection == ClipboardSelection::Primary) ? "--primary" : "--clipboard";
+            cmd = std::string("xsel -o ") + selArg + " 2>/dev/null";
+            pipe = popen(cmd.c_str(), "r");
+            if (!pipe) {
+                return "";
+            }
+        }
+
+        std::string result;
+        char buffer[1024];
+        while (fgets(buffer, sizeof(buffer), pipe)) {
+            result += buffer;
+        }
+        pclose(pipe);
+
+        return result;
     }
 
-    bool setClipboardText(const std::string & /*text*/, ClipboardSelection /*selection*/) override
+    bool setClipboardText(const std::string &text, ClipboardSelection selection) override
     {
-        // TODO: Implement X11 clipboard
-        return false;
+        // Use xclip or xsel to set clipboard content
+        const char *selArg = (selection == ClipboardSelection::Primary) ? "-selection primary" : "-selection clipboard";
+
+        // Try xclip first
+        std::string cmd = std::string("xclip -i ") + selArg + " 2>/dev/null";
+        FILE *pipe = popen(cmd.c_str(), "w");
+        if (!pipe) {
+            // Try xsel as fallback
+            selArg = (selection == ClipboardSelection::Primary) ? "--primary --input" : "--clipboard --input";
+            cmd = std::string("xsel ") + selArg + " 2>/dev/null";
+            pipe = popen(cmd.c_str(), "w");
+            if (!pipe) {
+                return false;
+            }
+        }
+
+        size_t written = fwrite(text.c_str(), 1, text.size(), pipe);
+        int status = pclose(pipe);
+
+        return written == text.size() && status == 0;
     }
 
 private:

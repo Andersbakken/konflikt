@@ -28,7 +28,7 @@ The native C++ rewrite is largely functional. The macOS Swift app builds and run
   - Input injection via XTest (including scroll wheel)
   - Display enumeration via RandR
   - Cursor show/hide via pointer grab
-  - Clipboard text (basic)
+  - Clipboard text via xclip/xsel (both primary and clipboard selection)
   - Service discovery via Avahi (when available)
 - [x] macOS (CoreGraphics) - PlatformMac.mm
   - Input capture via CGEventTap (including scroll wheel)
