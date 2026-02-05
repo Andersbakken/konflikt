@@ -1,322 +1,453 @@
 # Konflikt Architecture
 
-This document describes the architecture of Konflikt, a cross-platform KVM (Keyboard, Video, Mouse) switch application that allows sharing input devices across multiple machines.
+This document describes the architecture of Konflikt, a cross-platform KVM (Keyboard, Video, Mouse) switch application. The native C++ implementation eliminates the Node.js dependency.
 
 ## Overview
 
 Konflikt uses a **server-client model** where:
 
-- **Server**: Captures input events and manages the screen layout for all connected clients
-- **Clients**: Receive layout assignments from the server and execute forwarded input events
+- **Server**: Captures input events, manages screen layout, and forwards input to clients
+- **Clients**: Receive layout assignments and execute forwarded input events
+
+## High-Level Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                     libkonflikt (C++ Static Library)            │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐             │
+│  │  Protocol   │  │  WebSocket  │  │    HTTP     │             │
+│  │   (Glaze)   │  │   Server    │  │   Server    │             │
+│  │             │  │ (uWebSockets)│  │ (uWebSockets)│            │
+│  └─────────────┘  └─────────────┘  └─────────────┘             │
+│                                                                 │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐             │
+│  │  WebSocket  │  │   Layout    │  │   Konflikt  │             │
+│  │   Client    │  │   Manager   │  │  (Main API) │             │
+│  │  (uSockets) │  │             │  │             │             │
+│  └─────────────┘  └─────────────┘  └─────────────┘             │
+│                                                                 │
+│  ┌─────────────────────────────────────────────────┐           │
+│  │              IPlatform Interface                 │           │
+│  │  - Input capture & injection                     │           │
+│  │  - Display enumeration                           │           │
+│  │  - Cursor visibility                             │           │
+│  │  - Clipboard access                              │           │
+│  └─────────────────────────────────────────────────┘           │
+│                                                                 │
+└───────────────────────┬─────────────────────┬───────────────────┘
+                        │                     │
+            ┌───────────▼───────────┐ ┌───────▼───────────┐
+            │  PlatformMac.mm       │ │ PlatformLinux.cpp │
+            │  (CoreGraphics)       │ │ (X11/XCB)         │
+            │                       │ │                   │
+            │  - CGEventTap         │ │ - XInput2         │
+            │  - CGEventPost        │ │ - XTest           │
+            │  - CGDisplay*         │ │ - RandR           │
+            │  - NSPasteboard       │ │ - XCB clipboard   │
+            └───────────────────────┘ └───────────────────┘
+                        │                     │
+            ┌───────────▼───────────┐ ┌───────▼───────────┐
+            │   macOS App (Swift)   │ │  Linux App (C++)  │
+            │                       │ │                   │
+            │  ┌─────────────────┐  │ │  ┌─────────────┐  │
+            │  │ KonfliktBridge  │  │ │  │   main.cpp  │  │
+            │  │   (ObjC++)      │  │ │  │   (CLI)     │  │
+            │  └────────┬────────┘  │ │  └─────────────┘  │
+            │           │           │ │                   │
+            │  ┌────────▼────────┐  │ │                   │
+            │  │  Swift App      │  │ │                   │
+            │  │  (Menu Bar)     │  │ │                   │
+            │  └─────────────────┘  │ │                   │
+            └───────────────────────┘ └───────────────────┘
+```
 
 ## Directory Structure
 
 ```
 konflikt/
+├── CMakeLists.txt                 # Top-level CMake
+├── BUILDING.md                    # Build instructions
+├── ARCHITECTURE.md                # This file
+├── REMAINING_TASKS.md             # Task tracking
+│
 ├── src/
-│   ├── app/           # Main application TypeScript code
-│   ├── native/        # Native C++ addon + TypeScript bindings
-│   └── webpage/       # React UI (separate build)
-├── dist/
-│   ├── app/           # Compiled application JS
-│   ├── native/        # Compiled native modules (Debug/Release)
-│   └── ui/            # Built React app (served statically)
-└── bin/
-    └── konflikt       # Symlink to dist/app/index.js
+│   ├── libkonflikt/               # Core C++ library
+│   │   ├── CMakeLists.txt
+│   │   ├── include/konflikt/      # Public headers
+│   │   │   ├── Konflikt.h         # Main API class
+│   │   │   ├── Platform.h         # Platform abstraction
+│   │   │   ├── Protocol.h         # Message definitions
+│   │   │   ├── WebSocketServer.h
+│   │   │   ├── WebSocketClient.h
+│   │   │   ├── HttpServer.h
+│   │   │   ├── LayoutManager.h
+│   │   │   ├── Rect.h
+│   │   │   └── KonfliktAll.h      # Convenience include
+│   │   └── src/
+│   │       ├── Konflikt.cpp       # Main logic
+│   │       ├── Protocol.cpp
+│   │       ├── WebSocketServer.cpp
+│   │       ├── WebSocketClient.cpp
+│   │       ├── HttpServer.cpp
+│   │       ├── LayoutManager.cpp
+│   │       ├── Rect.cpp
+│   │       ├── PlatformLinux.cpp  # Linux implementation
+│   │       ├── PlatformMac.mm     # macOS implementation
+│   │       ├── ServiceDiscoveryLinux.cpp  # Stub (TODO)
+│   │       └── ServiceDiscoveryMac.mm     # Stub (TODO)
+│   │
+│   ├── app/                       # Linux CLI application
+│   │   ├── CMakeLists.txt
+│   │   └── main.cpp
+│   │
+│   ├── macos/                     # macOS Swift application
+│   │   ├── CMakeLists.txt
+│   │   ├── Info.plist.in
+│   │   ├── KonfliktBridge/        # ObjC++ bridge
+│   │   │   ├── KonfliktBridge.h
+│   │   │   └── KonfliktBridge.mm
+│   │   └── Konflikt/              # Swift sources
+│   │       ├── main.swift
+│   │       ├── AppDelegate.swift
+│   │       ├── StatusBarController.swift
+│   │       └── Konflikt-Bridging-Header.h
+│   │
+│   ├── webpage/                   # React UI (unchanged)
+│   │   └── ...
+│   │
+│   └── native/                    # Legacy native code (reference)
+│       └── ...
+│
+├── third_party/
+│   ├── uWebSockets/               # WebSocket/HTTP (submodule)
+│   ├── uSockets/                  # Low-level sockets (submodule)
+│   └── glaze/                     # JSON serialization (submodule)
+│
+├── build/                         # CMake build directory
+│   └── bin/konflikt               # Linux executable
+│
+└── dist/
+    └── ui/                        # Built React UI
 ```
 
 ## Core Components
 
-### 1. Native Module (`src/native/`)
+### libkonflikt (C++ Static Library)
 
-The native addon provides platform-specific functionality:
+The shared library containing all core functionality.
 
-- **KonfliktNative.cpp/h**: Core native implementation
-- **KonfliktNativeMac.mm**: macOS-specific input capture
-- **KonfliktNativeLinux.cpp**: Linux input handling
-- **KonfliktNativeX11.cpp**: X11 display server support
-- **KonfliktNativeWayland.cpp**: Wayland display server support
+#### Konflikt.h / Konflikt.cpp
 
-TypeScript bindings:
+Main application class that coordinates everything:
 
-- **native.ts**: Loads the compiled `.node` module
-- **createNativeLogger.ts**: Creates logger callbacks for native code
-- **KonfliktNative.d.ts**: Type definitions for native interface
+```cpp
+class Konflikt {
+    bool init();           // Initialize platform, start servers
+    void run();            // Main event loop (blocking)
+    void stop();           // Clean shutdown
+    void quit();           // Signal to stop running
 
-### 2. Main Application (`src/app/`)
+    // Callbacks
+    void setStatusCallback(StatusCallback);
+    void setLogCallback(LogCallback);
+};
 
-#### Entry Point
-
-- **index.ts**: CLI entry point, parses args, loads config, starts main
-- **main.ts**: Creates and initializes Konflikt instance
-
-#### Core Classes
-
-**Konflikt.ts** - Main application orchestrator
-
-- Manages role (server/client)
-- Creates Server, PeerManager, LayoutManager
-- Handles input events and message routing
-- Coordinates screen transitions
-
-**Server.ts** - HTTP/WebSocket server using Fastify
-
-- Serves REST API at `/api/*`
-- Serves React UI at `/ui/`
-- Manages WebSocket connections at `/ws`
-- Handles service discovery (mDNS)
-
-**LayoutManager.ts** - Server-side screen layout management
-
-- Tracks all screens (server + clients)
-- Auto-arranges new clients (places right of existing)
-- Calculates adjacency relationships
-- Persists layout to `~/.config/konflikt/layout.json`
-- Emits `layoutChanged` events
-
-**PeerManager.ts** - Client-side connection management
-
-- Manages WebSocket connections to servers
-- Handles handshake and reconnection
-- Broadcasts messages to all connected peers
-
-**WebSocketClient.ts** - Individual WebSocket connection
-
-- Handles connection lifecycle
-- Manages handshake protocol
-- Sends/receives messages
-
-#### Configuration
-
-**Config.ts** - Configuration manager using convict
-
-- Loads from file, CLI args, environment
-- Validates and provides typed access
-
-**configSchema.ts** - Configuration schema definition
-
-- Instance settings (id, name, role)
-- Network settings (port, host, discovery)
-- Screen settings (position, dimensions)
-- Input settings (capture, forwarding)
-
-### 3. Message Protocol
-
-#### Registration Flow
-
-1. Client connects via WebSocket
-2. Client sends `HandshakeRequest` with screen geometry
-3. Server responds with `HandshakeResponse`
-4. Client sends `ClientRegistrationMessage`:
-    ```typescript
-    {
-      type: "client_registration",
-      instanceId: string,
-      displayName: string,
-      machineId: string,
-      screenWidth: number,
-      screenHeight: number
-    }
-    ```
-5. Server registers client in LayoutManager
-6. Server sends `LayoutAssignmentMessage`:
-    ```typescript
-    {
-      type: "layout_assignment",
-      position: { x: number, y: number },
-      adjacency: { left?, right?, top?, bottom?: string },
-      fullLayout: ScreenInfo[]
-    }
-    ```
-
-#### Layout Updates
-
-When layout changes, server broadcasts `LayoutUpdateMessage`:
-
-```typescript
-{
-  type: "layout_update",
-  screens: ScreenInfo[],
-  timestamp: number
-}
+struct Config {
+    InstanceRole role;     // Server or Client
+    std::string instanceId;
+    std::string instanceName;
+    int port;              // Server port (default 3000)
+    std::string serverHost; // For clients
+    int serverPort;
+    std::string uiPath;    // Path to React UI files
+    bool verbose;
+};
 ```
 
-#### Input Events
+#### Platform.h / PlatformLinux.cpp / PlatformMac.mm
 
-Input events are forwarded as `InputEventMessage`:
+Platform abstraction interface:
 
-```typescript
-{
-  type: "input_event",
-  sourceInstanceId: string,
-  eventType: "keyPress" | "keyRelease" | "mouseMove" | etc,
-  eventData: { x, y, timestamp, keyboardModifiers, mouseButtons, ... }
-}
+```cpp
+class IPlatform {
+    virtual bool initialize(const Logger &logger) = 0;
+    virtual void shutdown() = 0;
+    virtual InputState getState() const = 0;
+    virtual Desktop getDesktop() const = 0;
+    virtual void sendMouseEvent(const Event &event) = 0;
+    virtual void sendKeyEvent(const Event &event) = 0;
+    virtual void startListening() = 0;
+    virtual void stopListening() = 0;
+    virtual void showCursor() = 0;
+    virtual void hideCursor() = 0;
+    virtual bool isCursorVisible() const = 0;
+    virtual std::string getClipboardText(...) const = 0;
+    virtual bool setClipboardText(...) = 0;
+
+    std::function<void(const Event &)> onEvent;  // Event callback
+};
 ```
 
-### 4. REST API
+**Linux Implementation** (X11/XCB):
+- XInput2 for raw input capture
+- XTest for input injection
+- RandR for display enumeration
+- Pointer grab with blank cursor for hiding
 
-**Status & Config** (both roles):
+**macOS Implementation** (CoreGraphics):
+- CGEventTap for input capture
+- CGEventPost for input injection
+- CGDisplay APIs for display enumeration
+- CGDisplayShowCursor/HideCursor for cursor visibility
 
-- `GET /api/status` - Instance status (role, uptime, etc)
-- `GET /api/config` - Current configuration
-- `PUT /api/config` - Update configuration
+#### Protocol.h / Protocol.cpp
 
-**Layout** (server only):
+Message definitions with Glaze JSON serialization:
 
-- `GET /api/layout` - Get all screens
-- `PUT /api/layout` - Update entire layout
-- `PATCH /api/layout/:id` - Update single screen position
-- `DELETE /api/layout/:id` - Remove offline client
+```cpp
+// All messages have a "type" field
+struct HandshakeRequest {
+    std::string type = "handshake_request";
+    std::string instanceId;
+    std::string displayName;
+    // ...
+};
 
-### 5. React UI (`src/webpage/`)
+struct InputEventMessage {
+    std::string type = "input_event";
+    std::string sourceInstanceId;
+    std::string eventType;  // "mouseMove", "keyPress", etc.
+    InputEventData eventData;
+};
 
-Built with Vite + React, served from `/ui/`.
+// Glaze generates JSON serialization at compile time
+template<> struct glz::meta<InputEventMessage> { ... };
+```
 
-**Components:**
+#### WebSocketServer.h / WebSocketServer.cpp
 
-- **App.tsx**: Router, role detection
-- **LayoutEditor.tsx**: Drag-drop canvas (server)
-- **LayoutView.tsx**: Read-only layout display (client)
-- **ScreenRect.tsx**: Draggable screen rectangle
-- **SettingsForm.tsx**: Local config editor
-- **StatusBar.tsx**: Connection status
+Server for accepting client connections:
 
-**API Client:**
+```cpp
+class WebSocketServer {
+    void start(int port);
+    void stop();
+    void broadcast(const std::string &message);
+    void send(void *connection, const std::string &message);
 
-- **api/client.ts**: Typed fetch wrappers for REST API
+    // Callbacks
+    std::function<void(void *)> onConnect;
+    std::function<void(void *, const std::string &)> onMessage;
+    std::function<void(void *)> onDisconnect;
+};
+```
+
+Uses uWebSockets for the server implementation.
+
+#### WebSocketClient.h / WebSocketClient.cpp
+
+Client for connecting to servers:
+
+```cpp
+class WebSocketClient {
+    bool connect(const std::string &host, int port, const std::string &path);
+    void disconnect();
+    void send(const std::string &message);
+    void poll();
+
+    WebSocketClientCallbacks callbacks;  // onConnect, onMessage, etc.
+};
+```
+
+Custom implementation using uSockets directly (uWebSockets lacks client support).
+
+#### HttpServer.h / HttpServer.cpp
+
+Static file server for React UI:
+
+```cpp
+class HttpServer {
+    void setStaticPath(const std::string &prefix, const std::string &directory);
+    void route(const std::string &method, const std::string &path, RouteHandler);
+    void start();
+    void stop();
+};
+```
+
+#### LayoutManager.h / LayoutManager.cpp
+
+Manages screen arrangement:
+
+```cpp
+class LayoutManager {
+    void addScreen(const ScreenInfo &screen);
+    void removeScreen(const std::string &instanceId);
+    void updateScreenPosition(const std::string &id, int x, int y);
+    std::optional<std::string> getAdjacentScreen(const std::string &id, Edge edge);
+    std::vector<ScreenInfo> getAllScreens();
+};
+```
+
+### macOS Application
+
+#### KonfliktBridge (ObjC++)
+
+Objective-C++ wrapper for Swift compatibility:
+
+```objc
+@interface KonfliktConfig : NSObject
+@property (nonatomic) KonfliktRole role;
+@property (nonatomic, copy) NSString *instanceName;
+// ...
+@end
+
+@interface Konflikt : NSObject
+- (instancetype)initWithConfig:(KonfliktConfig *)config;
+- (BOOL)initialize;
+- (void)run;  // Call on background thread
+- (void)stop;
+- (void)quit;
+@end
+```
+
+#### Swift App
+
+Menu bar application:
+- `AppDelegate.swift` - App lifecycle, creates Konflikt instance
+- `StatusBarController.swift` - Status bar icon and menu
+
+### Linux Application
+
+CLI application (`main.cpp`):
+
+```bash
+konflikt [OPTIONS]
+  --role=server|client   Run as server or client
+  --server=HOST          Server hostname (client mode)
+  --port=PORT            Port (default 3000)
+  --ui-dir=PATH          React UI directory
+  --name=NAME            Display name
+  --verbose              Enable verbose logging
+```
+
+## Message Protocol
+
+### Message Types
+
+| Message | Direction | Purpose |
+|---------|-----------|---------|
+| `handshake_request` | Client → Server | Initial connection |
+| `handshake_response` | Server → Client | Connection accepted |
+| `input_event` | Bidirectional | Mouse/keyboard events |
+| `client_registration` | Server → All | New client joined |
+| `layout_assignment` | Server → Client | Screen position |
+| `layout_update` | Server → All | Layout changed |
+| `activate_client` | Server → Client | Switch to this screen |
+| `deactivation_request` | Client → Server | Return control |
+
+### Connection Flow
+
+```
+Client                          Server
+  |                               |
+  |--- WebSocket Connect -------->|
+  |                               |
+  |--- handshake_request -------->|
+  |<-- handshake_response --------|
+  |                               |
+  |<-- client_registration -------|  (broadcast to all)
+  |<-- layout_assignment ---------|
+  |                               |
+  |<-- input_event ---------------|  (when activated)
+  |--- deactivation_request ----->|  (cursor at edge)
+```
 
 ## Data Flow
 
-### Server Startup
+### Server Mode
 
 ```
-1. Load config
-2. Create Konflikt instance
-3. Create LayoutManager
-4. Start Fastify server
-5. Register API routes
-6. Serve static UI
-7. Advertise via mDNS
-8. Register server screen in layout
-9. Listen for input events
+┌──────────┐     ┌──────────┐     ┌──────────┐
+│ Platform │────▶│ Konflikt │────▶│ WebSocket│────▶ Clients
+│  Events  │     │  Logic   │     │  Server  │
+└──────────┘     └──────────┘     └──────────┘
+                       │
+                       ▼
+              ┌──────────────┐
+              │ HTTP Server  │────▶ React UI
+              └──────────────┘
 ```
 
-### Client Startup
+### Client Mode
 
 ```
-1. Load config
-2. Create Konflikt instance
-3. Start Fastify server (for local UI)
-4. Discover servers via mDNS
-5. Connect to server via WebSocket
-6. Complete handshake
-7. Send ClientRegistration
-8. Receive LayoutAssignment
-9. Update local screen position
+┌──────────┐     ┌──────────┐     ┌──────────┐
+│ WebSocket│────▶│ Konflikt │────▶│ Platform │
+│  Client  │     │  Logic   │     │  Inject  │
+└──────────┘     └──────────┘     └──────────┘
 ```
 
-### Layout Change
+## Screen Transition Logic
 
-```
-1. UI calls PUT /api/layout
-2. LayoutManager.updateLayout() called
-3. Positions updated, persisted to config
-4. "layoutChanged" event emitted
-5. LayoutUpdateMessage broadcast to all clients
-6. Clients update their local screen positions
-```
+1. Server captures mouse movement via `IPlatform`
+2. `Konflikt::checkScreenTransition()` checks if cursor is at screen edge
+3. If adjacent client exists:
+   - Hide local cursor (`platform->hideCursor()`)
+   - Send `activate_client` message to target
+   - Forward subsequent `input_event` messages to target
+4. Target client:
+   - Shows cursor (`platform->showCursor()`)
+   - Applies input events (`platform->sendMouseEvent/sendKeyEvent`)
+5. When cursor returns to edge:
+   - Client sends `deactivation_request`
+   - Server shows cursor, resumes local control
 
-## Key Types
+## Dependencies
 
-**ScreenEntry** (server-side):
-
-```typescript
-interface ScreenEntry {
-    instanceId: string;
-    displayName: string;
-    machineId: string;
-    x: number;
-    y: number;
-    width: number;
-    height: number;
-    isServer: boolean;
-    online: boolean;
-}
-```
-
-**ScreenInfo** (shared/transferred):
-
-```typescript
-interface ScreenInfo {
-    instanceId: string;
-    displayName: string;
-    x: number;
-    y: number;
-    width: number;
-    height: number;
-    isServer: boolean;
-    online: boolean;
-}
-```
-
-**Adjacency**:
-
-```typescript
-interface Adjacency {
-    left?: string; // instanceId of adjacent screen
-    right?: string;
-    top?: string;
-    bottom?: string;
-}
-```
+| Library | Purpose |
+|---------|---------|
+| uWebSockets | WebSocket server, HTTP server |
+| uSockets | Low-level networking (uWebSockets dep) |
+| Glaze | Compile-time JSON serialization (C++23) |
+| OpenSSL | SHA256 for instance ID generation |
+| XCB/X11 libs | Linux input/display |
+| CoreGraphics | macOS input/display |
 
 ## Build System
 
-**Scripts:**
+CMake-based with Ninja generator:
 
-- `npm run build` - Full build (lint + native + TS + UI)
-- `npm run build:ts` - TypeScript compilation only
-- `npm run build:ui` - React UI build only
-- `npm run build:native:all` - Debug + Release native builds
-- `npm run dev:ui` - Vite dev server with hot reload
+```bash
+mkdir build && cd build
+cmake .. -G Ninja -DCMAKE_BUILD_TYPE=Release
+ninja
+```
 
-**Output:**
+Options:
+- `BUILD_LINUX_APP` - Build Linux CLI (auto on Linux)
+- `BUILD_MACOS_APP` - Build macOS Swift app (auto on macOS)
+- `BUILD_UI` - Build React UI via npm
 
-- TypeScript compiles `src/app/` → `dist/app/`
-- TypeScript compiles `src/native/` → `dist/native/`
-- Native builds to `dist/native/Debug/` and `dist/native/Release/`
-- UI builds to `dist/ui/`
+Output:
+- `build/bin/konflikt` - Linux executable
+- `dist/libkonflikt.a` - Static library
+- `dist/ui/` - React UI (built separately)
 
-## Service Discovery
+## React UI
 
-Uses mDNS/Bonjour via `bonjour-service`:
+The UI is built separately with npm/Vite:
 
-- Service type: `_konflikt._tcp`
-- TXT records: `version`, `pid`, `started`, `role`
-- Clients discover servers automatically
-- Duplicate server detection (older server wins)
+```bash
+cd src/webpage
+npm install
+npm run build  # Output to dist/ui/
+```
 
-## Configuration Files
+Served by the HTTP server at `http://localhost:3000/ui/`
 
-**Runtime config** (searched in order):
-
-1. `--config` CLI argument
-2. `./konflikt.config.js`
-3. `./konflikt.config.json`
-4. `~/.config/konflikt/config.js`
-5. `~/.config/konflikt/config.json`
-
-**Layout persistence:**
-
-- `~/.config/konflikt/layout.json`
-- Stores client positions (not server)
-- Clients reconnect to saved positions
-
-## Future Considerations
-
-1. **WebSocket Updates**: Real-time layout sync in UI via WebSocket
-2. **Client mDNS removal**: Clients don't need to advertise (only servers)
-3. **Per-machine shortcuts**: Local hotkey configuration
-4. **Encryption**: TLS for WebSocket connections
-5. **Authentication**: Token-based client authentication
+Components:
+- Layout editor with drag-drop screen arrangement
+- Connection status
+- Settings panel
