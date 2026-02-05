@@ -78,6 +78,18 @@ struct KeyRemapDeleteJson
     int from;
 };
 
+// For GET /api/keyremap response
+struct KeyRemapEntryJson
+{
+    int from;
+    int to;
+};
+
+struct KeyRemapListJson
+{
+    std::vector<KeyRemapEntryJson> mappings;
+};
+
 struct LogEntryJson
 {
     std::string timestamp;
@@ -210,6 +222,20 @@ struct glz::meta<konflikt::KeyRemapDeleteJson>
 {
     using T = konflikt::KeyRemapDeleteJson;
     static constexpr auto value = object("from", &T::from);
+};
+
+template <>
+struct glz::meta<konflikt::KeyRemapEntryJson>
+{
+    using T = konflikt::KeyRemapEntryJson;
+    static constexpr auto value = object("from", &T::from, "to", &T::to);
+};
+
+template <>
+struct glz::meta<konflikt::KeyRemapListJson>
+{
+    using T = konflikt::KeyRemapListJson;
+    static constexpr auto value = object("mappings", &T::mappings);
 };
 
 template <>
@@ -695,6 +721,29 @@ bool Konflikt::init()
         response.body = "{\"success\":true,\"message\":\"Statistics reset\"}";
         log("log", "Statistics reset via API");
 
+        return response;
+    });
+
+    // API endpoint to get current key remaps
+    mHttpServer->route("GET", "/api/keyremap", [this](const HttpRequest &req) {
+        HttpResponse response;
+        response.contentType = "application/json";
+
+        KeyRemapListJson list;
+        for (const auto &[from, to] : mConfig.keyRemap) {
+            list.mappings.push_back({static_cast<int>(from), static_cast<int>(to)});
+        }
+
+        auto json = glz::write_json(list);
+        if (json) {
+            if (req.path.find("pretty") != std::string::npos) {
+                response.body = glz::prettify_json(*json);
+            } else {
+                response.body = *json;
+            }
+        } else {
+            response.body = "{\"mappings\":[]}";
+        }
         return response;
     });
 

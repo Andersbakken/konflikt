@@ -233,6 +233,7 @@ All endpoints support `?pretty` query parameter for formatted JSON output.
 - `POST /api/config/save` - Save current config to file
 - `GET /api/stats` - Input event statistics (totalEvents, mouseEvents, keyEvents, scrollEvents, eventsPerSecond, latency: lastMs/avgMs/maxMs/samples)
 - `POST /api/stats/reset` - Reset all statistics counters
+- `GET /api/keyremap` - Get current key remaps (returns `{"mappings":[{"from":55,"to":133},...]`)
 - `POST /api/keyremap` - Add key remap: `{"from": 55, "to": 133}` or use preset: `{"preset": "mac-to-linux"}`, `{"preset": "linux-to-mac"}`, `{"preset": "clear"}`
 - `DELETE /api/keyremap` - Remove key remap: `{"from": 55}`
 - `GET /api/cert` - Download server TLS certificate (if TLS enabled)
