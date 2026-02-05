@@ -87,6 +87,10 @@ struct WebSocketClient::Impl
     std::vector<char> receiveBuffer;
     bool handshakeComplete { false };
 
+    // Connection timeout tracking
+    std::chrono::steady_clock::time_point connectStartTime;
+    static constexpr int CONNECTION_TIMEOUT_MS = 10000; // 10 seconds
+
     // WebSocket frame helpers
     void sendFrame(uint8_t opcode, const char *data, size_t len)
     {
@@ -363,6 +367,7 @@ struct WebSocketClient::Impl
             state = WebSocketState::Connecting;
             handshakeComplete = false;
             receiveBuffer.clear();
+            connectStartTime = std::chrono::steady_clock::now();
 
             // Create event loop
             loop = us_create_loop(nullptr, [](struct us_loop_t *) {
@@ -430,6 +435,23 @@ struct WebSocketClient::Impl
                         const std::string &msg = outgoingMessages.front();
                         sendFrame(0x01, msg.c_str(), msg.size());
                         outgoingMessages.pop();
+                    }
+                }
+
+                // Check connection timeout (only during handshake phase)
+                if (state == WebSocketState::Connecting && !handshakeComplete) {
+                    auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
+                        std::chrono::steady_clock::now() - connectStartTime).count();
+
+                    if (elapsed > CONNECTION_TIMEOUT_MS) {
+                        state = WebSocketState::Error;
+                        if (callbacks.onError) {
+                            callbacks.onError("Connection timeout");
+                        }
+                        if (socket) {
+                            us_socket_close(0, socket, 0, nullptr);
+                        }
+                        break;
                     }
                 }
 

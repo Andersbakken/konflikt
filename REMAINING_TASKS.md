@@ -83,8 +83,8 @@ The native C++ rewrite is largely functional. The macOS Swift app builds and run
 
 #### 6. Error Handling Improvements
 - [x] Auto-reconnection logic for clients (DONE)
+- [x] Connection timeout handling (10 second timeout during handshake)
 - [ ] Handle server restart gracefully (notify clients)
-- [ ] Add connection timeout handling
 - [ ] Improve error messages and logging
 
 #### 7. Performance Optimization
