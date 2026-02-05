@@ -11,11 +11,59 @@
 #include <filesystem>
 #include <fstream>
 #include <functional>
+#include <glaze/json.hpp>
 #include <iomanip>
 #include <openssl/sha.h>
 #include <sstream>
 #include <thread>
 #include <unistd.h>
+
+namespace konflikt {
+
+// JSON response structs for API endpoints
+struct LatencyStatsJson
+{
+    double lastMs;
+    double avgMs;
+    double maxMs;
+    uint64_t samples;
+};
+
+struct StatsJson
+{
+    uint64_t totalEvents;
+    uint64_t mouseEvents;
+    uint64_t keyEvents;
+    uint64_t scrollEvents;
+    double eventsPerSecond;
+    LatencyStatsJson latency;
+};
+
+} // namespace konflikt
+
+template <>
+struct glz::meta<konflikt::LatencyStatsJson>
+{
+    using T = konflikt::LatencyStatsJson;
+    static constexpr auto value = object(
+        "lastMs", &T::lastMs,
+        "avgMs", &T::avgMs,
+        "maxMs", &T::maxMs,
+        "samples", &T::samples);
+};
+
+template <>
+struct glz::meta<konflikt::StatsJson>
+{
+    using T = konflikt::StatsJson;
+    static constexpr auto value = object(
+        "totalEvents", &T::totalEvents,
+        "mouseEvents", &T::mouseEvents,
+        "keyEvents", &T::keyEvents,
+        "scrollEvents", &T::scrollEvents,
+        "eventsPerSecond", &T::eventsPerSecond,
+        "latency", &T::latency);
+};
 
 namespace konflikt {
 
@@ -367,26 +415,35 @@ bool Konflikt::init()
     });
 
     // API endpoint for input event statistics
-    mHttpServer->route("GET", "/api/stats", [this](const HttpRequest &) {
+    mHttpServer->route("GET", "/api/stats", [this](const HttpRequest &req) {
         HttpResponse response;
         response.contentType = "application/json";
 
-        std::stringstream ss;
-        ss << std::fixed << std::setprecision(1);
-        ss << "{";
-        ss << "\"totalEvents\":" << mInputStats.totalEvents << ",";
-        ss << "\"mouseEvents\":" << mInputStats.mouseEvents << ",";
-        ss << "\"keyEvents\":" << mInputStats.keyEvents << ",";
-        ss << "\"scrollEvents\":" << mInputStats.scrollEvents << ",";
-        ss << "\"eventsPerSecond\":" << mInputStats.eventsPerSecond << ",";
-        ss << "\"latency\":{";
-        ss << "\"lastMs\":" << mInputStats.lastLatencyMs << ",";
-        ss << "\"avgMs\":" << mInputStats.avgLatencyMs << ",";
-        ss << "\"maxMs\":" << mInputStats.maxLatencyMs << ",";
-        ss << "\"samples\":" << mInputStats.latencySamples;
-        ss << "}}";
+        StatsJson stats {
+            mInputStats.totalEvents,
+            mInputStats.mouseEvents,
+            mInputStats.keyEvents,
+            mInputStats.scrollEvents,
+            mInputStats.eventsPerSecond,
+            {
+                mInputStats.lastLatencyMs,
+                mInputStats.avgLatencyMs,
+                mInputStats.maxLatencyMs,
+                mInputStats.latencySamples
+            }
+        };
 
-        response.body = ss.str();
+        auto json = glz::write_json(stats);
+        if (json) {
+            // Check if pretty printing requested via query param ?pretty
+            if (req.path.find("pretty") != std::string::npos) {
+                response.body = glz::prettify_json(*json);
+            } else {
+                response.body = *json;
+            }
+        } else {
+            response.body = "{}";
+        }
         return response;
     });
 
