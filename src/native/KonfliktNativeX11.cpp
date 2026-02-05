@@ -329,15 +329,14 @@ public:
             // but the cursor image is still the grabbed cursor (blank)
             xcb_grab_pointer_cookie_t cookie = xcb_grab_pointer(
                 mConnection,
-                1,  // owner_events: true - events reported normally, but cursor is blank
+                1, // owner_events: true - events reported normally, but cursor is blank
                 mScreen->root,
                 XCB_EVENT_MASK_POINTER_MOTION | XCB_EVENT_MASK_BUTTON_PRESS | XCB_EVENT_MASK_BUTTON_RELEASE,
-                XCB_GRAB_MODE_ASYNC,  // pointer_mode
-                XCB_GRAB_MODE_ASYNC,  // keyboard_mode
-                XCB_NONE,             // confine_to: don't confine
-                mBlankCursor,         // cursor: blank cursor
-                XCB_CURRENT_TIME
-            );
+                XCB_GRAB_MODE_ASYNC, // pointer_mode
+                XCB_GRAB_MODE_ASYNC, // keyboard_mode
+                XCB_NONE,            // confine_to: don't confine
+                mBlankCursor,        // cursor: blank cursor
+                XCB_CURRENT_TIME);
 
             xcb_grab_pointer_reply_t *reply = xcb_grab_pointer_reply(mConnection, cookie, nullptr);
             if (reply) {

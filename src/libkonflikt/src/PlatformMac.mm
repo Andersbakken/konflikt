@@ -1,6 +1,8 @@
+// macOS platform implementation
+
 #ifdef __APPLE__
 
-#include "KonfliktNative.h"
+#include "konflikt/Platform.h"
 
 #include <ApplicationServices/ApplicationServices.h>
 #include <Carbon/Carbon.h>
@@ -12,13 +14,14 @@
 
 namespace konflikt {
 
-class MacOSHook : public IPlatformHook
+class MacOSPlatform : public IPlatform
 {
 public:
-    MacOSHook() = default;
-    ~MacOSHook() override = default;
+    MacOSPlatform() = default;
 
-    virtual bool initialize(const Logger &logger) override
+    ~MacOSPlatform() override { shutdown(); }
+
+    bool initialize(const Logger &logger) override
     {
         mLogger = logger;
         mEventTap = nullptr;
@@ -36,7 +39,7 @@ public:
         return true;
     }
 
-    virtual void shutdown() override
+    void shutdown() override
     {
         stopListening();
 
@@ -44,9 +47,9 @@ public:
         CGDisplayRemoveReconfigurationCallback(displayConfigurationCallback, this);
     }
 
-    virtual State getState() const override
+    InputState getState() const override
     {
-        State state {};
+        InputState state {};
 
         // Get mouse position
         CGEventRef event = CGEventCreate(nullptr);
@@ -71,7 +74,6 @@ public:
         CGEventFlags flags = CGEventSourceFlagsState(kCGEventSourceStateHIDSystemState);
 
         if (flags & kCGEventFlagMaskShift) {
-            // Note: Can't distinguish left/right shift easily
             state.keyboardModifiers |= toUInt32(KeyboardModifier::LeftShift);
         }
         if (flags & kCGEventFlagMaskControl) {
@@ -90,13 +92,13 @@ public:
         return state;
     }
 
-    virtual Desktop getDesktop() const override
+    Desktop getDesktop() const override
     {
         std::lock_guard<std::mutex> lock(mDesktopMutex);
         return mCurrentDesktop;
     }
 
-    virtual void sendMouseEvent(const Event &event) override
+    void sendMouseEvent(const Event &event) override
     {
         CGPoint pos = CGPointMake(event.state.x, event.state.y);
         CGEventSourceRef source = CGEventSourceCreate(kCGEventSourceStateHIDSystemState);
@@ -175,7 +177,7 @@ public:
         CFRelease(source);
     }
 
-    virtual void sendKeyEvent(const Event &event) override
+    void sendKeyEvent(const Event &event) override
     {
         CGEventSourceRef source = CGEventSourceCreate(kCGEventSourceStateHIDSystemState);
 
@@ -190,7 +192,7 @@ public:
         CFRelease(source);
     }
 
-    virtual void startListening() override
+    void startListening() override
     {
         if (mIsRunning) {
             return;
@@ -204,7 +206,7 @@ public:
         });
     }
 
-    virtual void stopListening() override
+    void stopListening() override
     {
         if (!mIsRunning) {
             return;
@@ -232,7 +234,7 @@ public:
         }
     }
 
-    virtual void showCursor() override
+    void showCursor() override
     {
         if (mCursorVisible) {
             return;
@@ -242,7 +244,7 @@ public:
         mCursorVisible = true;
     }
 
-    virtual void hideCursor() override
+    void hideCursor() override
     {
         if (!mCursorVisible) {
             return;
@@ -252,16 +254,11 @@ public:
         mCursorVisible = false;
     }
 
-    virtual bool isCursorVisible() const override
-    {
-        return mCursorVisible;
-    }
+    bool isCursorVisible() const override { return mCursorVisible; }
 
-    virtual std::string getClipboardText(ClipboardSelection selection = ClipboardSelection::Auto) const override
+    std::string getClipboardText(ClipboardSelection /*selection*/) const override
     {
         // macOS only has system clipboard, ignore Primary selection
-        (void)selection; // Suppress unused parameter warning
-
         NSPasteboard *pasteboard = [NSPasteboard generalPasteboard];
         NSString *string = [pasteboard stringForType:NSPasteboardTypeString];
 
@@ -272,11 +269,9 @@ public:
         return "";
     }
 
-    virtual bool setClipboardText(const std::string &text, ClipboardSelection selection = ClipboardSelection::Auto) override
+    bool setClipboardText(const std::string &text, ClipboardSelection /*selection*/) override
     {
         // macOS only has system clipboard, ignore Primary selection
-        (void)selection; // Suppress unused parameter warning
-
         NSPasteboard *pasteboard = [NSPasteboard generalPasteboard];
         [pasteboard clearContents];
 
@@ -286,131 +281,17 @@ public:
         return success == YES;
     }
 
-    virtual std::vector<uint8_t> getClipboardData(const std::string &mimeType, ClipboardSelection selection = ClipboardSelection::Auto) const override
-    {
-        (void)selection; // macOS only has system clipboard
-
-        NSPasteboard *pasteboard = [NSPasteboard generalPasteboard];
-
-        // Convert MIME type to macOS pasteboard type
-        std::string macType = MimeTypeMapper::mimeToMacType(mimeType);
-        NSString *nsType = [NSString stringWithUTF8String:macType.c_str()];
-
-        // Special handling for text types
-        if (mimeType == "text/plain" || mimeType == "text/plain;charset=utf-8") {
-            std::string text = getClipboardText(selection);
-            return std::vector<uint8_t>(text.begin(), text.end());
-        }
-
-        // Special handling for JPEG conversion from TIFF
-        if (mimeType == "image/jpeg" || mimeType == "image/jpg") {
-            NSData *data = [pasteboard dataForType:NSPasteboardTypeTIFF];
-            if (data) {
-                NSImage *image = [[NSImage alloc] initWithData:data];
-                if (image) {
-                    NSBitmapImageRep *bitmap = [NSBitmapImageRep imageRepWithData:[image TIFFRepresentation]];
-                    if (bitmap) {
-                        NSData *jpegData = [bitmap representationUsingType:NSBitmapImageFileTypeJPEG properties:@ {}];
-                        if (jpegData) {
-                            const uint8_t *bytes = static_cast<const uint8_t *>([jpegData bytes]);
-                            return std::vector<uint8_t>(bytes, bytes + [jpegData length]);
-                        }
-                    }
-                }
-            }
-            return {};
-        }
-
-        // Generic data retrieval for all other types
-        NSData *data = [pasteboard dataForType:nsType];
-        if (data) {
-            const uint8_t *bytes = static_cast<const uint8_t *>([data bytes]);
-            return std::vector<uint8_t>(bytes, bytes + [data length]);
-        }
-
-        return {};
-    }
-
-    virtual bool setClipboardData(const std::string &mimeType, const std::vector<uint8_t> &data, ClipboardSelection selection = ClipboardSelection::Auto) override
-    {
-        (void)selection; // macOS only has system clipboard
-
-        NSPasteboard *pasteboard = [NSPasteboard generalPasteboard];
-        [pasteboard clearContents];
-
-        // Special handling for text types
-        if (mimeType == "text/plain" || mimeType == "text/plain;charset=utf-8") {
-            std::string text(data.begin(), data.end());
-            return setClipboardText(text, selection);
-        }
-
-        // Special handling for JPEG conversion to TIFF
-        if (mimeType == "image/jpeg" || mimeType == "image/jpg") {
-            NSData *jpegData = [NSData dataWithBytes:data.data() length:data.size()];
-            NSImage *image = [[NSImage alloc] initWithData:jpegData];
-            if (image) {
-                NSData *tiffData = [image TIFFRepresentation];
-                if (tiffData) {
-                    return [pasteboard setData:tiffData forType:NSPasteboardTypeTIFF];
-                }
-            }
-            return false;
-        }
-
-        // Generic data setting for all other types
-        std::string macType = MimeTypeMapper::mimeToMacType(mimeType);
-        NSString *nsType = [NSString stringWithUTF8String:macType.c_str()];
-        NSData *nsData = [NSData dataWithBytes:data.data() length:data.size()];
-
-        return [pasteboard setData:nsData forType:nsType];
-    }
-
-    virtual std::vector<std::string> getClipboardMimeTypes(ClipboardSelection selection = ClipboardSelection::Auto) const override
-    {
-        (void)selection; // macOS only has system clipboard
-
-        NSPasteboard *pasteboard = [NSPasteboard generalPasteboard];
-        NSArray *types = [pasteboard types];
-        std::vector<std::string> mimeTypes;
-
-        for (NSString *type in types) {
-            std::string macType = [type UTF8String];
-            std::string mimeType = MimeTypeMapper::macTypeToMime(macType);
-
-            // Add the converted MIME type
-            if (!mimeType.empty() && std::find(mimeTypes.begin(), mimeTypes.end(), mimeType) == mimeTypes.end()) {
-                mimeTypes.push_back(mimeType);
-            }
-
-            // Special case: TIFF can be converted to JPEG
-            if ([type isEqualToString:NSPasteboardTypeTIFF]) {
-                if (std::find(mimeTypes.begin(), mimeTypes.end(), "image/jpeg") == mimeTypes.end()) {
-                    mimeTypes.push_back("image/jpeg");
-                }
-            }
-
-            // Special case: text types
-            if ([type isEqualToString:NSPasteboardTypeString]) {
-                if (std::find(mimeTypes.begin(), mimeTypes.end(), "text/plain;charset=utf-8") == mimeTypes.end()) {
-                    mimeTypes.push_back("text/plain;charset=utf-8");
-                }
-            }
-        }
-
-        return mimeTypes;
-    }
-
 private:
     static void displayConfigurationCallback(
         CGDirectDisplayID /*display*/,
         CGDisplayChangeSummaryFlags flags,
         void *userInfo)
     {
-        auto *hook = static_cast<MacOSHook *>(userInfo);
+        auto *platform = static_cast<MacOSPlatform *>(userInfo);
 
         // Only respond to configuration changes (not just enable/disable)
         if (flags & kCGDisplayDesktopShapeChangedFlag) {
-            hook->onDisplayConfigurationChanged();
+            platform->onDisplayConfigurationChanged();
         }
     }
 
@@ -477,7 +358,7 @@ private:
             }
         }
 
-        if (changed && eventCallback) {
+        if (changed && onEvent) {
             mLogger.debug("Desktop changed: " + std::to_string(displayCount) + " displays, " +
                           std::to_string(newDesktop.width) + "x" + std::to_string(newDesktop.height));
 
@@ -486,14 +367,11 @@ private:
             event.timestamp = timestamp();
             event.state = getState();
 
-            eventCallback(event);
+            onEvent(event);
         }
     }
 
-    void onDisplayConfigurationChanged()
-    {
-        updateDesktopInfo();
-    }
+    void onDisplayConfigurationChanged() { updateDesktopInfo(); }
 
     static CGEventRef eventTapCallback(
         CGEventTapProxy /*proxy*/,
@@ -501,9 +379,9 @@ private:
         CGEventRef cgEvent,
         void *userInfo)
     {
-        auto *hook = static_cast<MacOSHook *>(userInfo);
+        auto *platform = static_cast<MacOSPlatform *>(userInfo);
 
-        if (!hook->eventCallback) {
+        if (!platform->onEvent) {
             return cgEvent;
         }
 
@@ -511,7 +389,7 @@ private:
         event.timestamp = timestamp();
 
         // Get current state
-        event.state = hook->getState();
+        event.state = platform->getState();
 
         // Update position from event
         CGPoint point = CGEventGetLocation(cgEvent);
@@ -530,43 +408,43 @@ private:
             case kCGEventRightMouseDragged:
             case kCGEventOtherMouseDragged:
                 event.type = EventType::MouseMove;
-                hook->eventCallback(event);
+                platform->onEvent(event);
                 break;
 
             case kCGEventLeftMouseDown:
                 event.type = EventType::MousePress;
                 event.button = MouseButton::Left;
-                hook->eventCallback(event);
+                platform->onEvent(event);
                 break;
 
             case kCGEventLeftMouseUp:
                 event.type = EventType::MouseRelease;
                 event.button = MouseButton::Left;
-                hook->eventCallback(event);
+                platform->onEvent(event);
                 break;
 
             case kCGEventRightMouseDown:
                 event.type = EventType::MousePress;
                 event.button = MouseButton::Right;
-                hook->eventCallback(event);
+                platform->onEvent(event);
                 break;
 
             case kCGEventRightMouseUp:
                 event.type = EventType::MouseRelease;
                 event.button = MouseButton::Right;
-                hook->eventCallback(event);
+                platform->onEvent(event);
                 break;
 
             case kCGEventOtherMouseDown:
                 event.type = EventType::MousePress;
                 event.button = MouseButton::Middle;
-                hook->eventCallback(event);
+                platform->onEvent(event);
                 break;
 
             case kCGEventOtherMouseUp:
                 event.type = EventType::MouseRelease;
                 event.button = MouseButton::Middle;
-                hook->eventCallback(event);
+                platform->onEvent(event);
                 break;
 
             case kCGEventKeyDown: {
@@ -581,7 +459,7 @@ private:
                     event.text = std::string(reinterpret_cast<char *>(chars), length * sizeof(UniChar));
                 }
 
-                hook->eventCallback(event);
+                platform->onEvent(event);
                 break;
             }
 
@@ -597,7 +475,7 @@ private:
                     event.text = std::string(reinterpret_cast<char *>(chars), length * sizeof(UniChar));
                 }
 
-                hook->eventCallback(event);
+                platform->onEvent(event);
                 break;
             }
 
@@ -645,11 +523,11 @@ private:
         CFRunLoopRun();
     }
 
-    CFMachPortRef mEventTap;
-    CFRunLoopSourceRef mRunLoopSource;
-    CFRunLoopRef mEventLoop;
+    CFMachPortRef mEventTap { nullptr };
+    CFRunLoopSourceRef mRunLoopSource { nullptr };
+    CFRunLoopRef mEventLoop { nullptr };
     std::thread mListenerThread;
-    std::atomic<bool> mIsRunning;
+    std::atomic<bool> mIsRunning { false };
     Logger mLogger;
     bool mCursorVisible { true };
 
@@ -658,9 +536,9 @@ private:
     Desktop mCurrentDesktop;
 };
 
-std::unique_ptr<IPlatformHook> createPlatformHook()
+std::unique_ptr<IPlatform> createPlatform()
 {
-    return std::make_unique<MacOSHook>();
+    return std::make_unique<MacOSPlatform>();
 }
 
 } // namespace konflikt
