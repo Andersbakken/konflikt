@@ -46,8 +46,14 @@ export class Server {
     // Regular WebSocket connections (non-console)
     #regularConnections: Set<WebSocket> = new Set();
 
+    // Map socket to client instance ID (set during handshake)
+    #socketToInstanceId: Map<WebSocket, string> = new Map();
+
     // Message handler callback for input events and client registration
     #messageHandler?: (message: InputEventMessage | InstanceInfoMessage | ClientRegistrationMessage) => void;
+
+    // Disconnect handler callback
+    #disconnectHandler?: (instanceId: string) => void;
 
     // Layout manager for server-side layout management
     #layoutManager: LayoutManager | null = null;
@@ -171,6 +177,11 @@ export class Server {
         handler: (message: InputEventMessage | InstanceInfoMessage | ClientRegistrationMessage) => void
     ): void {
         this.#messageHandler = handler;
+    }
+
+    /** Set disconnect handler for when a client disconnects */
+    setDisconnectHandler(handler: (instanceId: string) => void): void {
+        this.#disconnectHandler = handler;
     }
 
     /** Broadcast message to all regular WebSocket connections (excludes console connections) */
@@ -358,6 +369,9 @@ export class Server {
                     socket.send(JSON.stringify(response));
                     log(`Sent handshake response to ${request.instanceName}`);
 
+                    // Track this socket's instance ID for disconnect handling
+                    this.#socketToInstanceId.set(socket, request.instanceId);
+
                     // Check if client needs to update
                     if (serverCommit && request.gitCommit && request.gitCommit !== serverCommit) {
                         log(`Client ${request.instanceName} has different commit (${request.gitCommit}), sending update_required`);
@@ -401,11 +415,31 @@ export class Server {
         socket.on("close", () => {
             verbose(`Regular WS connection closed from ${req.socket.remoteAddress}`);
             this.#regularConnections.delete(socket);
+
+            // Notify about disconnect if we know the instance ID
+            const instanceId = this.#socketToInstanceId.get(socket);
+            if (instanceId) {
+                log(`Client ${instanceId} disconnected`);
+                this.#socketToInstanceId.delete(socket);
+                if (this.#disconnectHandler) {
+                    this.#disconnectHandler(instanceId);
+                }
+            }
         });
 
         socket.on("error", (err: Error) => {
             verbose(`Regular WS connection error from ${req.socket.remoteAddress}:`, err);
             this.#regularConnections.delete(socket);
+
+            // Notify about disconnect if we know the instance ID
+            const instanceId = this.#socketToInstanceId.get(socket);
+            if (instanceId) {
+                log(`Client ${instanceId} disconnected due to error`);
+                this.#socketToInstanceId.delete(socket);
+                if (this.#disconnectHandler) {
+                    this.#disconnectHandler(instanceId);
+                }
+            }
         });
     }
 

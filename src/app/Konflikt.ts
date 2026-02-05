@@ -65,6 +65,7 @@ export class Konflikt {
     #activeRemoteScreenBounds: Rect | null = null; // Bounds of the currently active remote screen
     #screenBounds: Rect;
     #lastDeactivationRequest: number = 0; // Debounce for deactivation requests
+    #lastDeactivationTime: number = 0; // Cooldown to prevent immediate reactivation after deactivation
     #activatedClientId: string | null = null; // Track which client we've activated at the edge
     #run: PromiseData<void>;
     #displayId: string;
@@ -184,6 +185,9 @@ export class Konflikt {
 
         // Set up message handler for input events
         this.#server.setMessageHandler(this.handleNetworkMessage.bind(this));
+
+        // Set up disconnect handler to deactivate remote screen when client disconnects
+        this.#server.setDisconnectHandler(this.#handleClientDisconnect.bind(this));
 
         await this.#server.start();
 
@@ -380,6 +384,12 @@ export class Konflikt {
             return false;
         }
 
+        // Cooldown period after deactivation to prevent immediate reactivation
+        const REACTIVATION_COOLDOWN_MS = 500;
+        if (Date.now() - this.#lastDeactivationTime < REACTIVATION_COOLDOWN_MS) {
+            return false;
+        }
+
         const EDGE_THRESHOLD = 1; // Cursor is at edge if within 1 pixel of boundary
 
         // Determine which edge (if any) the cursor is at
@@ -461,7 +471,7 @@ export class Konflikt {
         log(`Hiding server cursor`);
         try {
             this.#native.hideCursor();
-            log(`Server cursor hidden: ${!this.#native.isCursorVisible()}`);
+            log(`Server cursor hidden: ${!this.#native.isCursorVisible}`);
         } catch (err) {
             error(`Failed to hide cursor: ${err}`);
         }
@@ -485,13 +495,31 @@ export class Konflikt {
         log(`Showing server cursor`);
         try {
             this.#native.showCursor();
-            log(`Server cursor visible: ${this.#native.isCursorVisible()}`);
+            log(`Server cursor visible: ${this.#native.isCursorVisible}`);
         } catch (err) {
             error(`Failed to show cursor: ${err}`);
         }
 
+        // Move cursor to right edge of the server screen (where user expects it coming back from remote)
+        const rightEdgeX = this.#screenBounds.x + this.#screenBounds.width - 1;
+        const centerY = this.#lastCursorPosition.y; // Keep Y position from where user was
+        log(`Warping cursor to right edge: (${rightEdgeX}, ${centerY})`);
+        this.#native.sendMouseEvent({
+            type: "mouseMove",
+            x: rightEdgeX,
+            y: centerY,
+            dx: 0,
+            dy: 0,
+            timestamp: Date.now(),
+            keyboardModifiers: 0,
+            mouseButtons: 0
+        });
+
         // Server is now the active instance again
         this.#isActiveInstance = true;
+
+        // Set cooldown to prevent immediate reactivation
+        this.#lastDeactivationTime = Date.now();
 
         // TODO: Send deactivation message to the client so it knows to stop showing cursor
     }
@@ -543,6 +571,19 @@ export class Konflikt {
 
         log(`Received deactivation request from client ${message.instanceId}`);
         this.#deactivateRemoteScreen();
+    }
+
+    #handleClientDisconnect(instanceId: string): void {
+        // Only servers handle client disconnects
+        if (this.#role !== InstanceRole.Server) {
+            return;
+        }
+
+        // If the disconnected client was the active one, deactivate the remote screen
+        if (instanceId === this.#activatedClientId) {
+            log(`Active client ${instanceId} disconnected, deactivating remote screen`);
+            this.#deactivateRemoteScreen();
+        }
     }
 
     static #isActivateClientMessage(
@@ -968,7 +1009,9 @@ export class Konflikt {
             return;
         }
 
-        verbose("Mouse button pressed (active source):", event);
+        verbose(
+            `Mouse button pressed: event=(${event.x}, ${event.y}), virtualCursor=${this.#virtualCursorPosition ? `(${this.#virtualCursorPosition.x}, ${this.#virtualCursorPosition.y})` : "null"}, sending=(${cursorPos.x}, ${cursorPos.y})`
+        );
         this.#broadcastInputEvent("mousePress", {
             x: cursorPos.x,
             y: cursorPos.y,

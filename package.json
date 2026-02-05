@@ -28,6 +28,9 @@
     "start:debug": "KONFLIKT_BUILD=debug node dist/app/index.js",
     "start:autoupdate": "./bin/konflikt-autoupdate --",
     "clean": "del-cli dist/*",
+    "build:macos": "cd src/desktop/macos && chmod +x build.sh && ./build.sh",
+    "build:macos:universal": "cd src/desktop/macos && chmod +x build.sh && ./build.sh --universal",
+    "build:macos:dist": "cd src/desktop/macos && chmod +x build.sh && ./build.sh --universal --bundle-backend",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "",
