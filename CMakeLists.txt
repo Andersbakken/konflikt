@@ -72,7 +72,7 @@ add_subdirectory(src/libkonflikt)
 
 if(BUILD_LINUX_APP AND NOT APPLE)
     message(STATUS "Building Linux application")
-    add_subdirectory(src/app)
+    add_subdirectory(src/linux)
 endif()
 
 if(BUILD_MACOS_APP AND APPLE)
