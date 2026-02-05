@@ -1,6 +1,7 @@
 // Objective-C++ bridge implementation for libkonflikt
 
 #import "KonfliktBridge.h"
+#include <konflikt/ConfigManager.h>
 #include <konflikt/Konflikt.h>
 #include <memory>
 
@@ -24,6 +25,47 @@
     config.edgeBottom = YES;
     config.lockCursorToScreen = NO;
     config.verbose = NO;
+    return config;
+}
+
++ (instancetype)loadFromFile
+{
+    auto cppConfig = konflikt::ConfigManager::load();
+    if (!cppConfig) {
+        return nil;
+    }
+
+    KonfliktConfig *config = [[KonfliktConfig alloc] init];
+    config.role = (cppConfig->role == konflikt::InstanceRole::Server) ? KonfliktRoleServer : KonfliktRoleClient;
+    config.port = cppConfig->port;
+    config.serverPort = cppConfig->serverPort;
+    config.screenX = cppConfig->screenX;
+    config.screenY = cppConfig->screenY;
+    config.screenWidth = cppConfig->screenWidth;
+    config.screenHeight = cppConfig->screenHeight;
+    config.edgeLeft = cppConfig->edgeLeft;
+    config.edgeRight = cppConfig->edgeRight;
+    config.edgeTop = cppConfig->edgeTop;
+    config.edgeBottom = cppConfig->edgeBottom;
+    config.lockCursorToScreen = cppConfig->lockCursorToScreen;
+    config.verbose = cppConfig->verbose;
+
+    if (!cppConfig->instanceId.empty()) {
+        config.instanceId = [NSString stringWithUTF8String:cppConfig->instanceId.c_str()];
+    }
+    if (!cppConfig->instanceName.empty()) {
+        config.instanceName = [NSString stringWithUTF8String:cppConfig->instanceName.c_str()];
+    }
+    if (!cppConfig->serverHost.empty()) {
+        config.serverHost = [NSString stringWithUTF8String:cppConfig->serverHost.c_str()];
+    }
+    if (!cppConfig->uiPath.empty()) {
+        config.uiPath = [NSString stringWithUTF8String:cppConfig->uiPath.c_str()];
+    }
+    if (!cppConfig->logFile.empty()) {
+        config.logFile = [NSString stringWithUTF8String:cppConfig->logFile.c_str()];
+    }
+
     return config;
 }
 
@@ -214,6 +256,11 @@
 - (BOOL)edgeBottom
 {
     return _impl->edgeBottom() ? YES : NO;
+}
+
+- (BOOL)saveConfig
+{
+    return _impl->saveConfig() ? YES : NO;
 }
 
 @end

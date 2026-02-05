@@ -1,4 +1,5 @@
 #include "konflikt/Konflikt.h"
+#include "konflikt/ConfigManager.h"
 #include "konflikt/HttpServer.h"
 #include "konflikt/LayoutManager.h"
 #include "konflikt/ServiceDiscovery.h"
@@ -906,6 +907,17 @@ void Konflikt::setEdgeTransitions(bool left, bool right, bool top, bool bottom)
         "R=" + (right ? "on" : "off") + " " +
         "T=" + (top ? "on" : "off") + " " +
         "B=" + (bottom ? "on" : "off"));
+}
+
+bool Konflikt::saveConfig(const std::string &path)
+{
+    bool success = ConfigManager::save(mConfig, path);
+    if (success) {
+        log("log", "Configuration saved");
+    } else {
+        log("error", "Failed to save configuration");
+    }
+    return success;
 }
 
 void Konflikt::checkClipboardChange()

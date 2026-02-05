@@ -12,10 +12,21 @@ class AppDelegate: NSObject, NSApplicationDelegate, KonfliktDelegate {
         // Create status bar controller
         statusBarController = StatusBarController()
 
-        // Configure Konflikt
-        let config = KonfliktConfig.default()
+        // Load config from file if exists, otherwise use defaults
+        let config: KonfliktConfig
+        if let savedConfig = KonfliktConfig.loadFromFile() {
+            config = savedConfig
+            print("Loaded config from file")
+        } else {
+            config = KonfliktConfig.default()
+            print("Using default config")
+        }
+
+        // Always run as server and set instance name
         config.role = .server
-        config.instanceName = Host.current().localizedName ?? "Mac"
+        if config.instanceName == nil || config.instanceName!.isEmpty {
+            config.instanceName = Host.current().localizedName ?? "Mac"
+        }
 
         // Find UI path
         if let bundlePath = Bundle.main.resourcePath {

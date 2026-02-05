@@ -43,6 +43,9 @@ typedef NS_ENUM(NSInteger, KonfliktConnectionStatus) {
 
 + (instancetype)defaultConfig;
 
+/// Load config from file, returns nil if file doesn't exist
++ (nullable instancetype)loadFromFile;
+
 @end
 
 /// Delegate for Konflikt status updates
@@ -87,6 +90,9 @@ typedef NS_ENUM(NSInteger, KonfliktConnectionStatus) {
 - (BOOL)edgeRight;
 - (BOOL)edgeTop;
 - (BOOL)edgeBottom;
+
+/// Save current configuration to file
+- (BOOL)saveConfig;
 
 @end
 

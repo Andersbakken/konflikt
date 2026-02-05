@@ -123,6 +123,7 @@ class PreferencesWindowController: NSWindowController {
 
     @objc private func lockCursorChanged() {
         konflikt?.setLockCursorToScreen(lockCursorCheckbox.state == .on)
+        saveSettings()
         delegate?.preferencesDidChange()
     }
 
@@ -133,7 +134,12 @@ class PreferencesWindowController: NSWindowController {
             top: edgeTopCheckbox.state == .on,
             bottom: edgeBottomCheckbox.state == .on
         )
+        saveSettings()
         delegate?.preferencesDidChange()
+    }
+
+    private func saveSettings() {
+        _ = konflikt?.saveConfig()
     }
 
     @objc private func closeWindow() {

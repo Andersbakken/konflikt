@@ -122,6 +122,9 @@ public:
     /// Get current configuration
     const Config &config() const { return mConfig; }
 
+    /// Save current configuration to file
+    bool saveConfig(const std::string &path = "");
+
     /// Get instance role
     InstanceRole role() const { return mConfig.role; }
 
