@@ -92,21 +92,14 @@ if(BUILD_UI)
         set(UI_BUILD_DIR ${CMAKE_BINARY_DIR}/webpage)
         set(UI_OUTPUT_DIR ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/ui)
 
-        # Create build directory and symlinks/copies of source files
-        file(MAKE_DIRECTORY ${UI_BUILD_DIR})
-
-        # Symlink source directory (contains actual code)
-        if(NOT EXISTS ${UI_BUILD_DIR}/src)
-            file(CREATE_LINK ${UI_SOURCE_DIR}/src ${UI_BUILD_DIR}/src SYMBOLIC)
-        endif()
-
-        # Copy files that vite needs in the build directory
-        # (index.html must be copied, not symlinked, for vite's output path handling)
-        configure_file(${UI_SOURCE_DIR}/index.html ${UI_BUILD_DIR}/index.html COPYONLY)
-        configure_file(${UI_SOURCE_DIR}/tsconfig.json ${UI_BUILD_DIR}/tsconfig.json COPYONLY)
-        configure_file(${UI_SOURCE_DIR}/vite.config.ts ${UI_BUILD_DIR}/vite.config.ts COPYONLY)
-        configure_file(${UI_SOURCE_DIR}/package.json ${UI_BUILD_DIR}/package.json COPYONLY)
-        configure_file(${UI_SOURCE_DIR}/package-lock.json ${UI_BUILD_DIR}/package-lock.json COPYONLY)
+        # Copy source files to build directory
+        # (copying instead of symlinking ensures vite resolves node_modules from build dir)
+        file(COPY ${UI_SOURCE_DIR}/src DESTINATION ${UI_BUILD_DIR})
+        file(COPY ${UI_SOURCE_DIR}/index.html DESTINATION ${UI_BUILD_DIR})
+        file(COPY ${UI_SOURCE_DIR}/tsconfig.json DESTINATION ${UI_BUILD_DIR})
+        file(COPY ${UI_SOURCE_DIR}/vite.config.ts DESTINATION ${UI_BUILD_DIR})
+        file(COPY ${UI_SOURCE_DIR}/package.json DESTINATION ${UI_BUILD_DIR})
+        file(COPY ${UI_SOURCE_DIR}/package-lock.json DESTINATION ${UI_BUILD_DIR})
 
         # npm install target - only runs if node_modules doesn't exist
         add_custom_command(
