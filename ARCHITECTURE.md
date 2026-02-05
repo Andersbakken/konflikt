@@ -95,8 +95,9 @@ konflikt/
 │   │       ├── Rect.cpp
 │   │       ├── PlatformLinux.cpp  # Linux implementation
 │   │       ├── PlatformMac.mm     # macOS implementation
-│   │       ├── ServiceDiscoveryLinux.cpp  # Stub (TODO)
-│   │       └── ServiceDiscoveryMac.mm     # Stub (TODO)
+│   │       ├── ConfigManager.cpp  # Config file loading/saving
+│   │       ├── ServiceDiscoveryLinux.cpp  # Avahi mDNS (Linux)
+│   │       └── ServiceDiscoveryMac.mm     # Bonjour mDNS (macOS)
 │   │
 │   ├── app/                       # Linux CLI application
 │   │   ├── CMakeLists.txt
@@ -163,6 +164,21 @@ struct Config {
     int serverPort;
     std::string uiPath;    // Path to React UI files
     bool verbose;
+
+    // Edge transition settings
+    bool edgeLeft, edgeRight, edgeTop, edgeBottom;
+    bool lockCursorToScreen;
+    uint32_t lockCursorHotkey;
+
+    // Per-display edge settings
+    std::unordered_map<uint32_t, DisplayEdges> displayEdges;
+
+    // Key remapping
+    std::unordered_map<uint32_t, uint32_t> keyRemap;
+
+    // TLS/WSS
+    bool useTLS;
+    std::string tlsCertFile, tlsKeyFile;
 };
 ```
 
@@ -265,7 +281,7 @@ Custom implementation using uSockets directly (uWebSockets lacks client support)
 
 #### HttpServer.h / HttpServer.cpp
 
-Static file server for React UI:
+Static file server for React UI and REST API:
 
 ```cpp
 class HttpServer {
@@ -275,6 +291,50 @@ class HttpServer {
     void stop();
 };
 ```
+
+The HTTP server provides a comprehensive REST API:
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/health` | GET | Health check (status, version, uptime) |
+| `/api/version` | GET | Version info |
+| `/api/status` | GET | Instance status, connected clients |
+| `/api/config` | GET/POST | Runtime configuration |
+| `/api/config/save` | POST | Save config to file |
+| `/api/stats` | GET | Input event statistics |
+| `/api/keyremap` | GET/POST/DELETE | Key remapping |
+| `/api/displays` | GET | Local monitor info |
+| `/api/display-edges` | GET/POST/DELETE | Per-display edge settings |
+| `/api/layout` | GET | Screen arrangement (server) |
+| `/api/servers` | GET | Discovered mDNS servers |
+| `/api/connection` | GET | Client connection status |
+| `/api/connect` | POST | Connect to server (client) |
+| `/api/reconnect` | POST | Force reconnection (client) |
+| `/api/disconnect` | POST | Disconnect (client) |
+
+All endpoints support `?pretty` query parameter for formatted JSON output.
+
+#### ServiceDiscovery.h / ServiceDiscoveryMac.mm / ServiceDiscoveryLinux.cpp
+
+mDNS/DNS-SD service discovery for automatic server detection:
+
+```cpp
+class ServiceDiscovery {
+    bool registerService(const std::string &name, int port, const std::string &instanceId);
+    void unregisterService();
+    bool startBrowsing();
+    void stopBrowsing();
+    void poll();
+    std::vector<DiscoveredService> getDiscoveredServices() const;
+
+    ServiceDiscoveryCallbacks callbacks;  // onServiceFound, onServiceLost
+};
+```
+
+- **macOS**: Uses Bonjour (dns_sd.h)
+- **Linux**: Uses Avahi (with fallback stub when unavailable)
+
+Servers register themselves as `_konflikt._tcp` services. Clients without a configured server host automatically browse for and connect to discovered servers.
 
 #### LayoutManager.h / LayoutManager.cpp
 
@@ -346,6 +406,8 @@ konflikt [OPTIONS]
 | `layout_update` | Server → All | Layout changed |
 | `activate_client` | Server → Client | Switch to this screen |
 | `deactivation_request` | Client → Server | Return control |
+| `clipboard_sync` | Bidirectional | Clipboard content sync |
+| `server_shutdown` | Server → All | Graceful shutdown notice |
 
 ### Connection Flow
 
@@ -404,6 +466,28 @@ Client                          Server
    - Client sends `deactivation_request`
    - Server shows cursor, resumes local control
 
+## Security
+
+### TLS/WSS Support
+
+Konflikt supports secure WebSocket connections (WSS):
+
+- Server can be configured with TLS certificate and key
+- Clients connect via `wss://` when TLS is enabled
+- Self-signed certificates are supported (no verification by default)
+- Certificate available at `/api/cert` for manual trust
+
+Configuration:
+```json
+{
+  "useTLS": true,
+  "tlsCertFile": "/path/to/cert.pem",
+  "tlsKeyFile": "/path/to/key.pem"
+}
+```
+
+CLI: `--tls --tls-cert=cert.pem --tls-key=key.pem`
+
 ## Dependencies
 
 | Library | Purpose |
@@ -411,9 +495,10 @@ Client                          Server
 | uWebSockets | WebSocket server, HTTP server |
 | uSockets | Low-level networking (uWebSockets dep) |
 | Glaze | Compile-time JSON serialization (C++23) |
-| OpenSSL | SHA256 for instance ID generation |
+| OpenSSL | SHA256, TLS support |
 | XCB/X11 libs | Linux input/display |
 | CoreGraphics | macOS input/display |
+| Avahi | Linux mDNS service discovery (optional) |
 
 ## Build System
 

@@ -1,16 +1,37 @@
-# Konflikt macOS App
+# Konflikt macOS App (Legacy)
 
-A native macOS menu bar application for Konflikt.
+> **Note:** This is the legacy Node.js-based macOS application. The current implementation uses native C++ with a Swift menu bar app. See `src/macos/` for the current implementation and `BUILDING.md` for build instructions.
 
-## Features
+## Current Native Implementation
+
+The native implementation is located at `src/macos/` and includes:
+
+- **Swift Menu Bar App** - Native menu bar application
+- **ObjC++ Bridge** - KonfliktBridge for Swift/C++ interop
+- **libkonflikt** - Native C++ core library
+
+Build with CMake:
+```bash
+mkdir build && cd build
+cmake .. -G Ninja -DBUILD_UI=OFF
+ninja
+```
+
+The app will be at `dist/Konflikt.app`.
+
+---
+
+## Legacy Node.js Implementation
+
+The following documentation is for the legacy implementation that required Node.js:
+
+### Features
 
 - **Menu Bar Icon**: Shows connection status at a glance
 - **Accessibility Permissions**: Automatically prompts for required permissions
 - **Process Management**: Manages the Node.js backend lifecycle
 - **Launch at Login**: Option to start automatically when you log in
 - **Web Configuration**: Opens the configuration UI in your default browser
-
-## Building
 
 ### Prerequisites
 
@@ -30,64 +51,3 @@ A native macOS menu bar application for Konflikt.
 # Build with backend bundled (for distribution)
 ./build.sh --bundle-backend
 ```
-
-### Output
-
-The built app will be at: `dist/desktop/macos/Konflikt.app`
-
-## Installation
-
-```bash
-# Copy to Applications folder
-cp -r dist/desktop/macos/Konflikt.app /Applications/
-
-# Or open directly from dist
-open dist/desktop/macos/Konflikt.app
-```
-
-## Configuration
-
-The app will look for the Konflikt backend in the following locations:
-
-1. Inside the app bundle (`Konflikt.app/Contents/Resources/backend/`)
-2. Development path relative to the app
-3. `~/dev/konflikt/dist/app/index.js`
-4. `/usr/local/share/konflikt/dist/app/index.js`
-5. `/opt/konflikt/dist/app/index.js`
-
-## Code Signing
-
-For development, the app is signed with an ad-hoc signature. For distribution:
-
-```bash
-# Sign with your Developer ID
-export CODESIGN_IDENTITY="Developer ID Application: Your Name (XXXXXXXXXX)"
-./build.sh
-```
-
-## Accessibility Permissions
-
-The app requires Accessibility permissions to control the mouse and keyboard. On first launch, it will prompt you to grant access:
-
-1. Open System Preferences → Security & Privacy → Privacy → Accessibility
-2. Click the lock to make changes
-3. Add Konflikt to the list and enable it
-
-## Architecture
-
-```
-Konflikt.app/
-├── Contents/
-│   ├── Info.plist          # App metadata
-│   ├── MacOS/
-│   │   └── Konflikt        # Native Swift executable
-│   └── Resources/
-│       └── backend/        # (Optional) Bundled Node.js backend
-```
-
-The Swift app:
-- Displays a menu bar icon with status
-- Spawns and manages the Node.js backend process
-- Monitors backend output for connection status
-- Handles accessibility permission requests
-- Provides "Start at Login" functionality

@@ -13,12 +13,14 @@ Konflikt can be built in two modes:
 sudo apt install build-essential cmake ninja-build \
     libxcb1-dev libxcb-xinput-dev libxcb-xtest0-dev \
     libxcb-xkb-dev libxcb-randr0-dev libxkbcommon-dev \
-    libxkbcommon-x11-dev libssl-dev zlib1g-dev
+    libxkbcommon-x11-dev libssl-dev zlib1g-dev \
+    libavahi-client-dev  # Optional: for mDNS auto-discovery
 
 # Fedora
 sudo dnf install gcc-c++ cmake ninja-build \
     xcb-util-devel libxcb-devel libxkbcommon-devel \
-    libxkbcommon-x11-devel openssl-devel zlib-devel
+    libxkbcommon-x11-devel openssl-devel zlib-devel \
+    avahi-devel  # Optional: for mDNS auto-discovery
 ```
 
 ### Building
@@ -51,11 +53,30 @@ ninja
 
 Options:
 - `--role=server|client` - Run as server or client (default: server)
-- `--server=HOST` - Server hostname (required for client mode)
+- `--server=HOST` - Server hostname (client auto-discovers if not set)
 - `--port=PORT` - Port to use (default: 3000)
 - `--ui-dir=PATH` - Directory containing UI files
 - `--name=NAME` - Display name for this machine
+- `--config=PATH` - Path to config file
 - `--verbose` - Enable verbose logging
+
+Edge transition options:
+- `--no-edge-left/right/top/bottom` - Disable specific edge transitions
+- `--lock-cursor` - Lock cursor to current screen
+
+TLS/Security options:
+- `--tls` - Enable TLS/WSS for secure connections
+- `--tls-cert=PATH` - Path to TLS certificate file (PEM)
+- `--tls-key=PATH` - Path to TLS private key file (PEM)
+- `--tls-passphrase=PASS` - Passphrase for encrypted key
+
+Key remapping options:
+- `--remap-keys=PRESET` - Use preset: `mac-to-linux` or `linux-to-mac`
+- `--remap-key=FROM:TO` - Custom key remap (e.g., `55:133`)
+- `--log-keycodes` - Log pressed keycodes (for debugging)
+
+Debug options:
+- `--debug-api` - Enable debug API endpoint (`/api/log`)
 
 ## Native Build (macOS)
 
