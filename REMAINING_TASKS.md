@@ -102,7 +102,8 @@ The native C++ rewrite is largely functional. The macOS Swift app builds and run
 - [x] Lock cursor to screen option (lockCursorToScreen config + setLockCursorToScreen API)
 
 #### 9. Packaging & Distribution
-- [ ] Linux: Create .deb package
+- [x] Linux: Debian packaging files (packaging/debian/)
+- [x] Linux: Systemd user service (packaging/konflikt.service)
 - [ ] Linux: Create AppImage
 - [ ] macOS: Create signed .dmg
 - [ ] macOS: Notarization for Gatekeeper

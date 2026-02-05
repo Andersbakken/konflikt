@@ -1,0 +1,37 @@
+Source: konflikt
+Section: net
+Priority: optional
+Maintainer: Anders Bakken <agbakken@gmail.com>
+Build-Depends: debhelper (>= 12),
+               cmake (>= 3.20),
+               ninja-build,
+               libssl-dev,
+               libxcb1-dev,
+               libxcb-xinput-dev,
+               libxcb-xtest0-dev,
+               libxcb-xkb-dev,
+               libxcb-randr0-dev,
+               libxkbcommon-dev,
+               libxkbcommon-x11-dev,
+               libavahi-client-dev
+Standards-Version: 4.5.1
+Homepage: https://github.com/Andersbakken/konflikt
+
+Package: konflikt
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends},
+         xclip | xsel,
+         avahi-daemon
+Recommends: avahi-daemon
+Description: Software KVM switch for sharing keyboard and mouse
+ Konflikt is a software KVM switch that allows you to share a single
+ keyboard and mouse across multiple computers. It supports seamless
+ mouse movement between screens, clipboard synchronization, and
+ automatic server discovery via mDNS (Avahi/Bonjour).
+ .
+ Features:
+  - Seamless mouse and keyboard sharing
+  - Clipboard synchronization (text)
+  - Automatic server discovery (mDNS)
+  - Configurable screen edge transitions
+  - Hotkey for cursor lock toggle
