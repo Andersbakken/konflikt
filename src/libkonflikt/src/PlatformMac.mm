@@ -165,6 +165,15 @@ public:
                 cgEvent = CGEventCreateMouseEvent(source, type, pos, button);
                 break;
             }
+            case EventType::MouseScroll: {
+                // Create scroll wheel event
+                // wheelCount=2 for both axes, units are in "lines"
+                cgEvent = CGEventCreateScrollWheelEvent(
+                    source, kCGScrollEventUnitPixel, 2,
+                    static_cast<int32_t>(event.state.scrollY),
+                    static_cast<int32_t>(event.state.scrollX));
+                break;
+            }
             default:
                 break;
         }
@@ -447,6 +456,15 @@ private:
                 platform->onEvent(event);
                 break;
 
+            case kCGEventScrollWheel: {
+                event.type = EventType::MouseScroll;
+                // Get scroll deltas (continuous scrolling values)
+                event.state.scrollX = CGEventGetDoubleValueField(cgEvent, kCGScrollWheelEventFixedPtDeltaAxis2);
+                event.state.scrollY = CGEventGetDoubleValueField(cgEvent, kCGScrollWheelEventFixedPtDeltaAxis1);
+                platform->onEvent(event);
+                break;
+            }
+
             case kCGEventKeyDown: {
                 event.type = EventType::KeyPress;
                 event.keycode = static_cast<uint32_t>(CGEventGetIntegerValueField(cgEvent, kCGKeyboardEventKeycode));
@@ -499,6 +517,7 @@ private:
             CGEventMaskBit(kCGEventLeftMouseDragged) |
             CGEventMaskBit(kCGEventRightMouseDragged) |
             CGEventMaskBit(kCGEventOtherMouseDragged) |
+            CGEventMaskBit(kCGEventScrollWheel) |
             CGEventMaskBit(kCGEventKeyDown) |
             CGEventMaskBit(kCGEventKeyUp);
 

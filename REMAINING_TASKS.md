@@ -2,7 +2,7 @@
 
 ## Current Status
 
-The native C++ rewrite is largely functional. The Linux server mode works and can serve the React UI. The WebSocket client is implemented, enabling client mode. The macOS app structure exists but needs testing with Xcode.
+The native C++ rewrite is largely functional. The macOS Swift app builds and runs with CMake/Ninja. Service discovery, clipboard sync, scroll events, config management, and auto-reconnection are all implemented.
 
 ## Completed
 
@@ -15,6 +15,12 @@ The native C++ rewrite is largely functional. The Linux server mode works and ca
 - [x] Layout manager for screen arrangement
 - [x] Rect utility class for geometry calculations
 - [x] Platform abstraction interface (IPlatform)
+- [x] Service Discovery interface and macOS implementation (dns-sd/Bonjour)
+- [x] Service Discovery integration in Konflikt class (auto-register/browse)
+- [x] Clipboard sync protocol message and sync logic
+- [x] Mouse wheel/scroll events support (macOS)
+- [x] ConfigManager for loading/saving JSON config files
+- [x] Auto-reconnection logic for clients
 
 ### Platform Implementations
 - [x] Linux (X11/XCB) - PlatformLinux.cpp
@@ -24,17 +30,18 @@ The native C++ rewrite is largely functional. The Linux server mode works and ca
   - Cursor show/hide via pointer grab
   - Clipboard text (basic)
 - [x] macOS (CoreGraphics) - PlatformMac.mm
-  - Input capture via CGEventTap
-  - Input injection via CGEventPost
+  - Input capture via CGEventTap (including scroll wheel)
+  - Input injection via CGEventPost (including scroll wheel)
   - Display enumeration via CGDisplay APIs
   - Cursor show/hide via CGDisplayShowCursor/HideCursor
   - Clipboard text (basic)
 
 ### Applications
 - [x] Linux CLI application (src/app/main.cpp)
-- [x] macOS Swift app structure (src/macos/)
-  - ObjC++ bridge (KonfliktBridge)
-  - Swift menu bar app skeleton
+- [x] macOS Swift app (src/macos/)
+  - ObjC++ bridge (KonfliktBridge) with ARC
+  - Swift menu bar app
+  - Builds with CMake/Ninja (fixed bridging header, Info.plist)
 
 ### Documentation
 - [x] BUILDING.md - Build instructions
@@ -44,12 +51,10 @@ The native C++ rewrite is largely functional. The Linux server mode works and ca
 
 ### High Priority
 
-#### 1. macOS App Testing & Fixes
-- [ ] Test Swift app builds with Xcode
-- [ ] Fix any Swift/ObjC++ bridging issues
-- [ ] Test menu bar functionality
+#### 1. macOS App Polish
 - [ ] Add proper app icon
 - [ ] Code signing for accessibility permissions
+- [ ] Test with Xcode for debugging
 
 #### 2. End-to-End Testing
 - [ ] Test Linux server with Linux client
@@ -58,59 +63,41 @@ The native C++ rewrite is largely functional. The Linux server mode works and ca
 - [ ] Verify input events are properly forwarded
 - [ ] Verify screen transitions work correctly
 
-#### 3. Service Discovery (mDNS)
-- [ ] Implement ServiceDiscoveryLinux.cpp using Avahi
-  - Register "_konflikt._tcp" service
-  - Browse for servers
-  - Resolve server addresses
-- [ ] Implement ServiceDiscoveryMac.mm using dns-sd
-  - Register service via DNSServiceRegister
-  - Browse via DNSServiceBrowse
-  - Resolve via DNSServiceResolve
-- [ ] Add service discovery callbacks to Konflikt class
-- [ ] Auto-connect clients to discovered servers
-
 ### Medium Priority
 
-#### 4. Clipboard Sync
-- [ ] Wire up clipboard sync in Konflikt.cpp
-- [ ] Implement clipboard change detection
-- [ ] Add clipboard_sync message type to Protocol
-- [ ] Handle multi-format clipboard (text, images, files)
+#### 3. Linux Platform Updates
+- [ ] Implement ServiceDiscoveryLinux.cpp using Avahi
+- [ ] Implement scroll capture in PlatformLinux.cpp
+- [ ] Implement scroll injection in PlatformLinux.cpp
+
+#### 4. Clipboard Sync Enhancements
+- [ ] Handle multi-format clipboard (images, files)
 - [ ] Test clipboard sync between machines
 
-#### 5. Mouse Wheel / Scroll Events
-- [ ] Add scroll event type to Protocol
-- [ ] Implement scroll capture in PlatformLinux.cpp
-- [ ] Implement scroll capture in PlatformMac.mm
-- [ ] Implement scroll injection on both platforms
-
-#### 6. Preferences & Configuration
-- [ ] Add config file support (~/.config/konflikt/config.json)
-- [ ] Persist layout configuration
-- [ ] Add hotkey configuration for manual screen switching
+#### 5. Preferences UI
 - [ ] macOS: Preferences window in Swift app
+- [ ] Hot key configuration for manual screen switching
 
 ### Lower Priority
 
-#### 7. Error Handling & Robustness
-- [ ] Add reconnection logic for clients
-- [ ] Handle server restart gracefully
+#### 6. Error Handling Improvements
+- [x] Auto-reconnection logic for clients (DONE)
+- [ ] Handle server restart gracefully (notify clients)
 - [ ] Add connection timeout handling
 - [ ] Improve error messages and logging
 
-#### 8. Performance Optimization
+#### 7. Performance Optimization
 - [ ] Profile input event latency
 - [ ] Optimize JSON serialization if needed
 - [ ] Consider binary protocol for high-frequency events
 
-#### 9. Additional Features
+#### 8. Additional Features
 - [ ] Drag & drop file transfer
 - [ ] Screen edge switching configuration (which edges trigger transition)
 - [ ] Multi-monitor awareness (per-display screen edges)
 - [ ] Lock cursor to screen option
 
-#### 10. Packaging & Distribution
+#### 9. Packaging & Distribution
 - [ ] Linux: Create .deb package
 - [ ] Linux: Create AppImage
 - [ ] macOS: Create signed .dmg
@@ -123,15 +110,20 @@ Key files for continuing development:
 ```
 src/libkonflikt/
 ├── include/konflikt/
+│   ├── ConfigManager.h     # Config file load/save
 │   ├── Konflikt.h          # Main API class
 │   ├── Platform.h          # Platform abstraction interface
 │   ├── Protocol.h          # All message types
+│   ├── ServiceDiscovery.h  # mDNS service discovery
 │   └── ...
 ├── src/
-│   ├── Konflikt.cpp        # Core logic (screen transitions, etc.)
+│   ├── ConfigManager.cpp   # Config file implementation
+│   ├── Konflikt.cpp        # Core logic (screen transitions, clipboard, reconnect, etc.)
 │   ├── PlatformLinux.cpp   # Linux input/display handling
 │   ├── PlatformMac.mm      # macOS input/display handling
-│   ├── WebSocketClient.cpp # Client connection handling
+│   ├── ServiceDiscoveryMac.mm   # macOS Bonjour implementation
+│   ├── ServiceDiscoveryLinux.cpp # Linux Avahi stub
+│   ├── WebSocketClient.cpp # Client connection handling (with reconnect)
 │   ├── WebSocketServer.cpp # Server connection handling
 │   └── ...
 
@@ -142,10 +134,30 @@ src/macos/
 └── Konflikt/               # Swift app sources
 ```
 
+## Config File Format
+
+Config file location:
+- macOS: `~/Library/Application Support/Konflikt/config.json`
+- Linux: `~/.config/konflikt/config.json`
+
+Example config:
+```json
+{
+  "role": "server",
+  "instanceId": "my-server",
+  "instanceName": "My MacBook",
+  "port": 3000,
+  "serverHost": "",
+  "serverPort": 3000,
+  "verbose": false
+}
+```
+
 ## Notes for Continuation
 
-1. **Building**: Run `mkdir build && cd build && cmake .. -G Ninja && ninja`
-2. **Testing server**: `./build/bin/konflikt --verbose --ui-dir=dist/ui`
-3. **Testing client**: `./build/bin/konflikt --role=client --server=<host> --verbose`
-4. **UI must be built separately**: `cd src/webpage && npm install && npm run build`
-5. **macOS Swift app**: May need to open in Xcode for full build/debug
+1. **Building**: `mkdir build && cd build && cmake .. -G Ninja -DBUILD_UI=OFF && ninja`
+2. **Testing server**: `./dist/Konflikt.app/Contents/MacOS/Konflikt` (macOS) or `./dist/konflikt` (Linux)
+3. **Testing client**: `./dist/konflikt --role=client --server=<host> --verbose`
+4. **Auto-discovery**: Clients with no `--server` flag will automatically discover and connect
+5. **UI must be built separately**: `cd src/webpage && npm install && npm run build`
+6. **macOS Swift app**: Builds with CMake/Ninja, can also open in Xcode for debugging

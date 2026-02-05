@@ -16,6 +16,8 @@ class WebSocketServer;
 class WebSocketClient;
 class HttpServer;
 class LayoutManager;
+class ServiceDiscovery;
+struct DiscoveredService;
 
 /// Instance role
 enum class InstanceRole
@@ -127,6 +129,16 @@ private:
     void handleLayoutUpdate(const LayoutUpdateMessage &message);
     void handleActivateClient(const ActivateClientMessage &message);
     void handleDeactivationRequest(const DeactivationRequestMessage &message);
+    void handleClipboardSync(const ClipboardSyncMessage &message);
+
+    // Clipboard
+    void checkClipboardChange();
+    void broadcastClipboard(const std::string &text);
+
+    // Service discovery
+    void onServiceFound(const DiscoveredService &service);
+    void onServiceLost(const std::string &name);
+    void connectToDiscoveredServer(const std::string &host, int port);
 
     // Screen transition
     bool checkScreenTransition(int32_t x, int32_t y);
@@ -155,6 +167,7 @@ private:
     std::unique_ptr<WebSocketServer> m_wsServer;
     std::unique_ptr<WebSocketClient> m_wsClient;
     std::unique_ptr<HttpServer> m_httpServer;
+    std::unique_ptr<ServiceDiscovery> m_serviceDiscovery;
 
     // Layout
     std::unique_ptr<LayoutManager> m_layoutManager;
@@ -185,6 +198,17 @@ private:
 
     // Client connection tracking (for server)
     std::unordered_map<void *, std::string> m_connectionToInstanceId;
+
+    // Clipboard sync
+    std::string m_lastClipboardText;
+    uint32_t m_clipboardSequence { 0 };
+    uint64_t m_lastClipboardCheck { 0 };
+
+    // Reconnection
+    uint64_t m_lastReconnectAttempt { 0 };
+    int m_reconnectAttempts { 0 };
+    static constexpr int MAX_RECONNECT_ATTEMPTS = 10;
+    static constexpr uint64_t RECONNECT_DELAY_MS = 3000;
 
     // Callbacks
     StatusCallback m_statusCallback;

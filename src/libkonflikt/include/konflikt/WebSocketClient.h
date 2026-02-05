@@ -56,6 +56,15 @@ public:
     /// Process events (call this regularly or from event loop)
     void poll();
 
+    /// Reconnect to the last server
+    bool reconnect();
+
+    /// Get last connected host
+    const std::string &host() const { return m_host; }
+
+    /// Get last connected port
+    int port() const { return m_port; }
+
 private:
     struct Impl;
     std::unique_ptr<Impl> m_impl;
@@ -64,6 +73,7 @@ private:
     WebSocketClientCallbacks m_callbacks;
     std::string m_host;
     int m_port { 0 };
+    std::string m_path;
 };
 
 } // namespace konflikt

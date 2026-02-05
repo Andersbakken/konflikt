@@ -1,12 +1,79 @@
 // Linux service discovery implementation (Avahi)
-// TODO: Implement mDNS service discovery using Avahi
+// TODO: Full Avahi implementation
 
 #ifndef __APPLE__
 
+#include <konflikt/ServiceDiscovery.h>
+
 namespace konflikt {
 
-// Stub implementation - service discovery will be added later
-// For now, users must specify --server=host explicitly
+// Stub implementation for Linux
+// Full Avahi implementation can be added later
+
+struct ServiceDiscovery::Impl
+{
+    // Will hold Avahi client and browser references
+};
+
+ServiceDiscovery::ServiceDiscovery()
+    : m_impl(std::make_unique<Impl>())
+{
+}
+
+ServiceDiscovery::~ServiceDiscovery()
+{
+    unregisterService();
+    stopBrowsing();
+}
+
+void ServiceDiscovery::setCallbacks(ServiceDiscoveryCallbacks callbacks)
+{
+    m_callbacks = std::move(callbacks);
+}
+
+bool ServiceDiscovery::registerService(const std::string &name, int port, const std::string &instanceId)
+{
+    (void)name;
+    (void)port;
+    (void)instanceId;
+
+    // TODO: Implement using Avahi
+    // avahi_entry_group_add_service()
+    if (m_callbacks.onError) {
+        m_callbacks.onError("Service discovery not implemented on Linux (use --server=host)");
+    }
+    return false;
+}
+
+void ServiceDiscovery::unregisterService()
+{
+    m_registered = false;
+}
+
+bool ServiceDiscovery::startBrowsing()
+{
+    // TODO: Implement using Avahi
+    // avahi_service_browser_new()
+    if (m_callbacks.onError) {
+        m_callbacks.onError("Service discovery not implemented on Linux (use --server=host)");
+    }
+    return false;
+}
+
+void ServiceDiscovery::stopBrowsing()
+{
+    m_browsing = false;
+}
+
+void ServiceDiscovery::poll()
+{
+    // TODO: Process Avahi events
+}
+
+std::vector<DiscoveredService> ServiceDiscovery::getDiscoveredServices() const
+{
+    return {};
+}
 
 } // namespace konflikt
 

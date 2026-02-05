@@ -476,6 +476,7 @@ bool WebSocketClient::connect(const std::string &host, int port, const std::stri
 {
     m_host = host;
     m_port = port;
+    m_path = path.empty() ? "/ws" : path;
 
     {
         std::lock_guard<std::mutex> lock(m_impl->mutex);
@@ -511,6 +512,14 @@ void WebSocketClient::send(const std::string &message)
 void WebSocketClient::poll()
 {
     m_state = m_impl->state;
+}
+
+bool WebSocketClient::reconnect()
+{
+    if (m_host.empty() || m_port == 0) {
+        return false;
+    }
+    return connect(m_host, m_port, m_path);
 }
 
 } // namespace konflikt

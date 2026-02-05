@@ -59,7 +59,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, KonfliktDelegate {
 
     // MARK: - KonfliktDelegate
 
-    func konflikt(_ konflikt: Any, didUpdateStatus status: KonfliktConnectionStatus, message: String) {
+    func konflikt(_ konflikt: Any, didUpdate status: KonfliktConnectionStatus, message: String) {
         var statusText: String
         switch status {
         case .disconnected:

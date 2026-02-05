@@ -1,7 +1,7 @@
 #pragma once
 
 #include <cstdint>
-#include <glaze/glaze.hpp>
+#include <glaze/json.hpp>
 #include <optional>
 #include <string>
 #include <vector>
@@ -18,6 +18,8 @@ struct InputEventData
     int32_t y {};
     int32_t dx {};
     int32_t dy {};
+    double scrollX {};  // Horizontal scroll delta
+    double scrollY {};  // Vertical scroll delta
     uint64_t timestamp {};
     uint32_t keyboardModifiers {};
     uint32_t mouseButtons {};
@@ -184,6 +186,17 @@ struct UpdateRequiredMessage
     uint64_t timestamp {};
 };
 
+/// Clipboard sync message
+struct ClipboardSyncMessage
+{
+    std::string type = "clipboard_sync";
+    std::string sourceInstanceId;
+    std::string format;  // "text/plain", "text/html", "image/png", etc.
+    std::string data;    // Base64 encoded for binary formats
+    uint32_t sequence {}; // To detect stale updates
+    uint64_t timestamp {};
+};
+
 // ============================================================================
 // Glaze Metadata (for JSON serialization)
 // ============================================================================
@@ -200,6 +213,8 @@ struct glz::meta<konflikt::InputEventData>
         "y", &T::y,
         "dx", &T::dx,
         "dy", &T::dy,
+        "scrollX", &T::scrollX,
+        "scrollY", &T::scrollY,
         "timestamp", &T::timestamp,
         "keyboardModifiers", &T::keyboardModifiers,
         "mouseButtons", &T::mouseButtons,
@@ -380,6 +395,19 @@ struct glz::meta<konflikt::UpdateRequiredMessage>
         "type", &T::type,
         "serverCommit", &T::serverCommit,
         "clientCommit", &T::clientCommit,
+        "timestamp", &T::timestamp);
+};
+
+template <>
+struct glz::meta<konflikt::ClipboardSyncMessage>
+{
+    using T = konflikt::ClipboardSyncMessage;
+    static constexpr auto value = object(
+        "type", &T::type,
+        "sourceInstanceId", &T::sourceInstanceId,
+        "format", &T::format,
+        "data", &T::data,
+        "sequence", &T::sequence,
         "timestamp", &T::timestamp);
 };
 

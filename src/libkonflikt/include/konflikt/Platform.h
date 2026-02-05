@@ -45,6 +45,8 @@ struct InputState
     int32_t y {};
     int32_t dx {};
     int32_t dy {};
+    double scrollX {};  // Horizontal scroll delta
+    double scrollY {};  // Vertical scroll delta
     uint32_t keyboardModifiers {};
     uint32_t mouseButtons {};
 };
@@ -74,6 +76,7 @@ enum class EventType
     MouseMove,
     MousePress,
     MouseRelease,
+    MouseScroll,
     KeyPress,
     KeyRelease,
     DesktopChanged

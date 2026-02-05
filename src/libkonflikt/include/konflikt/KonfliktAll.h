@@ -2,12 +2,14 @@
 
 // Main Konflikt library header - includes all public headers
 
+#include "ConfigManager.h"
 #include "HttpServer.h"
 #include "Konflikt.h"
 #include "LayoutManager.h"
 #include "Platform.h"
 #include "Protocol.h"
 #include "Rect.h"
+#include "ServiceDiscovery.h"
 #include "WebSocketClient.h"
 #include "WebSocketServer.h"
 

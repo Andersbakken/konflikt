@@ -18,14 +18,21 @@ target_link_libraries(KonfliktBridge
         konflikt
 )
 
-# Objective-C++ specific flags
+# Objective-C++ specific flags (enable ARC)
 set_target_properties(KonfliktBridge PROPERTIES
-    COMPILE_FLAGS "-x objective-c++"
+    COMPILE_FLAGS "-x objective-c++ -fobjc-arc"
 )
 
 # Find required frameworks
 find_library(COCOA_FRAMEWORK Cocoa REQUIRED)
 find_library(APPKIT_FRAMEWORK AppKit REQUIRED)
+
+# Configure Info.plist (must be done before setting target properties)
+configure_file(
+    ${CMAKE_CURRENT_SOURCE_DIR}/Info.plist.in
+    ${CMAKE_CURRENT_BINARY_DIR}/Info.plist
+    @ONLY
+)
 
 # Swift application
 # Note: Swift/CMake integration is limited, so this may need adjustment
@@ -48,14 +55,13 @@ set_target_properties(KonfliktApp PROPERTIES
     MACOSX_BUNDLE_BUNDLE_NAME "Konflikt"
     MACOSX_BUNDLE_BUNDLE_VERSION "1.0"
     MACOSX_BUNDLE_SHORT_VERSION_STRING "1.0"
-    MACOSX_BUNDLE_INFO_PLIST ${CMAKE_CURRENT_SOURCE_DIR}/Info.plist
+    MACOSX_BUNDLE_INFO_PLIST ${CMAKE_CURRENT_BINARY_DIR}/Info.plist
     XCODE_ATTRIBUTE_SWIFT_OBJC_BRIDGING_HEADER "${CMAKE_CURRENT_SOURCE_DIR}/Konflikt/Konflikt-Bridging-Header.h"
     OUTPUT_NAME "Konflikt"
 )
 
-# Copy Info.plist
-configure_file(
-    ${CMAKE_CURRENT_SOURCE_DIR}/Info.plist.in
-    ${CMAKE_CURRENT_BINARY_DIR}/Info.plist
-    @ONLY
+# Set bridging header for Swift (works with both Ninja and Xcode)
+target_compile_options(KonfliktApp PRIVATE
+    "$<$<COMPILE_LANGUAGE:Swift>:-import-objc-header;${CMAKE_CURRENT_SOURCE_DIR}/Konflikt/Konflikt-Bridging-Header.h>"
+    "$<$<COMPILE_LANGUAGE:Swift>:-I;${CMAKE_CURRENT_SOURCE_DIR}/KonfliktBridge>"
 )

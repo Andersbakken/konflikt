@@ -1,6 +1,7 @@
 # libkonflikt - Core shared library for Konflikt KVM switch
 
 set(LIBKONFLIKT_SOURCES
+    src/ConfigManager.cpp
     src/Konflikt.cpp
     src/Protocol.cpp
     src/WebSocketServer.cpp
@@ -87,6 +88,7 @@ target_compile_options(konflikt PRIVATE
     -Wall
     -Wextra
     -Wpedantic
+    -Wno-missing-braces  # Suppress false positive from glaze library
 )
 
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")

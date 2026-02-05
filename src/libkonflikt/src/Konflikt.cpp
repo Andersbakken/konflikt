@@ -1,6 +1,7 @@
 #include "konflikt/Konflikt.h"
 #include "konflikt/HttpServer.h"
 #include "konflikt/LayoutManager.h"
+#include "konflikt/ServiceDiscovery.h"
 #include "konflikt/WebSocketClient.h"
 #include "konflikt/WebSocketServer.h"
 
@@ -101,6 +102,7 @@ bool Konflikt::init()
         m_wsClient = std::make_unique<WebSocketClient>();
         m_wsClient->setCallbacks({ .onConnect = [this]() {
             updateStatus(ConnectionStatus::Connected, "Connected to server");
+            m_reconnectAttempts = 0; // Reset on successful connection
                 // Send handshake
             HandshakeRequest req;
             req.instanceId = m_config.instanceId;
@@ -111,12 +113,28 @@ bool Konflikt::init()
             m_wsClient->send(toJson(req));
         }, .onDisconnect = [this](const std::string &reason) {
             updateStatus(ConnectionStatus::Disconnected, reason);
+            // Trigger reconnection attempt
+            m_lastReconnectAttempt = 0; // Allow immediate first attempt
         }, .onMessage = [this](const std::string &msg) {
             onWebSocketMessage(msg, nullptr);
         }, .onError = [this](const std::string &err) {
             updateStatus(ConnectionStatus::Error, err);
         } });
     }
+
+    // Initialize service discovery
+    m_serviceDiscovery = std::make_unique<ServiceDiscovery>();
+    m_serviceDiscovery->setCallbacks({
+        .onServiceFound = [this](const DiscoveredService &service) {
+            onServiceFound(service);
+        },
+        .onServiceLost = [this](const std::string &name) {
+            onServiceLost(name);
+        },
+        .onError = [this](const std::string &error) {
+            log("error", "Service discovery: " + error);
+        }
+    });
 
     return true;
 }
@@ -137,12 +155,22 @@ void Konflikt::run()
         }
         log("log", "Server listening on port " + std::to_string(m_wsServer->port()));
         updateStatus(ConnectionStatus::Connected, "Server running");
+
+        // Register service for discovery
+        if (m_serviceDiscovery->registerService(m_config.instanceName, m_wsServer->port(), m_config.instanceId)) {
+            log("log", "Registered mDNS service: " + m_config.instanceName);
+        }
     } else {
         // Client: connect to server
         if (!m_config.serverHost.empty()) {
             log("log", "Connecting to " + m_config.serverHost + ":" + std::to_string(m_config.serverPort));
             updateStatus(ConnectionStatus::Connecting, "Connecting...");
             m_wsClient->connect(m_config.serverHost, m_config.serverPort, "/ws");
+        } else {
+            // No server specified, browse for servers
+            log("log", "Browsing for Konflikt servers...");
+            updateStatus(ConnectionStatus::Connecting, "Searching for servers...");
+            m_serviceDiscovery->startBrowsing();
         }
     }
 
@@ -150,7 +178,33 @@ void Konflikt::run()
     while (m_running) {
         if (m_wsClient) {
             m_wsClient->poll();
+
+            // Auto-reconnect for clients
+            if (m_config.role == InstanceRole::Client &&
+                m_connectionStatus == ConnectionStatus::Disconnected &&
+                !m_wsClient->host().empty() &&
+                m_reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+
+                uint64_t now = timestamp();
+                if (now - m_lastReconnectAttempt >= RECONNECT_DELAY_MS) {
+                    m_lastReconnectAttempt = now;
+                    m_reconnectAttempts++;
+                    log("log", "Reconnection attempt " + std::to_string(m_reconnectAttempts) +
+                        "/" + std::to_string(MAX_RECONNECT_ATTEMPTS));
+                    updateStatus(ConnectionStatus::Connecting, "Reconnecting...");
+                    m_wsClient->reconnect();
+                }
+            }
         }
+
+        // Poll service discovery for events
+        if (m_serviceDiscovery) {
+            m_serviceDiscovery->poll();
+        }
+
+        // Check for clipboard changes periodically
+        checkClipboardChange();
+
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
 }
@@ -257,6 +311,21 @@ void Konflikt::onPlatformEvent(const Event &event)
             break;
         }
 
+        case EventType::MouseScroll: {
+            if (m_hasVirtualCursor) {
+                InputEventData data;
+                data.x = m_virtualCursor.x;
+                data.y = m_virtualCursor.y;
+                data.scrollX = event.state.scrollX;
+                data.scrollY = event.state.scrollY;
+                data.timestamp = event.timestamp;
+                data.keyboardModifiers = event.state.keyboardModifiers;
+
+                broadcastInputEvent("scroll", data);
+            }
+            break;
+        }
+
         case EventType::DesktopChanged:
             // Handle desktop change if needed
             break;
@@ -303,6 +372,10 @@ void Konflikt::onWebSocketMessage(const std::string &message, void *connection)
         auto dr = fromJson<DeactivationRequestMessage>(message);
         if (dr)
             handleDeactivationRequest(*dr);
+    } else if (*msgType == "clipboard_sync") {
+        auto cs = fromJson<ClipboardSyncMessage>(message);
+        if (cs)
+            handleClipboardSync(*cs);
     }
 }
 
@@ -410,6 +483,11 @@ void Konflikt::handleInputEvent(const InputEventMessage &message)
                 requestDeactivation();
             }
         }
+    } else if (message.eventType == "scroll") {
+        event.type = EventType::MouseScroll;
+        event.state.scrollX = message.eventData.scrollX;
+        event.state.scrollY = message.eventData.scrollY;
+        m_platform->sendMouseEvent(event);
     } else if (message.eventType == "keyPress" || message.eventType == "keyRelease") {
         event.type = message.eventType == "keyPress" ? EventType::KeyPress : EventType::KeyRelease;
         m_platform->sendKeyEvent(event);
@@ -705,6 +783,118 @@ std::string Konflikt::generateDisplayId()
         ss << std::hex << static_cast<int>(hash[i]);
     }
     return ss.str();
+}
+
+void Konflikt::handleClipboardSync(const ClipboardSyncMessage &message)
+{
+    // Don't apply our own clipboard updates
+    if (message.sourceInstanceId == m_config.instanceId) {
+        return;
+    }
+
+    // Only accept newer clipboard data
+    if (message.sequence <= m_clipboardSequence) {
+        return;
+    }
+
+    m_clipboardSequence = message.sequence;
+
+    // Currently only supporting plain text
+    if (message.format == "text/plain") {
+        m_lastClipboardText = message.data;
+        if (m_platform) {
+            m_platform->setClipboardText(message.data);
+        }
+        if (m_config.verbose) {
+            log("verbose", "Clipboard synced from " + message.sourceInstanceId);
+        }
+    }
+}
+
+void Konflikt::checkClipboardChange()
+{
+    if (!m_platform) {
+        return;
+    }
+
+    // Poll clipboard periodically (every 500ms)
+    uint64_t now = timestamp();
+    if (now - m_lastClipboardCheck < 500) {
+        return;
+    }
+    m_lastClipboardCheck = now;
+
+    std::string currentText = m_platform->getClipboardText();
+
+    // Check if clipboard changed
+    if (!currentText.empty() && currentText != m_lastClipboardText) {
+        m_lastClipboardText = currentText;
+        broadcastClipboard(currentText);
+    }
+}
+
+void Konflikt::broadcastClipboard(const std::string &text)
+{
+    m_clipboardSequence++;
+
+    ClipboardSyncMessage msg;
+    msg.sourceInstanceId = m_config.instanceId;
+    msg.format = "text/plain";
+    msg.data = text;
+    msg.sequence = m_clipboardSequence;
+    msg.timestamp = timestamp();
+
+    std::string json = toJson(msg);
+
+    // Server broadcasts to all clients
+    if (m_config.role == InstanceRole::Server) {
+        broadcastToClients(json);
+    } else if (m_wsClient) {
+        // Client sends to server (which will relay)
+        m_wsClient->send(json);
+    }
+
+    if (m_config.verbose) {
+        log("verbose", "Broadcasting clipboard change");
+    }
+}
+
+void Konflikt::onServiceFound(const DiscoveredService &service)
+{
+    log("log", "Discovered server: " + service.name + " at " + service.host + ":" + std::to_string(service.port));
+
+    // Don't connect to ourselves
+    if (service.instanceId == m_config.instanceId) {
+        return;
+    }
+
+    // Auto-connect if we're a client without a connection
+    if (m_config.role == InstanceRole::Client &&
+        m_connectionStatus != ConnectionStatus::Connected &&
+        m_config.serverHost.empty()) {
+        connectToDiscoveredServer(service.host, service.port);
+    }
+}
+
+void Konflikt::onServiceLost(const std::string &name)
+{
+    log("log", "Server disappeared: " + name);
+}
+
+void Konflikt::connectToDiscoveredServer(const std::string &host, int port)
+{
+    if (!m_wsClient) {
+        return;
+    }
+
+    // Don't reconnect if already connected
+    if (m_connectionStatus == ConnectionStatus::Connected) {
+        return;
+    }
+
+    log("log", "Auto-connecting to discovered server: " + host + ":" + std::to_string(port));
+    updateStatus(ConnectionStatus::Connecting, "Connecting to " + host + "...");
+    m_wsClient->connect(host, port, "/ws");
 }
 
 } // namespace konflikt
