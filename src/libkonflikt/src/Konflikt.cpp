@@ -23,32 +23,32 @@ namespace konflikt {
 // JSON response structs for API endpoints
 struct LatencyStatsJson
 {
-    double lastMs;
-    double avgMs;
-    double maxMs;
-    uint64_t samples;
+    double lastMs {};
+    double avgMs {};
+    double maxMs {};
+    uint64_t samples {};
 };
 
 struct StatsJson
 {
-    uint64_t totalEvents;
-    uint64_t mouseEvents;
-    uint64_t keyEvents;
-    uint64_t scrollEvents;
-    double eventsPerSecond;
+    uint64_t totalEvents {};
+    uint64_t mouseEvents {};
+    uint64_t keyEvents  {};
+    uint64_t scrollEvents {};
+    double eventsPerSecond {};
     LatencyStatsJson latency;
 };
 
 struct RuntimeConfigJson
 {
-    bool edgeLeft;
-    bool edgeRight;
-    bool edgeTop;
-    bool edgeBottom;
-    bool lockCursorToScreen;
-    uint32_t lockCursorHotkey;
-    bool verbose;
-    bool logKeycodes;
+    bool edgeLeft {};
+    bool edgeRight {};
+    bool edgeTop {};
+    bool edgeBottom {};
+    bool lockCursorToScreen {};
+    uint32_t lockCursorHotkey {};
+    bool verbose {};
+    bool logKeycodes {};
     std::map<std::string, uint32_t> keyRemap;
 };
 
@@ -75,14 +75,14 @@ struct KeyRemapRequestJson
 // For DELETE /api/keyremap
 struct KeyRemapDeleteJson
 {
-    int from;
+    int from {};
 };
 
 // For GET /api/keyremap response
 struct KeyRemapEntryJson
 {
-    int from;
-    int to;
+    int from {};
+    int to {};
 };
 
 struct KeyRemapListJson
@@ -95,7 +95,7 @@ struct DiscoveredServerJson
 {
     std::string name;
     std::string host;
-    int port;
+    int port {};
     std::string instanceId;
 };
 
@@ -109,12 +109,12 @@ struct ScreenLayoutEntryJson
 {
     std::string instanceId;
     std::string displayName;
-    int32_t x;
-    int32_t y;
-    int32_t width;
-    int32_t height;
-    bool isServer;
-    bool online;
+    int32_t x {};
+    int32_t y {};
+    int32_t width {};
+    int32_t height {};
+    bool isServer {};
+    bool online {};
 };
 
 struct ScreenLayoutJson
@@ -125,29 +125,29 @@ struct ScreenLayoutJson
 // For GET /api/displays (local monitor info)
 struct DisplayInfoJson
 {
-    uint32_t id;
-    int32_t x;
-    int32_t y;
-    int32_t width;
-    int32_t height;
-    bool isPrimary;
+    uint32_t id {};
+    int32_t x {};
+    int32_t y {};
+    int32_t width {};
+    int32_t height {};
+    bool isPrimary {};
 };
 
 struct DisplaysJson
 {
-    int32_t desktopWidth;
-    int32_t desktopHeight;
+    int32_t desktopWidth {};
+    int32_t desktopHeight {};
     std::vector<DisplayInfoJson> displays;
 };
 
 // For GET/POST /api/display-edges
 struct DisplayEdgesEntryJson
 {
-    uint32_t displayId;
-    bool left;
-    bool right;
-    bool top;
-    bool bottom;
+    uint32_t displayId {};
+    bool left {};
+    bool right {};
+    bool top {};
+    bool bottom {};
 };
 
 struct DisplayEdgesJson
@@ -158,7 +158,7 @@ struct DisplayEdgesJson
 // For POST /api/display-edges (single display update)
 struct DisplayEdgesUpdateJson
 {
-    uint32_t displayId;
+    uint32_t displayId {};
     std::optional<bool> left;
     std::optional<bool> right;
     std::optional<bool> top;
@@ -168,7 +168,7 @@ struct DisplayEdgesUpdateJson
 // For DELETE /api/display-edges
 struct DisplayEdgesDeleteJson
 {
-    uint32_t displayId;
+    uint32_t displayId {};
 };
 
 // For POST /api/connect (client connection control)
@@ -183,11 +183,11 @@ struct ConnectionStatusJson
 {
     std::string status;
     std::string serverHost;
-    int serverPort;
+    int serverPort {};
     std::string serverName;
-    int reconnectAttempts;
-    int maxReconnectAttempts;
-    bool expectingReconnect;
+    int reconnectAttempts {};
+    int maxReconnectAttempts {};
+    bool expectingReconnect {};
 };
 
 struct LogEntryJson
@@ -211,24 +211,24 @@ struct HealthJson
 {
     std::string status;
     std::string version;
-    uint64_t uptime;
+    uint64_t uptime {};
 };
 
 struct ServerInfoJson
 {
     std::string name;
-    int port;
-    bool tls;
+    int port {};
+    bool tls {};
 };
 
 struct ClientInfoJson
 {
     std::string instanceId;
     std::string displayName;
-    int32_t screenWidth;
-    int32_t screenHeight;
-    uint64_t connectedAt;
-    bool active;
+    int32_t screenWidth {};
+    int32_t screenHeight {};
+    uint64_t connectedAt {};
+    bool active {};
 };
 
 struct StatusJson
@@ -777,12 +777,10 @@ bool Konflikt::init()
         DiscoveredServersJson result;
         if (mServiceDiscovery) {
             for (const auto &service : mServiceDiscovery->getDiscoveredServices()) {
-                result.servers.push_back({
-                    service.name,
-                    service.host,
-                    service.port,
-                    service.instanceId
-                });
+                result.servers.push_back({ service.name,
+                                           service.host,
+                                           service.port,
+                                           service.instanceId });
             }
         }
 
@@ -807,16 +805,14 @@ bool Konflikt::init()
         ScreenLayoutJson layout;
         if (mLayoutManager) {
             for (const auto &screen : mLayoutManager->getLayout()) {
-                layout.screens.push_back({
-                    screen.instanceId,
-                    screen.displayName,
-                    screen.x,
-                    screen.y,
-                    screen.width,
-                    screen.height,
-                    screen.isServer,
-                    screen.online
-                });
+                layout.screens.push_back({ screen.instanceId,
+                                           screen.displayName,
+                                           screen.x,
+                                           screen.y,
+                                           screen.width,
+                                           screen.height,
+                                           screen.isServer,
+                                           screen.online });
             }
         }
 
@@ -844,14 +840,12 @@ bool Konflikt::init()
             result.desktopWidth = desktop.width;
             result.desktopHeight = desktop.height;
             for (const auto &display : desktop.displays) {
-                result.displays.push_back({
-                    display.id,
-                    display.x,
-                    display.y,
-                    display.width,
-                    display.height,
-                    display.isPrimary
-                });
+                result.displays.push_back({ display.id,
+                                            display.x,
+                                            display.y,
+                                            display.width,
+                                            display.height,
+                                            display.isPrimary });
             }
         }
 
@@ -890,13 +884,11 @@ bool Konflikt::init()
                     edges.top = mConfig.edgeTop;
                     edges.bottom = mConfig.edgeBottom;
                 }
-                result.edges.push_back({
-                    display.id,
-                    edges.left,
-                    edges.right,
-                    edges.top,
-                    edges.bottom
-                });
+                result.edges.push_back({ display.id,
+                                         edges.left,
+                                         edges.right,
+                                         edges.top,
+                                         edges.bottom });
             }
         }
 
@@ -1142,7 +1134,7 @@ bool Konflikt::init()
             {
                 std::lock_guard<std::mutex> lock(mLogBufferMutex);
                 for (const auto &entry : mLogBuffer) {
-                    logResponse.logs.push_back({entry.timestamp, entry.level, entry.message});
+                    logResponse.logs.push_back({ entry.timestamp, entry.level, entry.message });
                 }
             }
 
@@ -1275,12 +1267,10 @@ bool Konflikt::init()
             mInputStats.keyEvents,
             mInputStats.scrollEvents,
             mInputStats.eventsPerSecond,
-            {
-                mInputStats.lastLatencyMs,
-                mInputStats.avgLatencyMs,
-                mInputStats.maxLatencyMs,
-                mInputStats.latencySamples
-            }
+            { mInputStats.lastLatencyMs,
+              mInputStats.avgLatencyMs,
+              mInputStats.maxLatencyMs,
+              mInputStats.latencySamples }
         };
 
         auto json = glz::write_json(stats);
@@ -1316,7 +1306,7 @@ bool Konflikt::init()
 
         KeyRemapListJson list;
         for (const auto &[from, to] : mConfig.keyRemap) {
-            list.mappings.push_back({static_cast<int>(from), static_cast<int>(to)});
+            list.mappings.push_back({ static_cast<int>(from), static_cast<int>(to) });
         }
 
         auto json = glz::write_json(list);
@@ -1385,8 +1375,7 @@ bool Konflikt::init()
             mConfig.keyRemap[fromKey] = toKey;
             response.body = "{\"success\":true,\"message\":\"Added key remap " +
                 std::to_string(fromKey) + " -> " + std::to_string(toKey) + "\"}";
-            log("log", "Added key remap " + std::to_string(fromKey) + " -> " +
-                std::to_string(toKey) + " via API");
+            log("log", "Added key remap " + std::to_string(fromKey) + " -> " + std::to_string(toKey) + " via API");
         } else {
             response.statusCode = 400;
             response.statusMessage = "Bad Request";
@@ -1480,17 +1469,13 @@ bool Konflikt::init()
 
     // Initialize service discovery
     mServiceDiscovery = std::make_unique<ServiceDiscovery>();
-    mServiceDiscovery->setCallbacks({
-        .onServiceFound = [this](const DiscoveredService &service) {
-            onServiceFound(service);
-        },
-        .onServiceLost = [this](const std::string &name) {
-            onServiceLost(name);
-        },
-        .onError = [this](const std::string &error) {
-            log("error", "Service discovery: " + error);
-        }
-    });
+    mServiceDiscovery->setCallbacks({ .onServiceFound = [this](const DiscoveredService &service) {
+        onServiceFound(service);
+    }, .onServiceLost = [this](const std::string &name) {
+        onServiceLost(name);
+    }, .onError = [this](const std::string &error) {
+        log("error", "Service discovery: " + error);
+    } });
 
     return true;
 }
@@ -1541,7 +1526,6 @@ void Konflikt::run()
                 mConnectionStatus == ConnectionStatus::Disconnected &&
                 !mWsClient->host().empty() &&
                 mReconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
-
                 uint64_t now = timestamp();
                 // Use shorter delay if server sent graceful shutdown, or use expected restart delay
                 uint64_t delay = RECONNECT_DELAY_MS;
@@ -1557,11 +1541,9 @@ void Konflikt::run()
                     mLastReconnectAttempt = now;
                     mReconnectAttempts++;
                     if (mExpectingReconnect) {
-                        log("log", "Reconnecting after graceful server shutdown (attempt " +
-                            std::to_string(mReconnectAttempts) + ")");
+                        log("log", "Reconnecting after graceful server shutdown (attempt " + std::to_string(mReconnectAttempts) + ")");
                     } else {
-                        log("log", "Reconnection attempt " + std::to_string(mReconnectAttempts) +
-                            "/" + std::to_string(MAX_RECONNECT_ATTEMPTS));
+                        log("log", "Reconnection attempt " + std::to_string(mReconnectAttempts) + "/" + std::to_string(MAX_RECONNECT_ATTEMPTS));
                     }
                     updateStatus(ConnectionStatus::Connecting, "Reconnecting...");
                     mWsClient->reconnect();
@@ -1766,8 +1748,7 @@ void Konflikt::onPlatformEvent(const Event &event)
         case EventType::KeyRelease: {
             // Log keycodes for debugging if enabled
             if (mConfig.logKeycodes && event.type == EventType::KeyPress) {
-                log("log", "Keycode pressed: " + std::to_string(event.keycode) +
-                    " (modifiers: " + std::to_string(event.state.keyboardModifiers) + ")");
+                log("log", "Keycode pressed: " + std::to_string(event.keycode) + " (modifiers: " + std::to_string(event.state.keyboardModifiers) + ")");
             }
 
             // Check for hotkey (only on key press)
@@ -2281,15 +2262,14 @@ void Konflikt::log(const std::string &level, const std::string &message)
     auto now = std::chrono::system_clock::now();
     auto time = std::chrono::system_clock::to_time_t(now);
     auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
-        now.time_since_epoch()) % 1000;
+                  now.time_since_epoch()) %
+        1000;
 
     struct tm tm_buf;
     localtime_r(&time, &tm_buf);
 
     char timeStr[32];
-    snprintf(timeStr, sizeof(timeStr), "%02d:%02d:%02d.%03d",
-             tm_buf.tm_hour, tm_buf.tm_min, tm_buf.tm_sec,
-             static_cast<int>(ms.count()));
+    snprintf(timeStr, sizeof(timeStr), "%02d:%02d:%02d.%03d", tm_buf.tm_hour, tm_buf.tm_min, tm_buf.tm_sec, static_cast<int>(ms.count()));
 
     // Print to stderr for debugging
     if (mConfig.verbose || level == "error" || level == "log") {
@@ -2434,11 +2414,7 @@ void Konflikt::setEdgeTransitions(bool left, bool right, bool top, bool bottom)
     mConfig.edgeRight = right;
     mConfig.edgeTop = top;
     mConfig.edgeBottom = bottom;
-    log("log", std::string("Edge transitions: ") +
-        "L=" + (left ? "on" : "off") + " " +
-        "R=" + (right ? "on" : "off") + " " +
-        "T=" + (top ? "on" : "off") + " " +
-        "B=" + (bottom ? "on" : "off"));
+    log("log", std::string("Edge transitions: ") + "L=" + (left ? "on" : "off") + " " + "R=" + (right ? "on" : "off") + " " + "T=" + (top ? "on" : "off") + " " + "B=" + (bottom ? "on" : "off"));
 }
 
 bool Konflikt::saveConfig(const std::string &path)
