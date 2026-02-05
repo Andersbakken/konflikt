@@ -90,6 +90,20 @@ struct KeyRemapListJson
     std::vector<KeyRemapEntryJson> mappings;
 };
 
+// For GET /api/servers (discovered servers)
+struct DiscoveredServerJson
+{
+    std::string name;
+    std::string host;
+    int port;
+    std::string instanceId;
+};
+
+struct DiscoveredServersJson
+{
+    std::vector<DiscoveredServerJson> servers;
+};
+
 struct LogEntryJson
 {
     std::string timestamp;
@@ -236,6 +250,24 @@ struct glz::meta<konflikt::KeyRemapListJson>
 {
     using T = konflikt::KeyRemapListJson;
     static constexpr auto value = object("mappings", &T::mappings);
+};
+
+template <>
+struct glz::meta<konflikt::DiscoveredServerJson>
+{
+    using T = konflikt::DiscoveredServerJson;
+    static constexpr auto value = object(
+        "name", &T::name,
+        "host", &T::host,
+        "port", &T::port,
+        "instanceId", &T::instanceId);
+};
+
+template <>
+struct glz::meta<konflikt::DiscoveredServersJson>
+{
+    using T = konflikt::DiscoveredServersJson;
+    static constexpr auto value = object("servers", &T::servers);
 };
 
 template <>
@@ -543,6 +575,36 @@ bool Konflikt::init()
             }
         } else {
             response.body = "{}";
+        }
+        return response;
+    });
+
+    // API endpoint for discovered servers (useful for clients)
+    mHttpServer->route("GET", "/api/servers", [this](const HttpRequest &req) {
+        HttpResponse response;
+        response.contentType = "application/json";
+
+        DiscoveredServersJson result;
+        if (mServiceDiscovery) {
+            for (const auto &service : mServiceDiscovery->getDiscoveredServices()) {
+                result.servers.push_back({
+                    service.name,
+                    service.host,
+                    service.port,
+                    service.instanceId
+                });
+            }
+        }
+
+        auto json = glz::write_json(result);
+        if (json) {
+            if (req.path.find("pretty") != std::string::npos) {
+                response.body = glz::prettify_json(*json);
+            } else {
+                response.body = *json;
+            }
+        } else {
+            response.body = "{\"servers\":[]}";
         }
         return response;
     });
