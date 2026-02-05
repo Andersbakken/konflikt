@@ -372,15 +372,33 @@ bool Konflikt::init()
         response.contentType = "application/json";
 
         std::stringstream ss;
+        ss << std::fixed << std::setprecision(1);
         ss << "{";
         ss << "\"totalEvents\":" << mInputStats.totalEvents << ",";
         ss << "\"mouseEvents\":" << mInputStats.mouseEvents << ",";
         ss << "\"keyEvents\":" << mInputStats.keyEvents << ",";
         ss << "\"scrollEvents\":" << mInputStats.scrollEvents << ",";
-        ss << "\"eventsPerSecond\":" << std::fixed << std::setprecision(1) << mInputStats.eventsPerSecond;
-        ss << "}";
+        ss << "\"eventsPerSecond\":" << mInputStats.eventsPerSecond << ",";
+        ss << "\"latency\":{";
+        ss << "\"lastMs\":" << mInputStats.lastLatencyMs << ",";
+        ss << "\"avgMs\":" << mInputStats.avgLatencyMs << ",";
+        ss << "\"maxMs\":" << mInputStats.maxLatencyMs << ",";
+        ss << "\"samples\":" << mInputStats.latencySamples;
+        ss << "}}";
 
         response.body = ss.str();
+        return response;
+    });
+
+    // API endpoint to reset statistics
+    mHttpServer->route("POST", "/api/stats/reset", [this](const HttpRequest &) {
+        HttpResponse response;
+        response.contentType = "application/json";
+
+        mInputStats = InputStats {};
+        response.body = "{\"success\":true,\"message\":\"Statistics reset\"}";
+        log("log", "Statistics reset via API");
+
         return response;
     });
 
@@ -737,6 +755,28 @@ void Konflikt::updateInputStats(const std::string &eventType)
     }
 }
 
+void Konflikt::recordLatency(uint64_t eventTimestamp)
+{
+    if (eventTimestamp == 0) {
+        return;
+    }
+
+    uint64_t now = timestamp();
+    if (now < eventTimestamp) {
+        return; // Clock skew, ignore
+    }
+
+    double latency = static_cast<double>(now - eventTimestamp);
+    mInputStats.lastLatencyMs = latency;
+    mInputStats.latencySamples++;
+    mInputStats.latencySum += latency;
+    mInputStats.avgLatencyMs = mInputStats.latencySum / static_cast<double>(mInputStats.latencySamples);
+
+    if (latency > mInputStats.maxLatencyMs) {
+        mInputStats.maxLatencyMs = latency;
+    }
+}
+
 void Konflikt::onPlatformEvent(const Event &event)
 {
     switch (event.type) {
@@ -968,6 +1008,10 @@ void Konflikt::handleInputEvent(const InputEventMessage &message)
     if (message.sourceInstanceId == mConfig.instanceId) {
         return;
     }
+
+    // Record latency for statistics
+    recordLatency(message.eventData.timestamp);
+    updateInputStats(message.eventType);
 
     Event event;
     event.timestamp = message.eventData.timestamp;

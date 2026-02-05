@@ -309,9 +309,16 @@ private:
         uint64_t windowStartTime { 0 };
         uint64_t eventsInWindow { 0 };
         double eventsPerSecond { 0.0 };
+        // Latency tracking (client-side only, measures event timestamp to execution)
+        double lastLatencyMs { 0.0 };
+        double avgLatencyMs { 0.0 };
+        double maxLatencyMs { 0.0 };
+        uint64_t latencySamples { 0 };
+        double latencySum { 0.0 };
     };
     InputStats mInputStats;
     void updateInputStats(const std::string &eventType);
+    void recordLatency(uint64_t eventTimestamp);
 };
 
 } // namespace konflikt

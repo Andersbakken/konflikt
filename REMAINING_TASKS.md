@@ -91,7 +91,7 @@ The native C++ rewrite is largely functional. The macOS Swift app builds and run
 - [x] Improved logging with timestamps
 
 #### 7. Performance Optimization
-- [ ] Profile input event latency
+- [x] Profile input event latency (latency tracking in /api/stats)
 - [ ] Optimize JSON serialization if needed
 - [ ] Consider binary protocol for high-frequency events
 
@@ -228,7 +228,8 @@ CLI presets:
 - `GET /api/config` - Get current runtime configuration
 - `POST /api/config` - Update runtime config (JSON body with edgeLeft, edgeRight, edgeTop, edgeBottom, lockCursorToScreen, verbose, logKeycodes)
 - `POST /api/config/save` - Save current config to file
-- `GET /api/stats` - Input event statistics (totalEvents, mouseEvents, keyEvents, scrollEvents, eventsPerSecond)
+- `GET /api/stats` - Input event statistics (totalEvents, mouseEvents, keyEvents, scrollEvents, eventsPerSecond, latency: lastMs/avgMs/maxMs/samples)
+- `POST /api/stats/reset` - Reset all statistics counters
 - `POST /api/keyremap` - Add key remap: `{"from": 55, "to": 133}` or use preset: `{"preset": "mac-to-linux"}`, `{"preset": "linux-to-mac"}`, `{"preset": "clear"}`
 - `DELETE /api/keyremap` - Remove key remap: `{"from": 55}`
 - `GET /api/cert` - Download server TLS certificate (if TLS enabled)
