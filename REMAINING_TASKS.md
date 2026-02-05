@@ -222,6 +222,9 @@ CLI presets:
 
 ## HTTP API Endpoints
 
+All endpoints support `?pretty` query parameter for formatted JSON output.
+
+- `GET /health` - Health check endpoint (status, version, uptime in ms)
 - `GET /api/version` - Version info
 - `GET /api/server-info` - Server name, port, TLS status
 - `GET /api/status` - Instance status, connection info, client details

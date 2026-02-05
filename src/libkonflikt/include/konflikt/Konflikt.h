@@ -236,6 +236,7 @@ private:
 
     // State
     bool mRunning { false };
+    uint64_t mStartTime { 0 };
     ConnectionStatus mConnectionStatus { ConnectionStatus::Disconnected };
     std::string mConnectedServerName;
     bool mIsActiveInstance { false };

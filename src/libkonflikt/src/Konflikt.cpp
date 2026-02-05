@@ -64,6 +64,55 @@ struct LogResponseJson
     std::vector<LogEntryJson> logs;
 };
 
+struct VersionJson
+{
+    std::string version;
+};
+
+struct HealthJson
+{
+    std::string status;
+    std::string version;
+    uint64_t uptime;
+};
+
+struct ServerInfoJson
+{
+    std::string name;
+    int port;
+    bool tls;
+};
+
+struct ClientInfoJson
+{
+    std::string instanceId;
+    std::string displayName;
+    int32_t screenWidth;
+    int32_t screenHeight;
+    uint64_t connectedAt;
+    bool active;
+};
+
+struct StatusJson
+{
+    std::string version;
+    std::string role;
+    std::string instanceId;
+    std::string instanceName;
+    std::string status;
+    std::string connection;
+    // Server fields
+    std::optional<int> clientCount;
+    std::optional<bool> tls;
+    std::optional<int> port;
+    std::optional<std::string> activeClient;
+    std::optional<std::vector<ClientInfoJson>> clients;
+    // Client fields
+    std::optional<std::string> serverHost;
+    std::optional<int> serverPort;
+    std::optional<std::string> connectedServer;
+};
+
 } // namespace konflikt
 
 template <>
@@ -121,6 +170,67 @@ struct glz::meta<konflikt::LogResponseJson>
 {
     using T = konflikt::LogResponseJson;
     static constexpr auto value = object("logs", &T::logs);
+};
+
+template <>
+struct glz::meta<konflikt::VersionJson>
+{
+    using T = konflikt::VersionJson;
+    static constexpr auto value = object("version", &T::version);
+};
+
+template <>
+struct glz::meta<konflikt::HealthJson>
+{
+    using T = konflikt::HealthJson;
+    static constexpr auto value = object(
+        "status", &T::status,
+        "version", &T::version,
+        "uptime", &T::uptime);
+};
+
+template <>
+struct glz::meta<konflikt::ServerInfoJson>
+{
+    using T = konflikt::ServerInfoJson;
+    static constexpr auto value = object(
+        "name", &T::name,
+        "port", &T::port,
+        "tls", &T::tls);
+};
+
+template <>
+struct glz::meta<konflikt::ClientInfoJson>
+{
+    using T = konflikt::ClientInfoJson;
+    static constexpr auto value = object(
+        "instanceId", &T::instanceId,
+        "displayName", &T::displayName,
+        "screenWidth", &T::screenWidth,
+        "screenHeight", &T::screenHeight,
+        "connectedAt", &T::connectedAt,
+        "active", &T::active);
+};
+
+template <>
+struct glz::meta<konflikt::StatusJson>
+{
+    using T = konflikt::StatusJson;
+    static constexpr auto value = object(
+        "version", &T::version,
+        "role", &T::role,
+        "instanceId", &T::instanceId,
+        "instanceName", &T::instanceName,
+        "status", &T::status,
+        "connection", &T::connection,
+        "clientCount", &T::clientCount,
+        "tls", &T::tls,
+        "port", &T::port,
+        "activeClient", &T::activeClient,
+        "clients", &T::clients,
+        "serverHost", &T::serverHost,
+        "serverPort", &T::serverPort,
+        "connectedServer", &T::connectedServer);
 };
 
 namespace konflikt {
@@ -216,20 +326,61 @@ bool Konflikt::init()
     }
 
     // API endpoint for version
-    mHttpServer->route("GET", "/api/version", [](const HttpRequest &) {
+    mHttpServer->route("GET", "/api/version", [](const HttpRequest &req) {
         HttpResponse response;
         response.contentType = "application/json";
-        response.body = "{\"version\":\"" + std::string(VERSION) + "\"}";
+
+        VersionJson ver { std::string(VERSION) };
+        auto json = glz::write_json(ver);
+        if (json) {
+            if (req.path.find("pretty") != std::string::npos) {
+                response.body = glz::prettify_json(*json);
+            } else {
+                response.body = *json;
+            }
+        } else {
+            response.body = "{}";
+        }
+        return response;
+    });
+
+    // Health check endpoint for monitoring
+    mHttpServer->route("GET", "/health", [this](const HttpRequest &req) {
+        HttpResponse response;
+        response.contentType = "application/json";
+
+        uint64_t uptime = (mStartTime > 0) ? (timestamp() - mStartTime) : 0;
+        HealthJson health { "ok", std::string(VERSION), uptime };
+
+        auto json = glz::write_json(health);
+        if (json) {
+            if (req.path.find("pretty") != std::string::npos) {
+                response.body = glz::prettify_json(*json);
+            } else {
+                response.body = *json;
+            }
+        } else {
+            response.body = "{\"status\":\"ok\"}";
+        }
         return response;
     });
 
     // API endpoint for server info (including TLS availability)
-    mHttpServer->route("GET", "/api/server-info", [this](const HttpRequest &) {
+    mHttpServer->route("GET", "/api/server-info", [this](const HttpRequest &req) {
         HttpResponse response;
         response.contentType = "application/json";
-        response.body = "{\"name\":\"" + mConfig.instanceName + "\","
-                       "\"port\":" + std::to_string(mConfig.port) + ","
-                       "\"tls\":" + (mConfig.useTLS ? "true" : "false") + "}";
+
+        ServerInfoJson info { mConfig.instanceName, mConfig.port, mConfig.useTLS };
+        auto json = glz::write_json(info);
+        if (json) {
+            if (req.path.find("pretty") != std::string::npos) {
+                response.body = glz::prettify_json(*json);
+            } else {
+                response.body = *json;
+            }
+        } else {
+            response.body = "{}";
+        }
         return response;
     });
 
@@ -258,56 +409,58 @@ bool Konflikt::init()
     }
 
     // API endpoint for server status
-    mHttpServer->route("GET", "/api/status", [this](const HttpRequest &) {
+    mHttpServer->route("GET", "/api/status", [this](const HttpRequest &req) {
         HttpResponse response;
         response.contentType = "application/json";
 
-        std::stringstream ss;
-        ss << "{";
-        ss << "\"version\":\"" << VERSION << "\",";
-        ss << "\"role\":\"" << (mConfig.role == InstanceRole::Server ? "server" : "client") << "\",";
-        ss << "\"instanceId\":\"" << mConfig.instanceId << "\",";
-        ss << "\"instanceName\":\"" << mConfig.instanceName << "\",";
-        ss << "\"status\":\"" << (mRunning ? "running" : "stopped") << "\",";
-        ss << "\"connection\":\"";
+        StatusJson status;
+        status.version = VERSION;
+        status.role = (mConfig.role == InstanceRole::Server) ? "server" : "client";
+        status.instanceId = mConfig.instanceId;
+        status.instanceName = mConfig.instanceName;
+        status.status = mRunning ? "running" : "stopped";
+
         switch (mConnectionStatus) {
-            case ConnectionStatus::Connected: ss << "connected"; break;
-            case ConnectionStatus::Connecting: ss << "connecting"; break;
-            case ConnectionStatus::Disconnected: ss << "disconnected"; break;
-            case ConnectionStatus::Error: ss << "error"; break;
+            case ConnectionStatus::Connected: status.connection = "connected"; break;
+            case ConnectionStatus::Connecting: status.connection = "connecting"; break;
+            case ConnectionStatus::Disconnected: status.connection = "disconnected"; break;
+            case ConnectionStatus::Error: status.connection = "error"; break;
         }
-        ss << "\",";
 
         if (mConfig.role == InstanceRole::Server && mWsServer) {
-            ss << "\"clientCount\":" << mWsServer->clientCount() << ",";
-            ss << "\"tls\":" << (mConfig.useTLS ? "true" : "false") << ",";
-            ss << "\"port\":" << mWsServer->port() << ",";
-            ss << "\"activeClient\":\"" << mActivatedClientId << "\",";
-            ss << "\"clients\":[";
-            bool first = true;
+            status.clientCount = static_cast<int>(mWsServer->clientCount());
+            status.tls = mConfig.useTLS;
+            status.port = mWsServer->port();
+            status.activeClient = mActivatedClientId;
+
+            std::vector<ClientInfoJson> clientList;
             for (const auto &[id, client] : mConnectedClients) {
-                if (!first) {
-                    ss << ",";
-                }
-                first = false;
-                ss << "{";
-                ss << "\"instanceId\":\"" << client.instanceId << "\",";
-                ss << "\"displayName\":\"" << client.displayName << "\",";
-                ss << "\"screenWidth\":" << client.screenWidth << ",";
-                ss << "\"screenHeight\":" << client.screenHeight << ",";
-                ss << "\"connectedAt\":" << client.connectedAt << ",";
-                ss << "\"active\":" << (client.active ? "true" : "false");
-                ss << "}";
+                ClientInfoJson ci;
+                ci.instanceId = client.instanceId;
+                ci.displayName = client.displayName;
+                ci.screenWidth = client.screenWidth;
+                ci.screenHeight = client.screenHeight;
+                ci.connectedAt = client.connectedAt;
+                ci.active = client.active;
+                clientList.push_back(ci);
             }
-            ss << "]";
+            status.clients = clientList;
         } else {
-            ss << "\"serverHost\":\"" << mConfig.serverHost << "\",";
-            ss << "\"serverPort\":" << mConfig.serverPort << ",";
-            ss << "\"connectedServer\":\"" << mConnectedServerName << "\"";
+            status.serverHost = mConfig.serverHost;
+            status.serverPort = mConfig.serverPort;
+            status.connectedServer = mConnectedServerName;
         }
 
-        ss << "}";
-        response.body = ss.str();
+        auto json = glz::write_json(status);
+        if (json) {
+            if (req.path.find("pretty") != std::string::npos) {
+                response.body = glz::prettify_json(*json);
+            } else {
+                response.body = *json;
+            }
+        } else {
+            response.body = "{}";
+        }
         return response;
     });
 
@@ -698,6 +851,7 @@ bool Konflikt::init()
 void Konflikt::run()
 {
     mRunning = true;
+    mStartTime = timestamp();
 
     // Start servers
     if (mConfig.role == InstanceRole::Server) {
