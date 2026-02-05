@@ -21,6 +21,7 @@ The native C++ rewrite is largely functional. The macOS Swift app builds and run
 - [x] Mouse wheel/scroll events support (macOS)
 - [x] ConfigManager for loading/saving JSON config files
 - [x] Auto-reconnection logic for clients
+- [x] WebSocket heartbeat with ping/pong for dead connection detection
 
 ### Platform Implementations
 - [x] Linux (X11/XCB) - PlatformLinux.cpp
@@ -84,6 +85,7 @@ The native C++ rewrite is largely functional. The macOS Swift app builds and run
 #### 6. Error Handling Improvements
 - [x] Auto-reconnection logic for clients (DONE)
 - [x] Connection timeout handling (10 second timeout during handshake)
+- [x] WebSocket heartbeat/ping-pong (30s interval, 10s timeout)
 - [ ] Handle server restart gracefully (notify clients)
 - [ ] Improve error messages and logging
 
@@ -123,7 +125,7 @@ src/libkonflikt/
 │   ├── PlatformLinux.cpp   # Linux input/display handling
 │   ├── PlatformMac.mm      # macOS input/display handling
 │   ├── ServiceDiscoveryMac.mm   # macOS Bonjour implementation
-│   ├── ServiceDiscoveryLinux.cpp # Linux Avahi stub
+│   ├── ServiceDiscoveryLinux.cpp # Linux Avahi implementation
 │   ├── WebSocketClient.cpp # Client connection handling (with reconnect)
 │   ├── WebSocketServer.cpp # Server connection handling
 │   └── ...

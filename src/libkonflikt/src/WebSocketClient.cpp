@@ -91,6 +91,13 @@ struct WebSocketClient::Impl
     std::chrono::steady_clock::time_point connectStartTime;
     static constexpr int CONNECTION_TIMEOUT_MS = 10000; // 10 seconds
 
+    // Heartbeat tracking
+    std::chrono::steady_clock::time_point lastActivityTime;
+    std::chrono::steady_clock::time_point lastPingSentTime;
+    bool waitingForPong { false };
+    static constexpr int PING_INTERVAL_MS = 30000;    // Send ping every 30 seconds
+    static constexpr int PONG_TIMEOUT_MS = 10000;      // Expect pong within 10 seconds
+
     // WebSocket frame helpers
     void sendFrame(uint8_t opcode, const char *data, size_t len)
     {
@@ -149,6 +156,8 @@ struct WebSocketClient::Impl
                     bufStr.find("Upgrade") != std::string::npos) {
                     handshakeComplete = true;
                     state = WebSocketState::Connected;
+                    lastActivityTime = std::chrono::steady_clock::now();
+                    waitingForPong = false;
 
                     if (callbacks.onConnect) {
                         callbacks.onConnect();
@@ -245,7 +254,7 @@ struct WebSocketClient::Impl
                     sendFrame(0x0A, payload.c_str(), payload.size());
                     break;
                 case 0x0A: // Pong
-                    // Ignore
+                    waitingForPong = false;
                     break;
             }
         }
@@ -281,6 +290,7 @@ struct WebSocketClient::Impl
     static struct us_socket_t *onData(struct us_socket_t *s, char *data, int length)
     {
         Impl *impl = static_cast<Impl *>(us_socket_context_ext(0, us_socket_context(0, s)));
+        impl->lastActivityTime = std::chrono::steady_clock::now();
         impl->processReceivedData(data, length);
         return s;
     }
@@ -452,6 +462,33 @@ struct WebSocketClient::Impl
                             us_socket_close(0, socket, 0, nullptr);
                         }
                         break;
+                    }
+                }
+
+                // Heartbeat: send pings and check for pong timeout
+                if (state == WebSocketState::Connected && handshakeComplete && socket) {
+                    auto now = std::chrono::steady_clock::now();
+                    auto sinceLastActivity = std::chrono::duration_cast<std::chrono::milliseconds>(
+                        now - lastActivityTime).count();
+
+                    if (waitingForPong) {
+                        // Check if pong timeout exceeded
+                        auto sinceLastPing = std::chrono::duration_cast<std::chrono::milliseconds>(
+                            now - lastPingSentTime).count();
+
+                        if (sinceLastPing > PONG_TIMEOUT_MS) {
+                            state = WebSocketState::Error;
+                            if (callbacks.onError) {
+                                callbacks.onError("Connection lost (no pong response)");
+                            }
+                            us_socket_close(0, socket, 0, nullptr);
+                            break;
+                        }
+                    } else if (sinceLastActivity > PING_INTERVAL_MS) {
+                        // Send ping
+                        sendFrame(0x09, nullptr, 0); // Ping frame
+                        lastPingSentTime = now;
+                        waitingForPong = true;
                     }
                 }
 
