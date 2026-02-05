@@ -20,6 +20,10 @@ struct ConfigJson
     int screenY { 0 };
     int screenWidth { 0 };
     int screenHeight { 0 };
+    bool edgeLeft { true };
+    bool edgeRight { true };
+    bool edgeTop { true };
+    bool edgeBottom { true };
     std::string uiPath;
     bool verbose { false };
     std::string logFile;
@@ -42,6 +46,10 @@ struct glz::meta<konflikt::ConfigJson>
         "screenY", &T::screenY,
         "screenWidth", &T::screenWidth,
         "screenHeight", &T::screenHeight,
+        "edgeLeft", &T::edgeLeft,
+        "edgeRight", &T::edgeRight,
+        "edgeTop", &T::edgeTop,
+        "edgeBottom", &T::edgeBottom,
         "uiPath", &T::uiPath,
         "verbose", &T::verbose,
         "logFile", &T::logFile);
@@ -112,6 +120,10 @@ std::optional<Config> ConfigManager::load(const std::string &path)
     config.screenY = jsonConfig.screenY;
     config.screenWidth = jsonConfig.screenWidth;
     config.screenHeight = jsonConfig.screenHeight;
+    config.edgeLeft = jsonConfig.edgeLeft;
+    config.edgeRight = jsonConfig.edgeRight;
+    config.edgeTop = jsonConfig.edgeTop;
+    config.edgeBottom = jsonConfig.edgeBottom;
     config.uiPath = jsonConfig.uiPath;
     config.verbose = jsonConfig.verbose;
     config.logFile = jsonConfig.logFile;
@@ -148,6 +160,10 @@ bool ConfigManager::save(const Config &config, const std::string &path)
     jsonConfig.screenY = config.screenY;
     jsonConfig.screenWidth = config.screenWidth;
     jsonConfig.screenHeight = config.screenHeight;
+    jsonConfig.edgeLeft = config.edgeLeft;
+    jsonConfig.edgeRight = config.edgeRight;
+    jsonConfig.edgeTop = config.edgeTop;
+    jsonConfig.edgeBottom = config.edgeBottom;
     jsonConfig.uiPath = config.uiPath;
     jsonConfig.verbose = config.verbose;
     jsonConfig.logFile = config.logFile;

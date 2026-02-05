@@ -88,7 +88,7 @@ The native C++ rewrite is largely functional. The macOS Swift app builds and run
 - [x] Connection timeout handling (10 second timeout during handshake)
 - [x] WebSocket heartbeat/ping-pong (30s interval, 10s timeout)
 - [x] Handle server restart gracefully (server_shutdown message, faster reconnection)
-- [ ] Improve error messages and logging
+- [x] Improved logging with timestamps
 
 #### 7. Performance Optimization
 - [ ] Profile input event latency
@@ -97,7 +97,7 @@ The native C++ rewrite is largely functional. The macOS Swift app builds and run
 
 #### 8. Additional Features
 - [ ] Drag & drop file transfer
-- [ ] Screen edge switching configuration (which edges trigger transition)
+- [x] Screen edge switching configuration (edgeLeft/Right/Top/Bottom in config)
 - [ ] Multi-monitor awareness (per-display screen edges)
 - [ ] Lock cursor to screen option
 
@@ -153,6 +153,10 @@ Example config:
   "port": 3000,
   "serverHost": "",
   "serverPort": 3000,
+  "edgeLeft": true,
+  "edgeRight": true,
+  "edgeTop": true,
+  "edgeBottom": true,
   "verbose": false
 }
 ```

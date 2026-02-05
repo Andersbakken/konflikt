@@ -630,16 +630,16 @@ bool Konflikt::checkScreenTransition(int32_t x, int32_t y)
     Side edge;
     bool atEdge = false;
 
-    if (x <= mScreenBounds.x + EDGE_THRESHOLD) {
+    if (x <= mScreenBounds.x + EDGE_THRESHOLD && mConfig.edgeLeft) {
         edge = Side::Left;
         atEdge = true;
-    } else if (x >= mScreenBounds.x + mScreenBounds.width - EDGE_THRESHOLD - 1) {
+    } else if (x >= mScreenBounds.x + mScreenBounds.width - EDGE_THRESHOLD - 1 && mConfig.edgeRight) {
         edge = Side::Right;
         atEdge = true;
-    } else if (y <= mScreenBounds.y + EDGE_THRESHOLD) {
+    } else if (y <= mScreenBounds.y + EDGE_THRESHOLD && mConfig.edgeTop) {
         edge = Side::Top;
         atEdge = true;
-    } else if (y >= mScreenBounds.y + mScreenBounds.height - EDGE_THRESHOLD - 1) {
+    } else if (y >= mScreenBounds.y + mScreenBounds.height - EDGE_THRESHOLD - 1 && mConfig.edgeBottom) {
         edge = Side::Bottom;
         atEdge = true;
     }
@@ -768,7 +768,21 @@ void Konflikt::log(const std::string &level, const std::string &message)
 
     // Also print to stderr for debugging
     if (mConfig.verbose || level == "error" || level == "log") {
-        fprintf(stderr, "[%s] %s\n", level.c_str(), message.c_str());
+        // Get timestamp
+        auto now = std::chrono::system_clock::now();
+        auto time = std::chrono::system_clock::to_time_t(now);
+        auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+            now.time_since_epoch()) % 1000;
+
+        struct tm tm_buf;
+        localtime_r(&time, &tm_buf);
+
+        char timeStr[32];
+        snprintf(timeStr, sizeof(timeStr), "%02d:%02d:%02d.%03d",
+                 tm_buf.tm_hour, tm_buf.tm_min, tm_buf.tm_sec,
+                 static_cast<int>(ms.count()));
+
+        fprintf(stderr, "[%s] [%s] %s\n", timeStr, level.c_str(), message.c_str());
     }
 }
 

@@ -46,6 +46,12 @@ struct Config
     int32_t screenWidth { 0 };  // 0 = auto-detect
     int32_t screenHeight { 0 }; // 0 = auto-detect
 
+    // Screen edge transition settings (which edges trigger screen transitions)
+    bool edgeLeft { true };
+    bool edgeRight { true };
+    bool edgeTop { true };
+    bool edgeBottom { true };
+
     // UI settings
     std::string uiPath;      // Path to React UI files
 
