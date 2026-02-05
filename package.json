@@ -7,11 +7,11 @@
     "konflikt": "./bin/konflikt"
   },
   "scripts": {
-    "build": "npm run lint && run-p build:native:all build:ts && npm run build:ui",
+    "build": "node scripts/build.js",
+    "build:force": "node scripts/build.js --force",
     "build:ts": "tsc",
     "build:ui": "cd src/webpage && npm run build",
     "dev:ui": "cd src/webpage && npm run dev",
-    "postbuild": "chmod +x dist/app/index.js && mkdir -p bin && ln -sf ../dist/app/index.js bin/konflikt",
     "build:native:all": "npm run build:native:release && npm run build:native:debug",
     "build:native": "npm run build:native:all",
     "build:native:release": "cmake-js compile -l error --directory src/native --out dist/native/Release --config Release",
@@ -28,9 +28,11 @@
     "start:debug": "KONFLIKT_BUILD=debug node dist/app/index.js",
     "start:autoupdate": "./bin/konflikt-autoupdate --",
     "clean": "del-cli dist/*",
-    "build:macos": "cd src/desktop/macos && chmod +x build.sh && ./build.sh",
-    "build:macos:universal": "cd src/desktop/macos && chmod +x build.sh && ./build.sh --universal",
-    "build:macos:dist": "cd src/desktop/macos && chmod +x build.sh && ./build.sh --universal --bundle-backend",
+    "build:desktop": "node scripts/build.js --desktop-only",
+    "build:macos": "node scripts/build.js --desktop-only",
+    "build:macos:universal": "node scripts/build.js --desktop-only --universal",
+    "build:macos:dist": "node scripts/build.js --desktop-only --universal --bundle-backend",
+    "dmg": "cd src/desktop/macos && chmod +x create-dmg.sh && ./create-dmg.sh",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "",

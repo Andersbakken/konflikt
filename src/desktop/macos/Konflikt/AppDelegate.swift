@@ -170,14 +170,17 @@ extension AppDelegate: ProcessManagerDelegate {
 
     func processDidConnect(to server: String) {
         statusBarController?.updateStatus(.connected, message: "Connected to \(server)")
+        NotificationManager.shared.notifyConnected(to: server)
     }
 
     func processDidDisconnect() {
         statusBarController?.updateStatus(.disconnected, message: "Disconnected")
+        NotificationManager.shared.notifyDisconnected()
     }
 
     func processDidFail(with error: String) {
         statusBarController?.updateStatus(.error, message: error)
+        NotificationManager.shared.notifyError(error)
     }
 
     func processDidTerminate(exitCode: Int32) {

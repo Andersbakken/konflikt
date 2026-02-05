@@ -26,6 +26,19 @@ mkdir -p "$APP_BUNDLE/Contents/Resources"
 # Copy Info.plist
 cp "$SOURCE_DIR/Info.plist" "$APP_BUNDLE/Contents/"
 
+# Generate app icon if it doesn't exist
+if [ ! -f "$SOURCE_DIR/AppIcon.icns" ]; then
+    echo "Generating app icon..."
+    chmod +x "$SCRIPT_DIR/generate-icon.sh"
+    "$SCRIPT_DIR/generate-icon.sh" 2>/dev/null || true
+fi
+
+# Copy app icon if it exists
+if [ -f "$SOURCE_DIR/AppIcon.icns" ]; then
+    cp "$SOURCE_DIR/AppIcon.icns" "$APP_BUNDLE/Contents/Resources/"
+    echo "Added app icon"
+fi
+
 # Compile Swift sources
 SWIFT_FILES=(
     "$SOURCE_DIR/main.swift"
@@ -36,6 +49,7 @@ SWIFT_FILES=(
     "$SOURCE_DIR/LaunchAtLoginHelper.swift"
     "$SOURCE_DIR/Preferences.swift"
     "$SOURCE_DIR/PreferencesWindow.swift"
+    "$SOURCE_DIR/NotificationManager.swift"
 )
 
 echo "Compiling Swift sources..."
@@ -46,6 +60,7 @@ swiftc \
     -framework Cocoa \
     -framework ApplicationServices \
     -framework ServiceManagement \
+    -framework UserNotifications \
     -O \
     "${SWIFT_FILES[@]}"
 
@@ -60,6 +75,7 @@ if [[ "$1" == "--universal" ]]; then
         -framework Cocoa \
         -framework ApplicationServices \
         -framework ServiceManagement \
+        -framework UserNotifications \
         -O \
         "${SWIFT_FILES[@]}"
 
