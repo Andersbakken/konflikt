@@ -169,7 +169,12 @@ class ProcessManager {
 
         while let newlineIndex = outputBuffer.firstIndex(of: "\n") {
             let line = String(outputBuffer[..<newlineIndex])
-            outputBuffer = String(outputBuffer[outputBuffer.index(after: newlineIndex)...])
+            let nextIndex = outputBuffer.index(after: newlineIndex)
+            if nextIndex < outputBuffer.endIndex {
+                outputBuffer = String(outputBuffer[nextIndex...])
+            } else {
+                outputBuffer = ""
+            }
             processLogLine(line)
         }
     }
