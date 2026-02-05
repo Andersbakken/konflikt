@@ -42,21 +42,21 @@ public:
     void broadcast(const std::string &message);
 
     /// Get the actual port (may differ if 0 was specified)
-    int port() const { return m_port; }
+    int port() const { return mPort; }
 
     /// Check if server is running
-    bool isRunning() const { return m_running; }
+    bool isRunning() const { return mRunning; }
 
     /// Get number of connected clients
     size_t clientCount() const;
 
 private:
     struct Impl;
-    std::unique_ptr<Impl> m_impl;
+    std::unique_ptr<Impl> mImpl;
 
-    int m_port;
-    bool m_running { false };
-    WebSocketServerCallbacks m_callbacks;
+    int mPort;
+    bool mRunning { false };
+    WebSocketServerCallbacks mCallbacks;
 };
 
 } // namespace konflikt

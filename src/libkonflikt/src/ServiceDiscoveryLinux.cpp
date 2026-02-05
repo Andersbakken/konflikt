@@ -16,7 +16,7 @@ struct ServiceDiscovery::Impl
 };
 
 ServiceDiscovery::ServiceDiscovery()
-    : m_impl(std::make_unique<Impl>())
+    : mImpl(std::make_unique<Impl>())
 {
 }
 
@@ -28,7 +28,7 @@ ServiceDiscovery::~ServiceDiscovery()
 
 void ServiceDiscovery::setCallbacks(ServiceDiscoveryCallbacks callbacks)
 {
-    m_callbacks = std::move(callbacks);
+    mCallbacks = std::move(callbacks);
 }
 
 bool ServiceDiscovery::registerService(const std::string &name, int port, const std::string &instanceId)
@@ -39,30 +39,30 @@ bool ServiceDiscovery::registerService(const std::string &name, int port, const 
 
     // TODO: Implement using Avahi
     // avahi_entry_group_add_service()
-    if (m_callbacks.onError) {
-        m_callbacks.onError("Service discovery not implemented on Linux (use --server=host)");
+    if (mCallbacks.onError) {
+        mCallbacks.onError("Service discovery not implemented on Linux (use --server=host)");
     }
     return false;
 }
 
 void ServiceDiscovery::unregisterService()
 {
-    m_registered = false;
+    mRegistered = false;
 }
 
 bool ServiceDiscovery::startBrowsing()
 {
     // TODO: Implement using Avahi
     // avahi_service_browser_new()
-    if (m_callbacks.onError) {
-        m_callbacks.onError("Service discovery not implemented on Linux (use --server=host)");
+    if (mCallbacks.onError) {
+        mCallbacks.onError("Service discovery not implemented on Linux (use --server=host)");
     }
     return false;
 }
 
 void ServiceDiscovery::stopBrowsing()
 {
-    m_browsing = false;
+    mBrowsing = false;
 }
 
 void ServiceDiscovery::poll()

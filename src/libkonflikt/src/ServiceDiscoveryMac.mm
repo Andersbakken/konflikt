@@ -85,8 +85,8 @@ void ServiceDiscovery::Impl::onRegisterResult(DNSServiceErrorType errorCode, con
     (void)name;
 
     if (errorCode != kDNSServiceErr_NoError) {
-        if (parent->m_callbacks.onError) {
-            parent->m_callbacks.onError("Service registration failed: " + std::to_string(errorCode));
+        if (parent->mCallbacks.onError) {
+            parent->mCallbacks.onError("Service registration failed: " + std::to_string(errorCode));
         }
     }
 }
@@ -96,8 +96,8 @@ void ServiceDiscovery::Impl::onBrowseResult(DNSServiceFlags flags, uint32_t inte
                                             const char *replyDomain)
 {
     if (errorCode != kDNSServiceErr_NoError) {
-        if (parent->m_callbacks.onError) {
-            parent->m_callbacks.onError("Browse error: " + std::to_string(errorCode));
+        if (parent->mCallbacks.onError) {
+            parent->mCallbacks.onError("Browse error: " + std::to_string(errorCode));
         }
         return;
     }
@@ -135,8 +135,8 @@ void ServiceDiscovery::Impl::onBrowseResult(DNSServiceFlags flags, uint32_t inte
         // Remove from discovered services
         services.erase(name);
 
-        if (parent->m_callbacks.onServiceLost) {
-            parent->m_callbacks.onServiceLost(name);
+        if (parent->mCallbacks.onServiceLost) {
+            parent->mCallbacks.onServiceLost(name);
         }
     }
 }
@@ -146,8 +146,8 @@ void ServiceDiscovery::Impl::onResolveResult(DNSServiceErrorType errorCode, cons
                                              const unsigned char *txtRecord)
 {
     if (errorCode != kDNSServiceErr_NoError) {
-        if (parent->m_callbacks.onError) {
-            parent->m_callbacks.onError("Resolve error: " + std::to_string(errorCode));
+        if (parent->mCallbacks.onError) {
+            parent->mCallbacks.onError("Resolve error: " + std::to_string(errorCode));
         }
         return;
     }
@@ -206,15 +206,15 @@ void ServiceDiscovery::Impl::onResolveResult(DNSServiceErrorType errorCode, cons
         }
     }
 
-    if (parent->m_callbacks.onServiceFound) {
-        parent->m_callbacks.onServiceFound(service);
+    if (parent->mCallbacks.onServiceFound) {
+        parent->mCallbacks.onServiceFound(service);
     }
 }
 
 ServiceDiscovery::ServiceDiscovery()
-    : m_impl(std::make_unique<Impl>())
+    : mImpl(std::make_unique<Impl>())
 {
-    m_impl->parent = this;
+    mImpl->parent = this;
 }
 
 ServiceDiscovery::~ServiceDiscovery()
@@ -225,12 +225,12 @@ ServiceDiscovery::~ServiceDiscovery()
 
 void ServiceDiscovery::setCallbacks(ServiceDiscoveryCallbacks callbacks)
 {
-    m_callbacks = std::move(callbacks);
+    mCallbacks = std::move(callbacks);
 }
 
 bool ServiceDiscovery::registerService(const std::string &name, int port, const std::string &instanceId)
 {
-    if (m_registered) {
+    if (mRegistered) {
         unregisterService();
     }
 
@@ -239,89 +239,89 @@ bool ServiceDiscovery::registerService(const std::string &name, int port, const 
     TXTRecordCreate(&txtRecord, 0, nullptr);
     TXTRecordSetValue(&txtRecord, "id", static_cast<uint8_t>(instanceId.length()), instanceId.c_str());
 
-    DNSServiceErrorType err = DNSServiceRegister(&m_impl->registerRef, 0, // flags
+    DNSServiceErrorType err = DNSServiceRegister(&mImpl->registerRef, 0, // flags
                                                  0,                       // interface index (0 = all)
                                                  name.c_str(),            // service name
                                                  kServiceType,            // service type
                                                  nullptr,                 // domain (null = default)
                                                  nullptr,                 // host (null = this machine)
                                                  htons(static_cast<uint16_t>(port)), TXTRecordGetLength(&txtRecord),
-                                                 TXTRecordGetBytesPtr(&txtRecord), registerCallback, m_impl.get());
+                                                 TXTRecordGetBytesPtr(&txtRecord), registerCallback, mImpl.get());
 
     TXTRecordDeallocate(&txtRecord);
 
     if (err != kDNSServiceErr_NoError) {
-        if (m_callbacks.onError) {
-            m_callbacks.onError("Failed to register service: " + std::to_string(err));
+        if (mCallbacks.onError) {
+            mCallbacks.onError("Failed to register service: " + std::to_string(err));
         }
         return false;
     }
 
-    m_impl->registeredName = name;
-    m_impl->registeredPort = port;
-    m_impl->registeredInstanceId = instanceId;
-    m_registered = true;
+    mImpl->registeredName = name;
+    mImpl->registeredPort = port;
+    mImpl->registeredInstanceId = instanceId;
+    mRegistered = true;
 
     return true;
 }
 
 void ServiceDiscovery::unregisterService()
 {
-    if (m_impl->registerRef) {
-        DNSServiceRefDeallocate(m_impl->registerRef);
-        m_impl->registerRef = nullptr;
+    if (mImpl->registerRef) {
+        DNSServiceRefDeallocate(mImpl->registerRef);
+        mImpl->registerRef = nullptr;
     }
-    m_registered = false;
+    mRegistered = false;
 }
 
 bool ServiceDiscovery::startBrowsing()
 {
-    if (m_browsing) {
+    if (mBrowsing) {
         return true;
     }
 
-    DNSServiceErrorType err = DNSServiceBrowse(&m_impl->browseRef, 0, // flags
+    DNSServiceErrorType err = DNSServiceBrowse(&mImpl->browseRef, 0, // flags
                                                0,                     // interface index (0 = all)
                                                kServiceType,          // service type
                                                nullptr,               // domain (null = default)
-                                               browseCallback, m_impl.get());
+                                               browseCallback, mImpl.get());
 
     if (err != kDNSServiceErr_NoError) {
-        if (m_callbacks.onError) {
-            m_callbacks.onError("Failed to start browsing: " + std::to_string(err));
+        if (mCallbacks.onError) {
+            mCallbacks.onError("Failed to start browsing: " + std::to_string(err));
         }
         return false;
     }
 
-    m_browsing = true;
+    mBrowsing = true;
     return true;
 }
 
 void ServiceDiscovery::stopBrowsing()
 {
-    std::lock_guard<std::mutex> lock(m_impl->mutex);
+    std::lock_guard<std::mutex> lock(mImpl->mutex);
 
     // Clean up all resolve refs
-    for (auto &[name, ref] : m_impl->resolveRefs) {
+    for (auto &[name, ref] : mImpl->resolveRefs) {
         DNSServiceRefDeallocate(ref);
     }
-    m_impl->resolveRefs.clear();
+    mImpl->resolveRefs.clear();
 
     // Clean up browse ref
-    if (m_impl->browseRef) {
-        DNSServiceRefDeallocate(m_impl->browseRef);
-        m_impl->browseRef = nullptr;
+    if (mImpl->browseRef) {
+        DNSServiceRefDeallocate(mImpl->browseRef);
+        mImpl->browseRef = nullptr;
     }
 
-    m_impl->services.clear();
-    m_browsing = false;
+    mImpl->services.clear();
+    mBrowsing = false;
 }
 
 void ServiceDiscovery::poll()
 {
     // Process registration events
-    if (m_impl->registerRef) {
-        int fd = DNSServiceRefSockFD(m_impl->registerRef);
+    if (mImpl->registerRef) {
+        int fd = DNSServiceRefSockFD(mImpl->registerRef);
         if (fd >= 0) {
             fd_set readfds;
             FD_ZERO(&readfds);
@@ -329,14 +329,14 @@ void ServiceDiscovery::poll()
 
             struct timeval tv = { 0, 0 }; // Non-blocking
             if (select(fd + 1, &readfds, nullptr, nullptr, &tv) > 0) {
-                DNSServiceProcessResult(m_impl->registerRef);
+                DNSServiceProcessResult(mImpl->registerRef);
             }
         }
     }
 
     // Process browse events
-    if (m_impl->browseRef) {
-        int fd = DNSServiceRefSockFD(m_impl->browseRef);
+    if (mImpl->browseRef) {
+        int fd = DNSServiceRefSockFD(mImpl->browseRef);
         if (fd >= 0) {
             fd_set readfds;
             FD_ZERO(&readfds);
@@ -344,15 +344,15 @@ void ServiceDiscovery::poll()
 
             struct timeval tv = { 0, 0 }; // Non-blocking
             if (select(fd + 1, &readfds, nullptr, nullptr, &tv) > 0) {
-                DNSServiceProcessResult(m_impl->browseRef);
+                DNSServiceProcessResult(mImpl->browseRef);
             }
         }
     }
 
     // Process resolve events
     {
-        std::lock_guard<std::mutex> lock(m_impl->mutex);
-        for (auto &[name, ref] : m_impl->resolveRefs) {
+        std::lock_guard<std::mutex> lock(mImpl->mutex);
+        for (auto &[name, ref] : mImpl->resolveRefs) {
             int fd = DNSServiceRefSockFD(ref);
             if (fd >= 0) {
                 fd_set readfds;
@@ -370,10 +370,10 @@ void ServiceDiscovery::poll()
 
 std::vector<DiscoveredService> ServiceDiscovery::getDiscoveredServices() const
 {
-    std::lock_guard<std::mutex> lock(m_impl->mutex);
+    std::lock_guard<std::mutex> lock(mImpl->mutex);
     std::vector<DiscoveredService> result;
-    result.reserve(m_impl->services.size());
-    for (const auto &[name, service] : m_impl->services) {
+    result.reserve(mImpl->services.size());
+    for (const auto &[name, service] : mImpl->services) {
         result.push_back(service);
     }
     return result;

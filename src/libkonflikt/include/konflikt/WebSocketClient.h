@@ -48,10 +48,10 @@ public:
     void send(const std::string &message);
 
     /// Get connection state
-    WebSocketState state() const { return m_state; }
+    WebSocketState state() const { return mState; }
 
     /// Check if connected
-    bool isConnected() const { return m_state == WebSocketState::Connected; }
+    bool isConnected() const { return mState == WebSocketState::Connected; }
 
     /// Process events (call this regularly or from event loop)
     void poll();
@@ -60,20 +60,20 @@ public:
     bool reconnect();
 
     /// Get last connected host
-    const std::string &host() const { return m_host; }
+    const std::string &host() const { return mHost; }
 
     /// Get last connected port
-    int port() const { return m_port; }
+    int port() const { return mPort; }
 
 private:
     struct Impl;
-    std::unique_ptr<Impl> m_impl;
+    std::unique_ptr<Impl> mImpl;
 
-    WebSocketState m_state { WebSocketState::Disconnected };
-    WebSocketClientCallbacks m_callbacks;
-    std::string m_host;
-    int m_port { 0 };
-    std::string m_path;
+    WebSocketState mState { WebSocketState::Disconnected };
+    WebSocketClientCallbacks mCallbacks;
+    std::string mHost;
+    int mPort { 0 };
+    std::string mPath;
 };
 
 } // namespace konflikt

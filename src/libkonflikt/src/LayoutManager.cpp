@@ -12,7 +12,7 @@ void LayoutManager::setServerScreen(const std::string &instanceId,
                                     const std::string &machineId,
                                     int32_t width, int32_t height)
 {
-    m_serverInstanceId = instanceId;
+    mServerInstanceId = instanceId;
 
     ScreenEntry entry;
     entry.instanceId = instanceId;
@@ -25,7 +25,7 @@ void LayoutManager::setServerScreen(const std::string &instanceId,
     entry.isServer = true;
     entry.online = true;
 
-    m_screens[instanceId] = entry;
+    mScreens[instanceId] = entry;
     notifyLayoutChanged();
 }
 
@@ -46,13 +46,13 @@ ScreenEntry LayoutManager::registerClient(const std::string &instanceId,
     // Position the client screen to the right of the server
     // Find the rightmost screen
     int32_t maxRight = 0;
-    for (const auto &[id, screen] : m_screens) {
+    for (const auto &[id, screen] : mScreens) {
         maxRight = std::max(maxRight, screen.x + screen.width);
     }
     entry.x = maxRight;
     entry.y = 0;
 
-    m_screens[instanceId] = entry;
+    mScreens[instanceId] = entry;
     notifyLayoutChanged();
 
     return entry;
@@ -60,15 +60,15 @@ ScreenEntry LayoutManager::registerClient(const std::string &instanceId,
 
 void LayoutManager::unregisterClient(const std::string &instanceId)
 {
-    m_screens.erase(instanceId);
+    mScreens.erase(instanceId);
     arrangeScreens();
     notifyLayoutChanged();
 }
 
 void LayoutManager::setClientOnline(const std::string &instanceId, bool online)
 {
-    auto it = m_screens.find(instanceId);
-    if (it != m_screens.end()) {
+    auto it = mScreens.find(instanceId);
+    if (it != mScreens.end()) {
         it->second.online = online;
         notifyLayoutChanged();
     }
@@ -77,8 +77,8 @@ void LayoutManager::setClientOnline(const std::string &instanceId, bool online)
 std::vector<ScreenEntry> LayoutManager::getLayout() const
 {
     std::vector<ScreenEntry> layout;
-    layout.reserve(m_screens.size());
-    for (const auto &[id, screen] : m_screens) {
+    layout.reserve(mScreens.size());
+    for (const auto &[id, screen] : mScreens) {
         layout.push_back(screen);
     }
 
@@ -92,8 +92,8 @@ std::vector<ScreenEntry> LayoutManager::getLayout() const
 
 std::optional<ScreenEntry> LayoutManager::getScreen(const std::string &instanceId) const
 {
-    auto it = m_screens.find(instanceId);
-    if (it != m_screens.end()) {
+    auto it = mScreens.find(instanceId);
+    if (it != mScreens.end()) {
         return it->second;
     }
     return std::nullopt;
@@ -103,15 +103,15 @@ Adjacency LayoutManager::getAdjacencyFor(const std::string &instanceId) const
 {
     Adjacency adj;
 
-    auto it = m_screens.find(instanceId);
-    if (it == m_screens.end()) {
+    auto it = mScreens.find(instanceId);
+    if (it == mScreens.end()) {
         return adj;
     }
 
     const auto &screen = it->second;
 
     // Find adjacent screens
-    for (const auto &[id, other] : m_screens) {
+    for (const auto &[id, other] : mScreens) {
         if (id == instanceId)
             continue;
 
@@ -141,8 +141,8 @@ std::optional<TransitionTarget> LayoutManager::getTransitionTargetAtEdge(
     Side edge,
     int32_t x, int32_t y) const
 {
-    auto fromIt = m_screens.find(fromInstanceId);
-    if (fromIt == m_screens.end()) {
+    auto fromIt = mScreens.find(fromInstanceId);
+    if (fromIt == mScreens.end()) {
         return std::nullopt;
     }
 
@@ -170,8 +170,8 @@ std::optional<TransitionTarget> LayoutManager::getTransitionTargetAtEdge(
         return std::nullopt;
     }
 
-    auto targetIt = m_screens.find(*targetId);
-    if (targetIt == m_screens.end() || !targetIt->second.online) {
+    auto targetIt = mScreens.find(*targetId);
+    if (targetIt == mScreens.end() || !targetIt->second.online) {
         return std::nullopt;
     }
 
@@ -218,7 +218,7 @@ void LayoutManager::arrangeScreens()
 {
     // Re-arrange screens left to right after one is removed
     std::vector<std::pair<std::string, ScreenEntry *>> screens;
-    for (auto &[id, screen] : m_screens) {
+    for (auto &[id, screen] : mScreens) {
         screens.emplace_back(id, &screen);
     }
 

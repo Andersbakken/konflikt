@@ -80,8 +80,8 @@ struct WebSocketServer::Impl
 };
 
 WebSocketServer::WebSocketServer(int port)
-    : m_impl(std::make_unique<Impl>())
-    , m_port(port)
+    : mImpl(std::make_unique<Impl>())
+    , mPort(port)
 {
 }
 
@@ -92,63 +92,63 @@ WebSocketServer::~WebSocketServer()
 
 void WebSocketServer::setCallbacks(WebSocketServerCallbacks callbacks)
 {
-    m_impl->callbacks = std::move(callbacks);
+    mImpl->callbacks = std::move(callbacks);
 }
 
 bool WebSocketServer::start()
 {
-    if (m_running) {
+    if (mRunning) {
         return true;
     }
 
-    m_impl->serverThread = std::thread([this]() {
-        m_impl->run(m_port);
+    mImpl->serverThread = std::thread([this]() {
+        mImpl->run(mPort);
     });
 
     // Wait for server to start
-    while (!m_impl->running && m_impl->serverThread.joinable()) {
+    while (!mImpl->running && mImpl->serverThread.joinable()) {
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
-        if (m_impl->port == 0 && m_impl->listenSocket == nullptr) {
+        if (mImpl->port == 0 && mImpl->listenSocket == nullptr) {
             // Server failed to start
             break;
         }
     }
 
-    m_running = m_impl->running;
-    if (m_running) {
-        m_port = m_impl->port;
+    mRunning = mImpl->running;
+    if (mRunning) {
+        mPort = mImpl->port;
     }
-    return m_running;
+    return mRunning;
 }
 
 void WebSocketServer::stop()
 {
-    if (!m_running) {
+    if (!mRunning) {
         return;
     }
 
-    m_running = false;
-    m_impl->running = false;
+    mRunning = false;
+    mImpl->running = false;
 
     // Close the listen socket to stop accepting new connections
-    if (m_impl->listenSocket) {
-        us_listen_socket_close(false, m_impl->listenSocket);
-        m_impl->listenSocket = nullptr;
+    if (mImpl->listenSocket) {
+        us_listen_socket_close(false, mImpl->listenSocket);
+        mImpl->listenSocket = nullptr;
     }
 
     // Stop the event loop
-    if (m_impl->loop) {
-        m_impl->loop->defer([this]() {
+    if (mImpl->loop) {
+        mImpl->loop->defer([this]() {
             // Close all connections
-            std::lock_guard<std::mutex> lock(m_impl->connectionsMutex);
-            for (auto *ws : m_impl->connections) {
+            std::lock_guard<std::mutex> lock(mImpl->connectionsMutex);
+            for (auto *ws : mImpl->connections) {
                 ws->close();
             }
         });
     }
 
-    if (m_impl->serverThread.joinable()) {
-        m_impl->serverThread.join();
+    if (mImpl->serverThread.joinable()) {
+        mImpl->serverThread.join();
     }
 }
 
@@ -160,16 +160,16 @@ void WebSocketServer::send(void *connection, const std::string &message)
 
 void WebSocketServer::broadcast(const std::string &message)
 {
-    std::lock_guard<std::mutex> lock(m_impl->connectionsMutex);
-    for (auto *ws : m_impl->connections) {
+    std::lock_guard<std::mutex> lock(mImpl->connectionsMutex);
+    for (auto *ws : mImpl->connections) {
         ws->send(message, uWS::OpCode::TEXT);
     }
 }
 
 size_t WebSocketServer::clientCount() const
 {
-    std::lock_guard<std::mutex> lock(m_impl->connectionsMutex);
-    return m_impl->connections.size();
+    std::lock_guard<std::mutex> lock(mImpl->connectionsMutex);
+    return mImpl->connections.size();
 }
 
 } // namespace konflikt

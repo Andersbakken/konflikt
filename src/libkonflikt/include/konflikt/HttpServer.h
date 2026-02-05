@@ -54,19 +54,19 @@ public:
     void stop();
 
     /// Get the actual port
-    int port() const { return m_port; }
+    int port() const { return mPort; }
 
     /// Check if running
-    bool isRunning() const { return m_running; }
+    bool isRunning() const { return mRunning; }
 
 private:
     struct Impl;
-    std::unique_ptr<Impl> m_impl;
+    std::unique_ptr<Impl> mImpl;
 
-    int m_port;
-    bool m_running { false };
-    std::string m_staticDir;
-    std::string m_staticPrefix;
+    int mPort;
+    bool mRunning { false };
+    std::string mStaticDir;
+    std::string mStaticPrefix;
 };
 
 } // namespace konflikt

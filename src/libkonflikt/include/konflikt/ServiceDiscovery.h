@@ -59,10 +59,10 @@ public:
     void stopBrowsing();
 
     /// Check if currently browsing
-    bool isBrowsing() const { return m_browsing; }
+    bool isBrowsing() const { return mBrowsing; }
 
     /// Check if service is registered
-    bool isRegistered() const { return m_registered; }
+    bool isRegistered() const { return mRegistered; }
 
     /// Process pending events (call periodically)
     void poll();
@@ -71,11 +71,11 @@ public:
     std::vector<DiscoveredService> getDiscoveredServices() const;
 
 private:
-    std::unique_ptr<Impl> m_impl;
+    std::unique_ptr<Impl> mImpl;
 
-    ServiceDiscoveryCallbacks m_callbacks;
-    bool m_browsing { false };
-    bool m_registered { false };
+    ServiceDiscoveryCallbacks mCallbacks;
+    bool mBrowsing { false };
+    bool mRegistered { false };
 };
 
 } // namespace konflikt

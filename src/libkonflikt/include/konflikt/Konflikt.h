@@ -93,22 +93,22 @@ public:
     void quit();
 
     /// Get current configuration
-    const Config &config() const { return m_config; }
+    const Config &config() const { return mConfig; }
 
     /// Get instance role
-    InstanceRole role() const { return m_config.role; }
+    InstanceRole role() const { return mConfig.role; }
 
     /// Get connection status
-    ConnectionStatus connectionStatus() const { return m_connectionStatus; }
+    ConnectionStatus connectionStatus() const { return mConnectionStatus; }
 
     /// Get connected server name (for clients)
-    const std::string &connectedServerName() const { return m_connectedServerName; }
+    const std::string &connectedServerName() const { return mConnectedServerName; }
 
     /// Set status callback
-    void setStatusCallback(StatusCallback callback) { m_statusCallback = std::move(callback); }
+    void setStatusCallback(StatusCallback callback) { mStatusCallback = std::move(callback); }
 
     /// Set log callback
-    void setLogCallback(LogCallback callback) { m_logCallback = std::move(callback); }
+    void setLogCallback(LogCallback callback) { mLogCallback = std::move(callback); }
 
     /// Get the HTTP server port (may differ from config if auto-assigned)
     int httpPort() const;
@@ -157,62 +157,62 @@ private:
     std::string generateDisplayId();
 
     // Configuration
-    Config m_config;
+    Config mConfig;
 
     // Platform
-    std::unique_ptr<IPlatform> m_platform;
-    Logger m_logger;
+    std::unique_ptr<IPlatform> mPlatform;
+    Logger mLogger;
 
     // Networking
-    std::unique_ptr<WebSocketServer> m_wsServer;
-    std::unique_ptr<WebSocketClient> m_wsClient;
-    std::unique_ptr<HttpServer> m_httpServer;
-    std::unique_ptr<ServiceDiscovery> m_serviceDiscovery;
+    std::unique_ptr<WebSocketServer> mWsServer;
+    std::unique_ptr<WebSocketClient> mWsClient;
+    std::unique_ptr<HttpServer> mHttpServer;
+    std::unique_ptr<ServiceDiscovery> mServiceDiscovery;
 
     // Layout
-    std::unique_ptr<LayoutManager> m_layoutManager;
+    std::unique_ptr<LayoutManager> mLayoutManager;
 
     // State
-    bool m_running { false };
-    ConnectionStatus m_connectionStatus { ConnectionStatus::Disconnected };
-    std::string m_connectedServerName;
-    bool m_isActiveInstance { false };
-    Rect m_screenBounds;
+    bool mRunning { false };
+    ConnectionStatus mConnectionStatus { ConnectionStatus::Disconnected };
+    std::string mConnectedServerName;
+    bool mIsActiveInstance { false };
+    Rect mScreenBounds;
 
     // Virtual cursor for remote screen control
     struct
     {
         int32_t x {};
         int32_t y {};
-    } m_virtualCursor;
+    } mVirtualCursor;
 
-    bool m_hasVirtualCursor { false };
-    Rect m_activeRemoteScreenBounds;
+    bool mHasVirtualCursor { false };
+    Rect mActiveRemoteScreenBounds;
 
     // Client tracking
-    std::string m_activatedClientId;
-    std::string m_machineId;
-    std::string m_displayId;
-    uint64_t m_lastDeactivationTime { 0 };
-    uint64_t m_lastDeactivationRequest { 0 };
+    std::string mActivatedClientId;
+    std::string mMachineId;
+    std::string mDisplayId;
+    uint64_t mLastDeactivationTime { 0 };
+    uint64_t mLastDeactivationRequest { 0 };
 
     // Client connection tracking (for server)
-    std::unordered_map<void *, std::string> m_connectionToInstanceId;
+    std::unordered_map<void *, std::string> mConnectionToInstanceId;
 
     // Clipboard sync
-    std::string m_lastClipboardText;
-    uint32_t m_clipboardSequence { 0 };
-    uint64_t m_lastClipboardCheck { 0 };
+    std::string mLastClipboardText;
+    uint32_t mClipboardSequence { 0 };
+    uint64_t mLastClipboardCheck { 0 };
 
     // Reconnection
-    uint64_t m_lastReconnectAttempt { 0 };
-    int m_reconnectAttempts { 0 };
+    uint64_t mLastReconnectAttempt { 0 };
+    int mReconnectAttempts { 0 };
     static constexpr int MAX_RECONNECT_ATTEMPTS = 10;
     static constexpr uint64_t RECONNECT_DELAY_MS = 3000;
 
     // Callbacks
-    StatusCallback m_statusCallback;
-    LogCallback m_logCallback;
+    StatusCallback mStatusCallback;
+    LogCallback mLogCallback;
 };
 
 } // namespace konflikt

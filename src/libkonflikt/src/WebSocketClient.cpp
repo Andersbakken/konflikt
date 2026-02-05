@@ -454,72 +454,72 @@ struct WebSocketClient::Impl
 };
 
 WebSocketClient::WebSocketClient()
-    : m_impl(std::make_unique<Impl>())
+    : mImpl(std::make_unique<Impl>())
 {
 }
 
 WebSocketClient::~WebSocketClient()
 {
     disconnect();
-    m_impl->shouldStop = true;
-    if (m_impl->clientThread.joinable()) {
-        m_impl->clientThread.join();
+    mImpl->shouldStop = true;
+    if (mImpl->clientThread.joinable()) {
+        mImpl->clientThread.join();
     }
 }
 
 void WebSocketClient::setCallbacks(WebSocketClientCallbacks callbacks)
 {
-    m_impl->callbacks = std::move(callbacks);
+    mImpl->callbacks = std::move(callbacks);
 }
 
 bool WebSocketClient::connect(const std::string &host, int port, const std::string &path)
 {
-    m_host = host;
-    m_port = port;
-    m_path = path.empty() ? "/ws" : path;
+    mHost = host;
+    mPort = port;
+    mPath = path.empty() ? "/ws" : path;
 
     {
-        std::lock_guard<std::mutex> lock(m_impl->mutex);
-        m_impl->connectHost = host;
-        m_impl->connectPort = port;
-        m_impl->connectPath = path.empty() ? "/" : path;
-        m_impl->shouldConnect = true;
+        std::lock_guard<std::mutex> lock(mImpl->mutex);
+        mImpl->connectHost = host;
+        mImpl->connectPort = port;
+        mImpl->connectPath = path.empty() ? "/" : path;
+        mImpl->shouldConnect = true;
     }
 
     // Start client thread if not running
-    if (!m_impl->clientThread.joinable()) {
-        m_impl->clientThread = std::thread([this]() {
-            m_impl->run();
+    if (!mImpl->clientThread.joinable()) {
+        mImpl->clientThread = std::thread([this]() {
+            mImpl->run();
         });
     }
 
-    m_state = WebSocketState::Connecting;
+    mState = WebSocketState::Connecting;
     return true;
 }
 
 void WebSocketClient::disconnect()
 {
-    std::lock_guard<std::mutex> lock(m_impl->mutex);
-    m_impl->shouldDisconnect = true;
+    std::lock_guard<std::mutex> lock(mImpl->mutex);
+    mImpl->shouldDisconnect = true;
 }
 
 void WebSocketClient::send(const std::string &message)
 {
-    std::lock_guard<std::mutex> lock(m_impl->mutex);
-    m_impl->outgoingMessages.push(message);
+    std::lock_guard<std::mutex> lock(mImpl->mutex);
+    mImpl->outgoingMessages.push(message);
 }
 
 void WebSocketClient::poll()
 {
-    m_state = m_impl->state;
+    mState = mImpl->state;
 }
 
 bool WebSocketClient::reconnect()
 {
-    if (m_host.empty() || m_port == 0) {
+    if (mHost.empty() || mPort == 0) {
         return false;
     }
-    return connect(m_host, m_port, m_path);
+    return connect(mHost, mPort, mPath);
 }
 
 } // namespace konflikt

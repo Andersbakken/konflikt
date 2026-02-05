@@ -89,8 +89,8 @@ private:
     void notifyLayoutChanged();
     void arrangeScreens();
 
-    std::unordered_map<std::string, ScreenEntry> m_screens;
-    std::string m_serverInstanceId;
+    std::unordered_map<std::string, ScreenEntry> mScreens;
+    std::string mServerInstanceId;
 };
 
 } // namespace konflikt

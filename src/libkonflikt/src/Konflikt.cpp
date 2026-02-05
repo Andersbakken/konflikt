@@ -16,10 +16,10 @@
 namespace konflikt {
 
 Konflikt::Konflikt(const Config &config)
-    : m_config(config)
+    : mConfig(config)
 {
     // Generate identifiers
-    m_machineId = generateMachineId();
+    mMachineId = generateMachineId();
 }
 
 Konflikt::~Konflikt()
@@ -30,41 +30,41 @@ Konflikt::~Konflikt()
 bool Konflikt::init()
 {
     // Set up logger
-    m_logger.verbose = [this](const std::string &msg) {
+    mLogger.verbose = [this](const std::string &msg) {
         log("verbose", msg);
     };
-    m_logger.debug = [this](const std::string &msg) {
+    mLogger.debug = [this](const std::string &msg) {
         log("debug", msg);
     };
-    m_logger.log = [this](const std::string &msg) {
+    mLogger.log = [this](const std::string &msg) {
         log("log", msg);
     };
-    m_logger.error = [this](const std::string &msg) {
+    mLogger.error = [this](const std::string &msg) {
         log("error", msg);
     };
 
     // Create platform
-    m_platform = createPlatform();
-    if (!m_platform || !m_platform->initialize(m_logger)) {
+    mPlatform = createPlatform();
+    if (!mPlatform || !mPlatform->initialize(mLogger)) {
         log("error", "Failed to initialize platform");
         return false;
     }
 
     // Get screen bounds
-    Desktop desktop = m_platform->getDesktop();
-    m_screenBounds = Rect(
-        m_config.screenX,
-        m_config.screenY,
-        m_config.screenWidth > 0 ? m_config.screenWidth : desktop.width,
-        m_config.screenHeight > 0 ? m_config.screenHeight : desktop.height);
+    Desktop desktop = mPlatform->getDesktop();
+    mScreenBounds = Rect(
+        mConfig.screenX,
+        mConfig.screenY,
+        mConfig.screenWidth > 0 ? mConfig.screenWidth : desktop.width,
+        mConfig.screenHeight > 0 ? mConfig.screenHeight : desktop.height);
 
-    m_displayId = generateDisplayId();
+    mDisplayId = generateDisplayId();
 
-    log("log", "Screen bounds: " + std::to_string(m_screenBounds.width) + "x" + std::to_string(m_screenBounds.height));
+    log("log", "Screen bounds: " + std::to_string(mScreenBounds.width) + "x" + std::to_string(mScreenBounds.height));
 
     // Create WebSocket server
-    m_wsServer = std::make_unique<WebSocketServer>(m_config.port);
-    m_wsServer->setCallbacks({ .onConnect = [this](void *conn) {
+    mWsServer = std::make_unique<WebSocketServer>(mConfig.port);
+    mWsServer->setCallbacks({ .onConnect = [this](void *conn) {
         onClientConnected(conn);
     }, .onDisconnect = [this](void *conn) {
         onClientDisconnected(conn);
@@ -73,48 +73,48 @@ bool Konflikt::init()
     } });
 
     // Create HTTP server (same port as WebSocket for now)
-    m_httpServer = std::make_unique<HttpServer>(m_config.port);
+    mHttpServer = std::make_unique<HttpServer>(mConfig.port);
 
     // Serve static UI files if path is configured
-    if (!m_config.uiPath.empty() && std::filesystem::exists(m_config.uiPath)) {
-        m_httpServer->serveStatic("/ui/", m_config.uiPath);
-        log("log", "Serving UI from " + m_config.uiPath);
+    if (!mConfig.uiPath.empty() && std::filesystem::exists(mConfig.uiPath)) {
+        mHttpServer->serveStatic("/ui/", mConfig.uiPath);
+        log("log", "Serving UI from " + mConfig.uiPath);
     }
 
     // Set up platform event handler for server role
-    if (m_config.role == InstanceRole::Server) {
-        m_layoutManager = std::make_unique<LayoutManager>();
-        m_layoutManager->setServerScreen(
-            m_config.instanceId,
-            m_config.instanceName,
-            m_machineId,
-            m_screenBounds.width,
-            m_screenBounds.height);
+    if (mConfig.role == InstanceRole::Server) {
+        mLayoutManager = std::make_unique<LayoutManager>();
+        mLayoutManager->setServerScreen(
+            mConfig.instanceId,
+            mConfig.instanceName,
+            mMachineId,
+            mScreenBounds.width,
+            mScreenBounds.height);
 
-        m_platform->onEvent = [this](const Event &event) {
+        mPlatform->onEvent = [this](const Event &event) {
             onPlatformEvent(event);
         };
 
-        m_platform->startListening();
-        m_isActiveInstance = true;
+        mPlatform->startListening();
+        mIsActiveInstance = true;
     } else {
         // Client role: create WebSocket client
-        m_wsClient = std::make_unique<WebSocketClient>();
-        m_wsClient->setCallbacks({ .onConnect = [this]() {
+        mWsClient = std::make_unique<WebSocketClient>();
+        mWsClient->setCallbacks({ .onConnect = [this]() {
             updateStatus(ConnectionStatus::Connected, "Connected to server");
-            m_reconnectAttempts = 0; // Reset on successful connection
+            mReconnectAttempts = 0; // Reset on successful connection
                 // Send handshake
             HandshakeRequest req;
-            req.instanceId = m_config.instanceId;
-            req.instanceName = m_config.instanceName;
+            req.instanceId = mConfig.instanceId;
+            req.instanceName = mConfig.instanceName;
             req.version = "2.0.0";
             req.capabilities = { "input_events", "screen_info" };
             req.timestamp = timestamp();
-            m_wsClient->send(toJson(req));
+            mWsClient->send(toJson(req));
         }, .onDisconnect = [this](const std::string &reason) {
             updateStatus(ConnectionStatus::Disconnected, reason);
             // Trigger reconnection attempt
-            m_lastReconnectAttempt = 0; // Allow immediate first attempt
+            mLastReconnectAttempt = 0; // Allow immediate first attempt
         }, .onMessage = [this](const std::string &msg) {
             onWebSocketMessage(msg, nullptr);
         }, .onError = [this](const std::string &err) {
@@ -123,8 +123,8 @@ bool Konflikt::init()
     }
 
     // Initialize service discovery
-    m_serviceDiscovery = std::make_unique<ServiceDiscovery>();
-    m_serviceDiscovery->setCallbacks({
+    mServiceDiscovery = std::make_unique<ServiceDiscovery>();
+    mServiceDiscovery->setCallbacks({
         .onServiceFound = [this](const DiscoveredService &service) {
             onServiceFound(service);
         },
@@ -141,65 +141,65 @@ bool Konflikt::init()
 
 void Konflikt::run()
 {
-    m_running = true;
+    mRunning = true;
 
     // Start servers
-    if (m_config.role == InstanceRole::Server) {
-        if (!m_wsServer->start()) {
+    if (mConfig.role == InstanceRole::Server) {
+        if (!mWsServer->start()) {
             log("error", "Failed to start WebSocket server");
             return;
         }
-        if (!m_httpServer->start()) {
+        if (!mHttpServer->start()) {
             log("error", "Failed to start HTTP server");
             return;
         }
-        log("log", "Server listening on port " + std::to_string(m_wsServer->port()));
+        log("log", "Server listening on port " + std::to_string(mWsServer->port()));
         updateStatus(ConnectionStatus::Connected, "Server running");
 
         // Register service for discovery
-        if (m_serviceDiscovery->registerService(m_config.instanceName, m_wsServer->port(), m_config.instanceId)) {
-            log("log", "Registered mDNS service: " + m_config.instanceName);
+        if (mServiceDiscovery->registerService(mConfig.instanceName, mWsServer->port(), mConfig.instanceId)) {
+            log("log", "Registered mDNS service: " + mConfig.instanceName);
         }
     } else {
         // Client: connect to server
-        if (!m_config.serverHost.empty()) {
-            log("log", "Connecting to " + m_config.serverHost + ":" + std::to_string(m_config.serverPort));
+        if (!mConfig.serverHost.empty()) {
+            log("log", "Connecting to " + mConfig.serverHost + ":" + std::to_string(mConfig.serverPort));
             updateStatus(ConnectionStatus::Connecting, "Connecting...");
-            m_wsClient->connect(m_config.serverHost, m_config.serverPort, "/ws");
+            mWsClient->connect(mConfig.serverHost, mConfig.serverPort, "/ws");
         } else {
             // No server specified, browse for servers
             log("log", "Browsing for Konflikt servers...");
             updateStatus(ConnectionStatus::Connecting, "Searching for servers...");
-            m_serviceDiscovery->startBrowsing();
+            mServiceDiscovery->startBrowsing();
         }
     }
 
     // Main loop
-    while (m_running) {
-        if (m_wsClient) {
-            m_wsClient->poll();
+    while (mRunning) {
+        if (mWsClient) {
+            mWsClient->poll();
 
             // Auto-reconnect for clients
-            if (m_config.role == InstanceRole::Client &&
-                m_connectionStatus == ConnectionStatus::Disconnected &&
-                !m_wsClient->host().empty() &&
-                m_reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+            if (mConfig.role == InstanceRole::Client &&
+                mConnectionStatus == ConnectionStatus::Disconnected &&
+                !mWsClient->host().empty() &&
+                mReconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
 
                 uint64_t now = timestamp();
-                if (now - m_lastReconnectAttempt >= RECONNECT_DELAY_MS) {
-                    m_lastReconnectAttempt = now;
-                    m_reconnectAttempts++;
-                    log("log", "Reconnection attempt " + std::to_string(m_reconnectAttempts) +
+                if (now - mLastReconnectAttempt >= RECONNECT_DELAY_MS) {
+                    mLastReconnectAttempt = now;
+                    mReconnectAttempts++;
+                    log("log", "Reconnection attempt " + std::to_string(mReconnectAttempts) +
                         "/" + std::to_string(MAX_RECONNECT_ATTEMPTS));
                     updateStatus(ConnectionStatus::Connecting, "Reconnecting...");
-                    m_wsClient->reconnect();
+                    mWsClient->reconnect();
                 }
             }
         }
 
         // Poll service discovery for events
-        if (m_serviceDiscovery) {
-            m_serviceDiscovery->poll();
+        if (mServiceDiscovery) {
+            mServiceDiscovery->poll();
         }
 
         // Check for clipboard changes periodically
@@ -211,34 +211,34 @@ void Konflikt::run()
 
 void Konflikt::stop()
 {
-    m_running = false;
+    mRunning = false;
 
-    if (m_platform) {
-        m_platform->stopListening();
-        m_platform->shutdown();
+    if (mPlatform) {
+        mPlatform->stopListening();
+        mPlatform->shutdown();
     }
 
-    if (m_wsServer) {
-        m_wsServer->stop();
+    if (mWsServer) {
+        mWsServer->stop();
     }
 
-    if (m_httpServer) {
-        m_httpServer->stop();
+    if (mHttpServer) {
+        mHttpServer->stop();
     }
 
-    if (m_wsClient) {
-        m_wsClient->disconnect();
+    if (mWsClient) {
+        mWsClient->disconnect();
     }
 }
 
 void Konflikt::quit()
 {
-    m_running = false;
+    mRunning = false;
 }
 
 int Konflikt::httpPort() const
 {
-    return m_httpServer ? m_httpServer->port() : m_config.port;
+    return mHttpServer ? mHttpServer->port() : mConfig.port;
 }
 
 void Konflikt::onPlatformEvent(const Event &event)
@@ -246,17 +246,17 @@ void Konflikt::onPlatformEvent(const Event &event)
     switch (event.type) {
         case EventType::MouseMove: {
             // Update local cursor position
-            if (m_hasVirtualCursor && m_activatedClientId.empty() == false) {
+            if (mHasVirtualCursor && mActivatedClientId.empty() == false) {
                 // Update virtual cursor
-                int32_t newX = m_virtualCursor.x + event.state.dx;
-                int32_t newY = m_virtualCursor.y + event.state.dy;
+                int32_t newX = mVirtualCursor.x + event.state.dx;
+                int32_t newY = mVirtualCursor.y + event.state.dy;
 
-                m_virtualCursor.x = std::clamp(newX, 0, m_activeRemoteScreenBounds.width - 1);
-                m_virtualCursor.y = std::clamp(newY, 0, m_activeRemoteScreenBounds.height - 1);
+                mVirtualCursor.x = std::clamp(newX, 0, mActiveRemoteScreenBounds.width - 1);
+                mVirtualCursor.y = std::clamp(newY, 0, mActiveRemoteScreenBounds.height - 1);
 
                 InputEventData data;
-                data.x = m_virtualCursor.x;
-                data.y = m_virtualCursor.y;
+                data.x = mVirtualCursor.x;
+                data.y = mVirtualCursor.y;
                 data.dx = event.state.dx;
                 data.dy = event.state.dy;
                 data.timestamp = event.timestamp;
@@ -275,10 +275,10 @@ void Konflikt::onPlatformEvent(const Event &event)
 
         case EventType::MousePress:
         case EventType::MouseRelease: {
-            if (m_hasVirtualCursor) {
+            if (mHasVirtualCursor) {
                 InputEventData data;
-                data.x = m_virtualCursor.x;
-                data.y = m_virtualCursor.y;
+                data.x = mVirtualCursor.x;
+                data.y = mVirtualCursor.y;
                 data.timestamp = event.timestamp;
                 data.keyboardModifiers = event.state.keyboardModifiers;
                 data.mouseButtons = event.state.mouseButtons;
@@ -297,10 +297,10 @@ void Konflikt::onPlatformEvent(const Event &event)
 
         case EventType::KeyPress:
         case EventType::KeyRelease: {
-            if (m_hasVirtualCursor) {
+            if (mHasVirtualCursor) {
                 InputEventData data;
-                data.x = m_virtualCursor.x;
-                data.y = m_virtualCursor.y;
+                data.x = mVirtualCursor.x;
+                data.y = mVirtualCursor.y;
                 data.timestamp = event.timestamp;
                 data.keyboardModifiers = event.state.keyboardModifiers;
                 data.keycode = event.keycode;
@@ -312,10 +312,10 @@ void Konflikt::onPlatformEvent(const Event &event)
         }
 
         case EventType::MouseScroll: {
-            if (m_hasVirtualCursor) {
+            if (mHasVirtualCursor) {
                 InputEventData data;
-                data.x = m_virtualCursor.x;
-                data.y = m_virtualCursor.y;
+                data.x = mVirtualCursor.x;
+                data.y = mVirtualCursor.y;
                 data.scrollX = event.state.scrollX;
                 data.scrollY = event.state.scrollY;
                 data.timestamp = event.timestamp;
@@ -388,20 +388,20 @@ void Konflikt::onClientConnected(void *connection)
 
 void Konflikt::onClientDisconnected(void *connection)
 {
-    auto it = m_connectionToInstanceId.find(connection);
-    if (it != m_connectionToInstanceId.end()) {
+    auto it = mConnectionToInstanceId.find(connection);
+    if (it != mConnectionToInstanceId.end()) {
         std::string instanceId = it->second;
         log("log", "Client disconnected: " + instanceId);
 
         // If this was the active client, deactivate remote screen
-        if (instanceId == m_activatedClientId) {
+        if (instanceId == mActivatedClientId) {
             deactivateRemoteScreen();
         }
 
-        if (m_layoutManager) {
-            m_layoutManager->setClientOnline(instanceId, false);
+        if (mLayoutManager) {
+            mLayoutManager->setClientOnline(instanceId, false);
         }
-        m_connectionToInstanceId.erase(it);
+        mConnectionToInstanceId.erase(it);
     }
 }
 
@@ -410,47 +410,47 @@ void Konflikt::handleHandshakeRequest(const HandshakeRequest &request, void *con
     log("log", "Handshake from " + request.instanceName);
 
     // Track connection
-    m_connectionToInstanceId[connection] = request.instanceId;
+    mConnectionToInstanceId[connection] = request.instanceId;
 
     // Send response
     HandshakeResponse response;
     response.accepted = true;
-    response.instanceId = m_config.instanceId;
-    response.instanceName = m_config.instanceName;
+    response.instanceId = mConfig.instanceId;
+    response.instanceName = mConfig.instanceName;
     response.version = "2.0.0";
     response.capabilities = { "input_events", "screen_info" };
     response.timestamp = timestamp();
 
-    m_wsServer->send(connection, toJson(response));
+    mWsServer->send(connection, toJson(response));
 }
 
 void Konflikt::handleHandshakeResponse(const HandshakeResponse &response)
 {
     if (response.accepted) {
-        m_connectedServerName = response.instanceName;
+        mConnectedServerName = response.instanceName;
         log("log", "Handshake completed with " + response.instanceName);
 
         // Send client registration
         ClientRegistrationMessage reg;
-        reg.instanceId = m_config.instanceId;
-        reg.displayName = m_config.instanceName;
-        reg.machineId = m_machineId;
-        reg.screenWidth = m_screenBounds.width;
-        reg.screenHeight = m_screenBounds.height;
+        reg.instanceId = mConfig.instanceId;
+        reg.displayName = mConfig.instanceName;
+        reg.machineId = mMachineId;
+        reg.screenWidth = mScreenBounds.width;
+        reg.screenHeight = mScreenBounds.height;
 
-        m_wsClient->send(toJson(reg));
+        mWsClient->send(toJson(reg));
     }
 }
 
 void Konflikt::handleInputEvent(const InputEventMessage &message)
 {
     // Only clients execute received input events
-    if (m_config.role != InstanceRole::Client || !m_isActiveInstance) {
+    if (mConfig.role != InstanceRole::Client || !mIsActiveInstance) {
         return;
     }
 
     // Don't execute our own events
-    if (message.sourceInstanceId == m_config.instanceId) {
+    if (message.sourceInstanceId == mConfig.instanceId) {
         return;
     }
 
@@ -474,11 +474,11 @@ void Konflikt::handleInputEvent(const InputEventMessage &message)
 
     if (message.eventType == "mouseMove" || message.eventType == "mousePress" ||
         message.eventType == "mouseRelease") {
-        m_platform->sendMouseEvent(event);
+        mPlatform->sendMouseEvent(event);
 
         // Check for deactivation (cursor at left edge moving left)
         if (message.eventType == "mouseMove") {
-            InputState state = m_platform->getState();
+            InputState state = mPlatform->getState();
             if (state.x <= 1 && message.eventData.dx < 0) {
                 requestDeactivation();
             }
@@ -487,22 +487,22 @@ void Konflikt::handleInputEvent(const InputEventMessage &message)
         event.type = EventType::MouseScroll;
         event.state.scrollX = message.eventData.scrollX;
         event.state.scrollY = message.eventData.scrollY;
-        m_platform->sendMouseEvent(event);
+        mPlatform->sendMouseEvent(event);
     } else if (message.eventType == "keyPress" || message.eventType == "keyRelease") {
         event.type = message.eventType == "keyPress" ? EventType::KeyPress : EventType::KeyRelease;
-        m_platform->sendKeyEvent(event);
+        mPlatform->sendKeyEvent(event);
     }
 }
 
 void Konflikt::handleClientRegistration(const ClientRegistrationMessage &message)
 {
-    if (m_config.role != InstanceRole::Server || !m_layoutManager) {
+    if (mConfig.role != InstanceRole::Server || !mLayoutManager) {
         return;
     }
 
     log("log", "Client registered: " + message.displayName);
 
-    auto entry = m_layoutManager->registerClient(
+    auto entry = mLayoutManager->registerClient(
         message.instanceId,
         message.displayName,
         message.machineId,
@@ -513,8 +513,8 @@ void Konflikt::handleClientRegistration(const ClientRegistrationMessage &message
     LayoutAssignmentMessage assignment;
     assignment.position.x = entry.x;
     assignment.position.y = entry.y;
-    assignment.adjacency = m_layoutManager->getAdjacencyFor(message.instanceId);
-    for (const auto &screen : m_layoutManager->getLayout()) {
+    assignment.adjacency = mLayoutManager->getAdjacencyFor(message.instanceId);
+    for (const auto &screen : mLayoutManager->getLayout()) {
         ScreenInfo info;
         info.instanceId = screen.instanceId;
         info.displayName = screen.displayName;
@@ -532,27 +532,27 @@ void Konflikt::handleClientRegistration(const ClientRegistrationMessage &message
 
 void Konflikt::handleLayoutAssignment(const LayoutAssignmentMessage &message)
 {
-    if (m_config.role != InstanceRole::Client) {
+    if (mConfig.role != InstanceRole::Client) {
         return;
     }
 
-    m_screenBounds.x = message.position.x;
-    m_screenBounds.y = message.position.y;
+    mScreenBounds.x = message.position.x;
+    mScreenBounds.y = message.position.y;
 
     log("log", "Layout assigned: position (" + std::to_string(message.position.x) + ", " + std::to_string(message.position.y) + ")");
 }
 
 void Konflikt::handleLayoutUpdate(const LayoutUpdateMessage &message)
 {
-    if (m_config.role != InstanceRole::Client) {
+    if (mConfig.role != InstanceRole::Client) {
         return;
     }
 
     // Update our position from the layout
     for (const auto &screen : message.screens) {
-        if (screen.instanceId == m_config.instanceId) {
-            m_screenBounds.x = screen.x;
-            m_screenBounds.y = screen.y;
+        if (screen.instanceId == mConfig.instanceId) {
+            mScreenBounds.x = screen.x;
+            mScreenBounds.y = screen.y;
             break;
         }
     }
@@ -560,16 +560,16 @@ void Konflikt::handleLayoutUpdate(const LayoutUpdateMessage &message)
 
 void Konflikt::handleActivateClient(const ActivateClientMessage &message)
 {
-    if (message.targetInstanceId != m_config.instanceId) {
+    if (message.targetInstanceId != mConfig.instanceId) {
         // Not for us
-        if (m_isActiveInstance) {
-            m_isActiveInstance = false;
+        if (mIsActiveInstance) {
+            mIsActiveInstance = false;
         }
         return;
     }
 
     log("log", "Activated at (" + std::to_string(message.cursorX) + ", " + std::to_string(message.cursorY) + ")");
-    m_isActiveInstance = true;
+    mIsActiveInstance = true;
 
     // Move cursor to specified position
     Event moveEvent;
@@ -577,16 +577,16 @@ void Konflikt::handleActivateClient(const ActivateClientMessage &message)
     moveEvent.state.x = message.cursorX;
     moveEvent.state.y = message.cursorY;
     moveEvent.timestamp = timestamp();
-    m_platform->sendMouseEvent(moveEvent);
+    mPlatform->sendMouseEvent(moveEvent);
 }
 
 void Konflikt::handleDeactivationRequest(const DeactivationRequestMessage &message)
 {
-    if (m_config.role != InstanceRole::Server) {
+    if (mConfig.role != InstanceRole::Server) {
         return;
     }
 
-    if (message.instanceId != m_activatedClientId) {
+    if (message.instanceId != mActivatedClientId) {
         return;
     }
 
@@ -596,12 +596,12 @@ void Konflikt::handleDeactivationRequest(const DeactivationRequestMessage &messa
 
 bool Konflikt::checkScreenTransition(int32_t x, int32_t y)
 {
-    if (m_config.role != InstanceRole::Server || !m_layoutManager) {
+    if (mConfig.role != InstanceRole::Server || !mLayoutManager) {
         return false;
     }
 
     // Cooldown after deactivation
-    if (timestamp() - m_lastDeactivationTime < 500) {
+    if (timestamp() - mLastDeactivationTime < 500) {
         return false;
     }
 
@@ -609,16 +609,16 @@ bool Konflikt::checkScreenTransition(int32_t x, int32_t y)
     Side edge;
     bool atEdge = false;
 
-    if (x <= m_screenBounds.x + EDGE_THRESHOLD) {
+    if (x <= mScreenBounds.x + EDGE_THRESHOLD) {
         edge = Side::Left;
         atEdge = true;
-    } else if (x >= m_screenBounds.x + m_screenBounds.width - EDGE_THRESHOLD - 1) {
+    } else if (x >= mScreenBounds.x + mScreenBounds.width - EDGE_THRESHOLD - 1) {
         edge = Side::Right;
         atEdge = true;
-    } else if (y <= m_screenBounds.y + EDGE_THRESHOLD) {
+    } else if (y <= mScreenBounds.y + EDGE_THRESHOLD) {
         edge = Side::Top;
         atEdge = true;
-    } else if (y >= m_screenBounds.y + m_screenBounds.height - EDGE_THRESHOLD - 1) {
+    } else if (y >= mScreenBounds.y + mScreenBounds.height - EDGE_THRESHOLD - 1) {
         edge = Side::Bottom;
         atEdge = true;
     }
@@ -627,13 +627,13 @@ bool Konflikt::checkScreenTransition(int32_t x, int32_t y)
         return false;
     }
 
-    auto target = m_layoutManager->getTransitionTargetAtEdge(m_config.instanceId, edge, x, y);
+    auto target = mLayoutManager->getTransitionTargetAtEdge(mConfig.instanceId, edge, x, y);
     if (!target) {
         return false;
     }
 
     // Only activate once
-    if (m_activatedClientId == target->targetScreen.instanceId) {
+    if (mActivatedClientId == target->targetScreen.instanceId) {
         return true;
     }
 
@@ -643,7 +643,7 @@ bool Konflikt::checkScreenTransition(int32_t x, int32_t y)
 
 void Konflikt::activateClient(const std::string &targetInstanceId, int32_t cursorX, int32_t cursorY)
 {
-    m_activatedClientId = targetInstanceId;
+    mActivatedClientId = targetInstanceId;
 
     ActivateClientMessage msg;
     msg.targetInstanceId = targetInstanceId;
@@ -654,70 +654,70 @@ void Konflikt::activateClient(const std::string &targetInstanceId, int32_t curso
     broadcastToClients(toJson(msg));
 
     // Set up virtual cursor
-    m_virtualCursor.x = cursorX;
-    m_virtualCursor.y = cursorY;
-    m_hasVirtualCursor = true;
+    mVirtualCursor.x = cursorX;
+    mVirtualCursor.y = cursorY;
+    mHasVirtualCursor = true;
 
-    auto screen = m_layoutManager->getScreen(targetInstanceId);
+    auto screen = mLayoutManager->getScreen(targetInstanceId);
     if (screen) {
-        m_activeRemoteScreenBounds = Rect(0, 0, screen->width, screen->height);
+        mActiveRemoteScreenBounds = Rect(0, 0, screen->width, screen->height);
     }
 
     // Hide cursor on server
-    m_platform->hideCursor();
-    m_isActiveInstance = false;
+    mPlatform->hideCursor();
+    mIsActiveInstance = false;
 
     log("log", "Activated client " + targetInstanceId);
 }
 
 void Konflikt::deactivateRemoteScreen()
 {
-    m_virtualCursor = { 0, 0 };
-    m_hasVirtualCursor = false;
-    m_activatedClientId.clear();
-    m_activeRemoteScreenBounds = Rect();
+    mVirtualCursor = { 0, 0 };
+    mHasVirtualCursor = false;
+    mActivatedClientId.clear();
+    mActiveRemoteScreenBounds = Rect();
 
     // Show cursor
-    m_platform->showCursor();
+    mPlatform->showCursor();
 
     // Warp cursor to right edge
-    int32_t rightEdgeX = m_screenBounds.x + m_screenBounds.width - 1;
-    InputState state = m_platform->getState();
+    int32_t rightEdgeX = mScreenBounds.x + mScreenBounds.width - 1;
+    InputState state = mPlatform->getState();
 
     Event moveEvent;
     moveEvent.type = EventType::MouseMove;
     moveEvent.state.x = rightEdgeX;
     moveEvent.state.y = state.y;
     moveEvent.timestamp = timestamp();
-    m_platform->sendMouseEvent(moveEvent);
+    mPlatform->sendMouseEvent(moveEvent);
 
-    m_isActiveInstance = true;
-    m_lastDeactivationTime = timestamp();
+    mIsActiveInstance = true;
+    mLastDeactivationTime = timestamp();
 
     log("log", "Deactivated remote screen");
 }
 
 void Konflikt::requestDeactivation()
 {
-    if (timestamp() - m_lastDeactivationRequest < 500) {
+    if (timestamp() - mLastDeactivationRequest < 500) {
         return;
     }
-    m_lastDeactivationRequest = timestamp();
+    mLastDeactivationRequest = timestamp();
 
     DeactivationRequestMessage msg;
-    msg.instanceId = m_config.instanceId;
+    msg.instanceId = mConfig.instanceId;
     msg.timestamp = timestamp();
 
-    m_wsClient->send(toJson(msg));
+    mWsClient->send(toJson(msg));
     log("log", "Requested deactivation");
 }
 
 void Konflikt::broadcastInputEvent(const std::string &eventType, const InputEventData &data)
 {
     InputEventMessage msg;
-    msg.sourceInstanceId = m_config.instanceId;
-    msg.sourceDisplayId = m_displayId;
-    msg.sourceMachineId = m_machineId;
+    msg.sourceInstanceId = mConfig.instanceId;
+    msg.sourceDisplayId = mDisplayId;
+    msg.sourceMachineId = mMachineId;
     msg.eventType = eventType;
     msg.eventData = data;
 
@@ -726,27 +726,27 @@ void Konflikt::broadcastInputEvent(const std::string &eventType, const InputEven
 
 void Konflikt::broadcastToClients(const std::string &message)
 {
-    if (m_wsServer) {
-        m_wsServer->broadcast(message);
+    if (mWsServer) {
+        mWsServer->broadcast(message);
     }
 }
 
 void Konflikt::updateStatus(ConnectionStatus status, const std::string &message)
 {
-    m_connectionStatus = status;
-    if (m_statusCallback) {
-        m_statusCallback(status, message);
+    mConnectionStatus = status;
+    if (mStatusCallback) {
+        mStatusCallback(status, message);
     }
 }
 
 void Konflikt::log(const std::string &level, const std::string &message)
 {
-    if (m_logCallback) {
-        m_logCallback(level, message);
+    if (mLogCallback) {
+        mLogCallback(level, message);
     }
 
     // Also print to stderr for debugging
-    if (m_config.verbose || level == "error" || level == "log") {
+    if (mConfig.verbose || level == "error" || level == "log") {
         fprintf(stderr, "[%s] %s\n", level.c_str(), message.c_str());
     }
 }
@@ -770,10 +770,10 @@ std::string Konflikt::generateMachineId()
 
 std::string Konflikt::generateDisplayId()
 {
-    Desktop desktop = m_platform->getDesktop();
-    std::string input = m_machineId + "-" +
+    Desktop desktop = mPlatform->getDesktop();
+    std::string input = mMachineId + "-" +
         std::to_string(desktop.width) + "x" + std::to_string(desktop.height) + "-" +
-        std::to_string(m_screenBounds.x) + "," + std::to_string(m_screenBounds.y);
+        std::to_string(mScreenBounds.x) + "," + std::to_string(mScreenBounds.y);
 
     unsigned char hash[SHA256_DIGEST_LENGTH];
     SHA256(reinterpret_cast<const unsigned char *>(input.c_str()), input.length(), hash);
@@ -788,24 +788,24 @@ std::string Konflikt::generateDisplayId()
 void Konflikt::handleClipboardSync(const ClipboardSyncMessage &message)
 {
     // Don't apply our own clipboard updates
-    if (message.sourceInstanceId == m_config.instanceId) {
+    if (message.sourceInstanceId == mConfig.instanceId) {
         return;
     }
 
     // Only accept newer clipboard data
-    if (message.sequence <= m_clipboardSequence) {
+    if (message.sequence <= mClipboardSequence) {
         return;
     }
 
-    m_clipboardSequence = message.sequence;
+    mClipboardSequence = message.sequence;
 
     // Currently only supporting plain text
     if (message.format == "text/plain") {
-        m_lastClipboardText = message.data;
-        if (m_platform) {
-            m_platform->setClipboardText(message.data);
+        mLastClipboardText = message.data;
+        if (mPlatform) {
+            mPlatform->setClipboardText(message.data);
         }
-        if (m_config.verbose) {
+        if (mConfig.verbose) {
             log("verbose", "Clipboard synced from " + message.sourceInstanceId);
         }
     }
@@ -813,48 +813,48 @@ void Konflikt::handleClipboardSync(const ClipboardSyncMessage &message)
 
 void Konflikt::checkClipboardChange()
 {
-    if (!m_platform) {
+    if (!mPlatform) {
         return;
     }
 
     // Poll clipboard periodically (every 500ms)
     uint64_t now = timestamp();
-    if (now - m_lastClipboardCheck < 500) {
+    if (now - mLastClipboardCheck < 500) {
         return;
     }
-    m_lastClipboardCheck = now;
+    mLastClipboardCheck = now;
 
-    std::string currentText = m_platform->getClipboardText();
+    std::string currentText = mPlatform->getClipboardText();
 
     // Check if clipboard changed
-    if (!currentText.empty() && currentText != m_lastClipboardText) {
-        m_lastClipboardText = currentText;
+    if (!currentText.empty() && currentText != mLastClipboardText) {
+        mLastClipboardText = currentText;
         broadcastClipboard(currentText);
     }
 }
 
 void Konflikt::broadcastClipboard(const std::string &text)
 {
-    m_clipboardSequence++;
+    mClipboardSequence++;
 
     ClipboardSyncMessage msg;
-    msg.sourceInstanceId = m_config.instanceId;
+    msg.sourceInstanceId = mConfig.instanceId;
     msg.format = "text/plain";
     msg.data = text;
-    msg.sequence = m_clipboardSequence;
+    msg.sequence = mClipboardSequence;
     msg.timestamp = timestamp();
 
     std::string json = toJson(msg);
 
     // Server broadcasts to all clients
-    if (m_config.role == InstanceRole::Server) {
+    if (mConfig.role == InstanceRole::Server) {
         broadcastToClients(json);
-    } else if (m_wsClient) {
+    } else if (mWsClient) {
         // Client sends to server (which will relay)
-        m_wsClient->send(json);
+        mWsClient->send(json);
     }
 
-    if (m_config.verbose) {
+    if (mConfig.verbose) {
         log("verbose", "Broadcasting clipboard change");
     }
 }
@@ -864,14 +864,14 @@ void Konflikt::onServiceFound(const DiscoveredService &service)
     log("log", "Discovered server: " + service.name + " at " + service.host + ":" + std::to_string(service.port));
 
     // Don't connect to ourselves
-    if (service.instanceId == m_config.instanceId) {
+    if (service.instanceId == mConfig.instanceId) {
         return;
     }
 
     // Auto-connect if we're a client without a connection
-    if (m_config.role == InstanceRole::Client &&
-        m_connectionStatus != ConnectionStatus::Connected &&
-        m_config.serverHost.empty()) {
+    if (mConfig.role == InstanceRole::Client &&
+        mConnectionStatus != ConnectionStatus::Connected &&
+        mConfig.serverHost.empty()) {
         connectToDiscoveredServer(service.host, service.port);
     }
 }
@@ -883,18 +883,18 @@ void Konflikt::onServiceLost(const std::string &name)
 
 void Konflikt::connectToDiscoveredServer(const std::string &host, int port)
 {
-    if (!m_wsClient) {
+    if (!mWsClient) {
         return;
     }
 
     // Don't reconnect if already connected
-    if (m_connectionStatus == ConnectionStatus::Connected) {
+    if (mConnectionStatus == ConnectionStatus::Connected) {
         return;
     }
 
     log("log", "Auto-connecting to discovered server: " + host + ":" + std::to_string(port));
     updateStatus(ConnectionStatus::Connecting, "Connecting to " + host + "...");
-    m_wsClient->connect(host, port, "/ws");
+    mWsClient->connect(host, port, "/ws");
 }
 
 } // namespace konflikt

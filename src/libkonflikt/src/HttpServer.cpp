@@ -180,8 +180,8 @@ struct HttpServer::Impl
 };
 
 HttpServer::HttpServer(int port)
-    : m_impl(std::make_unique<Impl>())
-    , m_port(port)
+    : mImpl(std::make_unique<Impl>())
+    , mPort(port)
 {
 }
 
@@ -192,58 +192,58 @@ HttpServer::~HttpServer()
 
 void HttpServer::route(const std::string &method, const std::string &path, RouteHandler handler)
 {
-    m_impl->routes[method + " " + path] = std::move(handler);
+    mImpl->routes[method + " " + path] = std::move(handler);
 }
 
 void HttpServer::serveStatic(const std::string &urlPrefix, const std::string &directory)
 {
-    m_impl->staticPrefix = urlPrefix;
-    m_impl->staticDir = directory;
-    m_staticDir = directory;
-    m_staticPrefix = urlPrefix;
+    mImpl->staticPrefix = urlPrefix;
+    mImpl->staticDir = directory;
+    mStaticDir = directory;
+    mStaticPrefix = urlPrefix;
 }
 
 bool HttpServer::start()
 {
-    if (m_running) {
+    if (mRunning) {
         return true;
     }
 
-    m_impl->serverThread = std::thread([this]() {
-        m_impl->run(m_port);
+    mImpl->serverThread = std::thread([this]() {
+        mImpl->run(mPort);
     });
 
     // Wait for server to start
-    while (!m_impl->running && m_impl->serverThread.joinable()) {
+    while (!mImpl->running && mImpl->serverThread.joinable()) {
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
-        if (m_impl->port == 0 && m_impl->listenSocket == nullptr) {
+        if (mImpl->port == 0 && mImpl->listenSocket == nullptr) {
             break;
         }
     }
 
-    m_running = m_impl->running;
-    if (m_running) {
-        m_port = m_impl->port;
+    mRunning = mImpl->running;
+    if (mRunning) {
+        mPort = mImpl->port;
     }
-    return m_running;
+    return mRunning;
 }
 
 void HttpServer::stop()
 {
-    if (!m_running) {
+    if (!mRunning) {
         return;
     }
 
-    m_running = false;
-    m_impl->running = false;
+    mRunning = false;
+    mImpl->running = false;
 
-    if (m_impl->listenSocket) {
-        us_listen_socket_close(false, m_impl->listenSocket);
-        m_impl->listenSocket = nullptr;
+    if (mImpl->listenSocket) {
+        us_listen_socket_close(false, mImpl->listenSocket);
+        mImpl->listenSocket = nullptr;
     }
 
-    if (m_impl->serverThread.joinable()) {
-        m_impl->serverThread.join();
+    if (mImpl->serverThread.joinable()) {
+        mImpl->serverThread.join();
     }
 }
 
