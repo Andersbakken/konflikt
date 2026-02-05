@@ -224,7 +224,9 @@ CLI presets:
 
 - `GET /api/version` - Version info
 - `GET /api/server-info` - Server name, port, TLS status
-- `GET /api/status` - Instance status, connection info, client details (including connected clients array with instanceId, displayName, screenWidth, screenHeight, connectedAt, active)
+- `GET /api/status` - Instance status, connection info, client details
+- `GET /api/config` - Get current runtime configuration
+- `POST /api/config` - Update runtime config (JSON body with edgeLeft, edgeRight, edgeTop, edgeBottom, lockCursorToScreen, verbose, logKeycodes)
 - `GET /api/cert` - Download server TLS certificate (if TLS enabled)
 - `GET /api/log` - Recent logs with key data filtered (if `enableDebugApi` enabled)
 

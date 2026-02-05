@@ -247,6 +247,108 @@ bool Konflikt::init()
         log("log", "Debug API enabled at /api/log");
     }
 
+    // API endpoint for getting runtime config
+    mHttpServer->route("GET", "/api/config", [this](const HttpRequest &) {
+        HttpResponse response;
+        response.contentType = "application/json";
+
+        std::stringstream ss;
+        ss << "{";
+        ss << "\"edgeLeft\":" << (mConfig.edgeLeft ? "true" : "false") << ",";
+        ss << "\"edgeRight\":" << (mConfig.edgeRight ? "true" : "false") << ",";
+        ss << "\"edgeTop\":" << (mConfig.edgeTop ? "true" : "false") << ",";
+        ss << "\"edgeBottom\":" << (mConfig.edgeBottom ? "true" : "false") << ",";
+        ss << "\"lockCursorToScreen\":" << (mConfig.lockCursorToScreen ? "true" : "false") << ",";
+        ss << "\"lockCursorHotkey\":" << mConfig.lockCursorHotkey << ",";
+        ss << "\"verbose\":" << (mConfig.verbose ? "true" : "false") << ",";
+        ss << "\"logKeycodes\":" << (mConfig.logKeycodes ? "true" : "false") << ",";
+        ss << "\"keyRemap\":{";
+        bool first = true;
+        for (const auto &[from, to] : mConfig.keyRemap) {
+            if (!first) {
+                ss << ",";
+            }
+            first = false;
+            ss << "\"" << from << "\":" << to;
+        }
+        ss << "}}";
+
+        response.body = ss.str();
+        return response;
+    });
+
+    // API endpoint for updating runtime config (POST with JSON body)
+    mHttpServer->route("POST", "/api/config", [this](const HttpRequest &req) {
+        HttpResponse response;
+        response.contentType = "application/json";
+
+        // Parse simple JSON (key: value pairs)
+        // Looking for: edgeLeft, edgeRight, edgeTop, edgeBottom, lockCursorToScreen, logKeycodes, verbose
+        const std::string &body = req.body;
+
+        auto getBool = [&body](const std::string &key) -> std::optional<bool> {
+            size_t pos = body.find("\"" + key + "\"");
+            if (pos == std::string::npos) {
+                return std::nullopt;
+            }
+            pos = body.find(":", pos);
+            if (pos == std::string::npos) {
+                return std::nullopt;
+            }
+            size_t start = body.find_first_not_of(" \t\n", pos + 1);
+            if (start == std::string::npos) {
+                return std::nullopt;
+            }
+            if (body.substr(start, 4) == "true") {
+                return true;
+            }
+            if (body.substr(start, 5) == "false") {
+                return false;
+            }
+            return std::nullopt;
+        };
+
+        bool changed = false;
+
+        if (auto val = getBool("edgeLeft")) {
+            mConfig.edgeLeft = *val;
+            changed = true;
+        }
+        if (auto val = getBool("edgeRight")) {
+            mConfig.edgeRight = *val;
+            changed = true;
+        }
+        if (auto val = getBool("edgeTop")) {
+            mConfig.edgeTop = *val;
+            changed = true;
+        }
+        if (auto val = getBool("edgeBottom")) {
+            mConfig.edgeBottom = *val;
+            changed = true;
+        }
+        if (auto val = getBool("lockCursorToScreen")) {
+            mConfig.lockCursorToScreen = *val;
+            changed = true;
+        }
+        if (auto val = getBool("verbose")) {
+            mConfig.verbose = *val;
+            changed = true;
+        }
+        if (auto val = getBool("logKeycodes")) {
+            mConfig.logKeycodes = *val;
+            changed = true;
+        }
+
+        if (changed) {
+            response.body = "{\"success\":true,\"message\":\"Config updated\"}";
+            log("log", "Config updated via API");
+        } else {
+            response.body = "{\"success\":false,\"message\":\"No valid config options found\"}";
+        }
+
+        return response;
+    });
+
     // Set up platform event handler for server role
     if (mConfig.role == InstanceRole::Server) {
         mLayoutManager = std::make_unique<LayoutManager>();
