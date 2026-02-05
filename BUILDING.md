@@ -112,6 +112,44 @@ npm run build
 npm start
 ```
 
+## Packaging
+
+### Linux AppImage
+
+Create a portable AppImage that works on most Linux distributions:
+
+```bash
+./packaging/appimage/build-appimage.sh
+```
+
+This will create `Konflikt-*.AppImage` in the `dist/` directory.
+
+Requirements: `wget` (to download linuxdeploy if not installed)
+
+### Linux Debian Package
+
+Build a .deb package:
+
+```bash
+dpkg-buildpackage -us -uc -b
+```
+
+The package will be created in the parent directory.
+
+### Linux Systemd Service
+
+To run Konflikt as a user service:
+
+```bash
+# Copy service file
+mkdir -p ~/.config/systemd/user
+cp packaging/konflikt.service ~/.config/systemd/user/
+
+# Enable and start
+systemctl --user enable konflikt
+systemctl --user start konflikt
+```
+
 ## Project Structure
 
 ```
@@ -128,6 +166,10 @@ konflikt/
 │   ├── uWebSockets/         # WebSocket/HTTP library
 │   ├── uSockets/            # Low-level networking
 │   └── glaze/               # JSON serialization
+├── packaging/
+│   ├── appimage/            # AppImage build scripts
+│   ├── debian/              # Debian package files
+│   └── konflikt.service     # Systemd user service
 └── dist/
     └── ui/                  # Built React UI
 ```

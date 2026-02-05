@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Konflikt
+Comment=Software KVM for sharing keyboard and mouse between computers
+Exec=konflikt
+Icon=konflikt
+Categories=Utility;RemoteAccess;
+Terminal=false
+StartupNotify=false
