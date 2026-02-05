@@ -4,6 +4,7 @@
 #include <filesystem>
 #include <fstream>
 #include <glaze/json.hpp>
+#include <map>
 
 namespace konflikt {
 
@@ -34,6 +35,7 @@ struct ConfigJson
     bool verbose { false };
     std::string logFile;
     bool enableDebugApi { false };
+    std::map<std::string, int> keyRemap;  // String keys for JSON compatibility
 };
 
 } // namespace konflikt
@@ -66,7 +68,8 @@ struct glz::meta<konflikt::ConfigJson>
         "tlsKeyPassphrase", &T::tlsKeyPassphrase,
         "verbose", &T::verbose,
         "logFile", &T::logFile,
-        "enableDebugApi", &T::enableDebugApi);
+        "enableDebugApi", &T::enableDebugApi,
+        "keyRemap", &T::keyRemap);
 };
 
 namespace konflikt {
@@ -197,6 +200,17 @@ std::optional<Config> ConfigManager::load(const std::string &path)
     config.logFile = jsonConfig.logFile;
     config.enableDebugApi = jsonConfig.enableDebugApi;
 
+    // Convert string keys to uint32_t for keyRemap
+    for (const auto &[key, value] : jsonConfig.keyRemap) {
+        try {
+            uint32_t fromKey = static_cast<uint32_t>(std::stoul(key));
+            uint32_t toKey = static_cast<uint32_t>(value);
+            config.keyRemap[fromKey] = toKey;
+        } catch (...) {
+            // Skip invalid entries
+        }
+    }
+
     return config;
 }
 
@@ -243,6 +257,11 @@ bool ConfigManager::save(const Config &config, const std::string &path)
     jsonConfig.verbose = config.verbose;
     jsonConfig.logFile = config.logFile;
     jsonConfig.enableDebugApi = config.enableDebugApi;
+
+    // Convert uint32_t keys to string for JSON
+    for (const auto &[fromKey, toKey] : config.keyRemap) {
+        jsonConfig.keyRemap[std::to_string(fromKey)] = static_cast<int>(toKey);
+    }
 
     auto json = glz::write_json(jsonConfig);
     if (!json) {

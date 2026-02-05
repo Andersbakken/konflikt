@@ -443,6 +443,15 @@ std::vector<std::string> Konflikt::connectedClientNames() const
     return names;
 }
 
+uint32_t Konflikt::remapKeycode(uint32_t keycode) const
+{
+    auto it = mConfig.keyRemap.find(keycode);
+    if (it != mConfig.keyRemap.end()) {
+        return it->second;
+    }
+    return keycode;
+}
+
 void Konflikt::onPlatformEvent(const Event &event)
 {
     switch (event.type) {
@@ -513,7 +522,7 @@ void Konflikt::onPlatformEvent(const Event &event)
                 data.y = mVirtualCursor.y;
                 data.timestamp = event.timestamp;
                 data.keyboardModifiers = event.state.keyboardModifiers;
-                data.keycode = event.keycode;
+                data.keycode = remapKeycode(event.keycode);
                 data.text = event.text;
 
                 broadcastInputEvent(event.type == EventType::KeyPress ? "keyPress" : "keyRelease", data);

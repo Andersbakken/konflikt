@@ -186,9 +186,31 @@ Example config:
   "tlsCertFile": "",
   "tlsKeyFile": "",
   "verbose": false,
-  "enableDebugApi": false
+  "enableDebugApi": false,
+  "keyRemap": {
+    "55": 133,
+    "54": 134,
+    "58": 64,
+    "61": 108
+  }
 }
 ```
+
+### Key Remapping
+
+Cross-platform modifier key remapping is supported. Common keycodes:
+
+| Key | macOS | Linux |
+|-----|-------|-------|
+| Command/Super Left | 55 | 133 |
+| Command/Super Right | 54 | 134 |
+| Option/Alt Left | 58 | 64 |
+| Option/Alt Right | 61 | 108 |
+
+CLI presets:
+- `--remap-keys=mac-to-linux` - Running on Mac, controlling Linux
+- `--remap-keys=linux-to-mac` - Running on Linux, controlling Mac
+- `--remap-key=55:133` - Custom single key remap
 
 ## HTTP API Endpoints
 

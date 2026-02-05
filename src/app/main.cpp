@@ -49,6 +49,8 @@ void printUsage(const char *programName)
               << "  --tls-key=PATH        Path to TLS private key file (PEM)\n"
               << "  --tls-passphrase=PASS Passphrase for encrypted key (optional)\n"
               << "  --debug-api           Enable debug API endpoint (/api/log)\n"
+              << "  --remap-keys=PRESET   Key remapping preset: mac-to-linux, linux-to-mac\n"
+              << "  --remap-key=FROM:TO   Custom key remap (keycodes, e.g., 55:133)\n"
               << "  --verbose             Enable verbose logging\n"
               << "  -v, --version         Show version information\n"
               << "  -h, --help            Show this help message\n"
@@ -174,6 +176,40 @@ int main(int argc, char *argv[])
             config.tlsKeyPassphrase = arg.substr(17);
         } else if (arg == "--debug-api") {
             config.enableDebugApi = true;
+        } else if (arg.rfind("--remap-keys=", 0) == 0) {
+            std::string preset = arg.substr(13);
+            if (preset == "mac-to-linux") {
+                // Mac Command -> Linux Super, Mac Option -> Linux Alt
+                config.keyRemap[55] = 133;   // Command Left -> Super Left
+                config.keyRemap[54] = 134;   // Command Right -> Super Right
+                config.keyRemap[58] = 64;    // Option Left -> Alt Left
+                config.keyRemap[61] = 108;   // Option Right -> Alt Right
+            } else if (preset == "linux-to-mac") {
+                // Linux Super -> Mac Command, Linux Alt -> Mac Option
+                config.keyRemap[133] = 55;   // Super Left -> Command Left
+                config.keyRemap[134] = 54;   // Super Right -> Command Right
+                config.keyRemap[64] = 58;    // Alt Left -> Option Left
+                config.keyRemap[108] = 61;   // Alt Right -> Option Right
+            } else {
+                std::cerr << "Error: Unknown remap preset '" << preset << "'" << std::endl;
+                std::cerr << "Valid presets: mac-to-linux, linux-to-mac" << std::endl;
+                return 1;
+            }
+        } else if (arg.rfind("--remap-key=", 0) == 0) {
+            std::string mapping = arg.substr(12);
+            size_t colonPos = mapping.find(':');
+            if (colonPos == std::string::npos) {
+                std::cerr << "Error: Invalid key remap format. Use FROM:TO (e.g., 55:133)" << std::endl;
+                return 1;
+            }
+            try {
+                uint32_t fromKey = static_cast<uint32_t>(std::stoul(mapping.substr(0, colonPos)));
+                uint32_t toKey = static_cast<uint32_t>(std::stoul(mapping.substr(colonPos + 1)));
+                config.keyRemap[fromKey] = toKey;
+            } catch (...) {
+                std::cerr << "Error: Invalid keycodes in remap. Use numeric keycodes." << std::endl;
+                return 1;
+            }
         } else {
             std::cerr << "Error: Unknown option '" << arg << "'" << std::endl;
             printUsage(argv[0]);

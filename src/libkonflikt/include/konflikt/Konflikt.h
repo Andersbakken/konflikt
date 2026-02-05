@@ -76,6 +76,16 @@ struct Config
 
     // Debug API (enables /api/log endpoint)
     bool enableDebugApi { false };
+
+    // Key remapping: map of source keycode -> target keycode
+    // Applied when sending input events to clients
+    // Example: {"55": 133} maps Mac Command Left (55) to Linux Super Left (133)
+    // Common mappings:
+    //   Mac Command Left (55) <-> Linux Super Left (133)
+    //   Mac Command Right (54) <-> Linux Super Right (134)
+    //   Mac Option Left (58) <-> Linux Alt Left (64)
+    //   Mac Option Right (61) <-> Linux Alt Right (108)
+    std::unordered_map<uint32_t, uint32_t> keyRemap;
 };
 
 /// Connection status
@@ -203,6 +213,7 @@ private:
     void log(const std::string &level, const std::string &message);
     std::string generateMachineId();
     std::string generateDisplayId();
+    uint32_t remapKeycode(uint32_t keycode) const;
 
     // Configuration
     Config mConfig;
