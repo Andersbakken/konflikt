@@ -248,6 +248,10 @@ All endpoints support `?pretty` query parameter for formatted JSON output.
 - `DELETE /api/keyremap` - Remove key remap: `{"from": 55}`
 - `GET /api/cert` - Download server TLS certificate (if TLS enabled)
 - `GET /api/log` - Recent logs with key data filtered (if `enableDebugApi` enabled)
+- `GET /api/connection` - Client connection status (serverHost, serverPort, reconnectAttempts)
+- `POST /api/connect` - Connect to server: `{"host": "192.168.1.5", "port": 3000}` (client only)
+- `POST /api/reconnect` - Force reconnection attempt (client only)
+- `POST /api/disconnect` - Disconnect from server (client only)
 
 ## Notes for Continuation
 

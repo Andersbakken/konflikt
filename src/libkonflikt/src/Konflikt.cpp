@@ -171,6 +171,25 @@ struct DisplayEdgesDeleteJson
     uint32_t displayId;
 };
 
+// For POST /api/connect (client connection control)
+struct ConnectRequestJson
+{
+    std::optional<std::string> host;
+    std::optional<int> port;
+};
+
+// For GET /api/connection (client connection status)
+struct ConnectionStatusJson
+{
+    std::string status;
+    std::string serverHost;
+    int serverPort;
+    std::string serverName;
+    int reconnectAttempts;
+    int maxReconnectAttempts;
+    bool expectingReconnect;
+};
+
 struct LogEntryJson
 {
     std::string timestamp;
@@ -418,6 +437,27 @@ struct glz::meta<konflikt::DisplayEdgesDeleteJson>
 {
     using T = konflikt::DisplayEdgesDeleteJson;
     static constexpr auto value = object("displayId", &T::displayId);
+};
+
+template <>
+struct glz::meta<konflikt::ConnectRequestJson>
+{
+    using T = konflikt::ConnectRequestJson;
+    static constexpr auto value = object("host", &T::host, "port", &T::port);
+};
+
+template <>
+struct glz::meta<konflikt::ConnectionStatusJson>
+{
+    using T = konflikt::ConnectionStatusJson;
+    static constexpr auto value = object(
+        "status", &T::status,
+        "serverHost", &T::serverHost,
+        "serverPort", &T::serverPort,
+        "serverName", &T::serverName,
+        "reconnectAttempts", &T::reconnectAttempts,
+        "maxReconnectAttempts", &T::maxReconnectAttempts,
+        "expectingReconnect", &T::expectingReconnect);
 };
 
 template <>
@@ -949,6 +989,146 @@ bool Konflikt::init()
             response.body = "{\"success\":false,\"message\":\"No custom edge settings for this display\"}";
         }
 
+        return response;
+    });
+
+    // API endpoint for connection status (useful for clients)
+    mHttpServer->route("GET", "/api/connection", [this](const HttpRequest &req) {
+        HttpResponse response;
+        response.contentType = "application/json";
+
+        ConnectionStatusJson status;
+
+        switch (mConnectionStatus) {
+            case ConnectionStatus::Connected: status.status = "connected"; break;
+            case ConnectionStatus::Connecting: status.status = "connecting"; break;
+            case ConnectionStatus::Disconnected: status.status = "disconnected"; break;
+            case ConnectionStatus::Error: status.status = "error"; break;
+        }
+
+        if (mWsClient) {
+            status.serverHost = mWsClient->host();
+            status.serverPort = mWsClient->port();
+        } else {
+            status.serverHost = mConfig.serverHost;
+            status.serverPort = mConfig.serverPort;
+        }
+        status.serverName = mConnectedServerName;
+        status.reconnectAttempts = mReconnectAttempts;
+        status.maxReconnectAttempts = MAX_RECONNECT_ATTEMPTS;
+        status.expectingReconnect = mExpectingReconnect;
+
+        auto json = glz::write_json(status);
+        if (json) {
+            if (req.path.find("pretty") != std::string::npos) {
+                response.body = glz::prettify_json(*json);
+            } else {
+                response.body = *json;
+            }
+        } else {
+            response.body = "{}";
+        }
+        return response;
+    });
+
+    // API endpoint to reconnect (for clients)
+    mHttpServer->route("POST", "/api/reconnect", [this](const HttpRequest &) {
+        HttpResponse response;
+        response.contentType = "application/json";
+
+        if (mConfig.role != InstanceRole::Client) {
+            response.statusCode = 400;
+            response.statusMessage = "Bad Request";
+            response.body = "{\"success\":false,\"message\":\"Only clients can reconnect\"}";
+            return response;
+        }
+
+        if (!mWsClient) {
+            response.body = "{\"success\":false,\"message\":\"No client connection configured\"}";
+            return response;
+        }
+
+        // Reset reconnection state and trigger immediate reconnect
+        mReconnectAttempts = 0;
+        mLastReconnectAttempt = 0;
+        updateStatus(ConnectionStatus::Connecting, "Reconnecting...");
+        mWsClient->reconnect();
+
+        response.body = "{\"success\":true,\"message\":\"Reconnection initiated\"}";
+        log("log", "Reconnection requested via API");
+        return response;
+    });
+
+    // API endpoint to connect to a specific server (for clients)
+    mHttpServer->route("POST", "/api/connect", [this](const HttpRequest &req) {
+        HttpResponse response;
+        response.contentType = "application/json";
+
+        if (mConfig.role != InstanceRole::Client) {
+            response.statusCode = 400;
+            response.statusMessage = "Bad Request";
+            response.body = "{\"success\":false,\"message\":\"Only clients can connect\"}";
+            return response;
+        }
+
+        if (!mWsClient) {
+            response.body = "{\"success\":false,\"message\":\"Client not initialized\"}";
+            return response;
+        }
+
+        ConnectRequestJson connReq;
+        auto error = glz::read_json(connReq, req.body);
+        if (error) {
+            response.statusCode = 400;
+            response.statusMessage = "Bad Request";
+            response.body = "{\"success\":false,\"message\":\"Invalid JSON\"}";
+            return response;
+        }
+
+        std::string host = connReq.host.value_or(mConfig.serverHost);
+        int port = connReq.port.value_or(mConfig.serverPort);
+
+        if (host.empty()) {
+            response.body = "{\"success\":false,\"message\":\"No host specified\"}";
+            return response;
+        }
+
+        // Update config and connect
+        mConfig.serverHost = host;
+        mConfig.serverPort = port;
+        mReconnectAttempts = 0;
+        updateStatus(ConnectionStatus::Connecting, "Connecting to " + host + "...");
+        mWsClient->connect(host, port, "/ws");
+
+        response.body = "{\"success\":true,\"message\":\"Connecting to " + host + ":" + std::to_string(port) + "\"}";
+        log("log", "Connection to " + host + ":" + std::to_string(port) + " requested via API");
+        return response;
+    });
+
+    // API endpoint to disconnect (for clients)
+    mHttpServer->route("POST", "/api/disconnect", [this](const HttpRequest &) {
+        HttpResponse response;
+        response.contentType = "application/json";
+
+        if (mConfig.role != InstanceRole::Client) {
+            response.statusCode = 400;
+            response.statusMessage = "Bad Request";
+            response.body = "{\"success\":false,\"message\":\"Only clients can disconnect\"}";
+            return response;
+        }
+
+        if (!mWsClient) {
+            response.body = "{\"success\":false,\"message\":\"No client connection\"}";
+            return response;
+        }
+
+        // Disable reconnection and disconnect
+        mReconnectAttempts = MAX_RECONNECT_ATTEMPTS; // Prevent auto-reconnect
+        mWsClient->disconnect();
+        updateStatus(ConnectionStatus::Disconnected, "Disconnected by user");
+
+        response.body = "{\"success\":true,\"message\":\"Disconnected\"}";
+        log("log", "Disconnection requested via API");
         return response;
     });
 
