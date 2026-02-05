@@ -36,6 +36,7 @@ struct ConfigJson
     std::string logFile;
     bool enableDebugApi { false };
     std::map<std::string, int> keyRemap;  // String keys for JSON compatibility
+    bool logKeycodes { false };
 };
 
 } // namespace konflikt
@@ -69,7 +70,8 @@ struct glz::meta<konflikt::ConfigJson>
         "verbose", &T::verbose,
         "logFile", &T::logFile,
         "enableDebugApi", &T::enableDebugApi,
-        "keyRemap", &T::keyRemap);
+        "keyRemap", &T::keyRemap,
+        "logKeycodes", &T::logKeycodes);
 };
 
 namespace konflikt {
@@ -211,6 +213,8 @@ std::optional<Config> ConfigManager::load(const std::string &path)
         }
     }
 
+    config.logKeycodes = jsonConfig.logKeycodes;
+
     return config;
 }
 
@@ -262,6 +266,8 @@ bool ConfigManager::save(const Config &config, const std::string &path)
     for (const auto &[fromKey, toKey] : config.keyRemap) {
         jsonConfig.keyRemap[std::to_string(fromKey)] = static_cast<int>(toKey);
     }
+
+    jsonConfig.logKeycodes = config.logKeycodes;
 
     auto json = glz::write_json(jsonConfig);
     if (!json) {

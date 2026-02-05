@@ -86,6 +86,9 @@ struct Config
     //   Mac Option Left (58) <-> Linux Alt Left (64)
     //   Mac Option Right (61) <-> Linux Alt Right (108)
     std::unordered_map<uint32_t, uint32_t> keyRemap;
+
+    // Log keycodes for debugging key remapping (shows pressed keycodes in log)
+    bool logKeycodes { false };
 };
 
 /// Connection status

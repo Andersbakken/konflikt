@@ -508,6 +508,12 @@ void Konflikt::onPlatformEvent(const Event &event)
 
         case EventType::KeyPress:
         case EventType::KeyRelease: {
+            // Log keycodes for debugging if enabled
+            if (mConfig.logKeycodes && event.type == EventType::KeyPress) {
+                log("log", "Keycode pressed: " + std::to_string(event.keycode) +
+                    " (modifiers: " + std::to_string(event.state.keyboardModifiers) + ")");
+            }
+
             // Check for hotkey (only on key press)
             if (event.type == EventType::KeyPress && mConfig.lockCursorHotkey != 0 &&
                 event.keycode == mConfig.lockCursorHotkey) {

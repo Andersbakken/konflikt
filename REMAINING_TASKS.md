@@ -167,7 +167,7 @@ Config file locations (searched in order, first found wins):
 - macOS: `/Library/Application Support/Konflikt/config.json`
 - Linux: `$XDG_CONFIG_DIRS/konflikt/config.json` (default: `/etc/xdg/konflikt/`)
 
-Example config:
+Example config (all options):
 ```json
 {
   "role": "server",
@@ -176,17 +176,25 @@ Example config:
   "port": 3000,
   "serverHost": "",
   "serverPort": 3000,
+  "screenX": 0,
+  "screenY": 0,
+  "screenWidth": 0,
+  "screenHeight": 0,
   "edgeLeft": true,
   "edgeRight": true,
   "edgeTop": true,
   "edgeBottom": true,
   "lockCursorToScreen": false,
   "lockCursorHotkey": 107,
+  "uiPath": "",
   "useTLS": false,
   "tlsCertFile": "",
   "tlsKeyFile": "",
+  "tlsKeyPassphrase": "",
   "verbose": false,
+  "logFile": "",
   "enableDebugApi": false,
+  "logKeycodes": false,
   "keyRemap": {
     "55": 133,
     "54": 134,

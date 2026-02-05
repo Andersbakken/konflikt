@@ -51,6 +51,7 @@ void printUsage(const char *programName)
               << "  --debug-api           Enable debug API endpoint (/api/log)\n"
               << "  --remap-keys=PRESET   Key remapping preset: mac-to-linux, linux-to-mac\n"
               << "  --remap-key=FROM:TO   Custom key remap (keycodes, e.g., 55:133)\n"
+              << "  --log-keycodes        Log pressed keycodes (for debugging key remaps)\n"
               << "  --verbose             Enable verbose logging\n"
               << "  -v, --version         Show version information\n"
               << "  -h, --help            Show this help message\n"
@@ -176,6 +177,8 @@ int main(int argc, char *argv[])
             config.tlsKeyPassphrase = arg.substr(17);
         } else if (arg == "--debug-api") {
             config.enableDebugApi = true;
+        } else if (arg == "--log-keycodes") {
+            config.logKeycodes = true;
         } else if (arg.rfind("--remap-keys=", 0) == 0) {
             std::string preset = arg.substr(13);
             if (preset == "mac-to-linux") {
