@@ -52,6 +52,32 @@ struct RuntimeConfigJson
     std::map<std::string, uint32_t> keyRemap;
 };
 
+// For partial updates via POST /api/config
+struct ConfigUpdateJson
+{
+    std::optional<bool> edgeLeft;
+    std::optional<bool> edgeRight;
+    std::optional<bool> edgeTop;
+    std::optional<bool> edgeBottom;
+    std::optional<bool> lockCursorToScreen;
+    std::optional<bool> verbose;
+    std::optional<bool> logKeycodes;
+};
+
+// For POST /api/keyremap
+struct KeyRemapRequestJson
+{
+    std::optional<std::string> preset;
+    std::optional<int> from;
+    std::optional<int> to;
+};
+
+// For DELETE /api/keyremap
+struct KeyRemapDeleteJson
+{
+    int from;
+};
+
 struct LogEntryJson
 {
     std::string timestamp;
@@ -153,6 +179,37 @@ struct glz::meta<konflikt::RuntimeConfigJson>
         "verbose", &T::verbose,
         "logKeycodes", &T::logKeycodes,
         "keyRemap", &T::keyRemap);
+};
+
+template <>
+struct glz::meta<konflikt::ConfigUpdateJson>
+{
+    using T = konflikt::ConfigUpdateJson;
+    static constexpr auto value = object(
+        "edgeLeft", &T::edgeLeft,
+        "edgeRight", &T::edgeRight,
+        "edgeTop", &T::edgeTop,
+        "edgeBottom", &T::edgeBottom,
+        "lockCursorToScreen", &T::lockCursorToScreen,
+        "verbose", &T::verbose,
+        "logKeycodes", &T::logKeycodes);
+};
+
+template <>
+struct glz::meta<konflikt::KeyRemapRequestJson>
+{
+    using T = konflikt::KeyRemapRequestJson;
+    static constexpr auto value = object(
+        "preset", &T::preset,
+        "from", &T::from,
+        "to", &T::to);
+};
+
+template <>
+struct glz::meta<konflikt::KeyRemapDeleteJson>
+{
+    using T = konflikt::KeyRemapDeleteJson;
+    static constexpr auto value = object("from", &T::from);
 };
 
 template <>
@@ -530,60 +587,43 @@ bool Konflikt::init()
         HttpResponse response;
         response.contentType = "application/json";
 
-        // Parse simple JSON (key: value pairs)
-        // Looking for: edgeLeft, edgeRight, edgeTop, edgeBottom, lockCursorToScreen, logKeycodes, verbose
-        const std::string &body = req.body;
-
-        auto getBool = [&body](const std::string &key) -> std::optional<bool> {
-            size_t pos = body.find("\"" + key + "\"");
-            if (pos == std::string::npos) {
-                return std::nullopt;
-            }
-            pos = body.find(":", pos);
-            if (pos == std::string::npos) {
-                return std::nullopt;
-            }
-            size_t start = body.find_first_not_of(" \t\n", pos + 1);
-            if (start == std::string::npos) {
-                return std::nullopt;
-            }
-            if (body.substr(start, 4) == "true") {
-                return true;
-            }
-            if (body.substr(start, 5) == "false") {
-                return false;
-            }
-            return std::nullopt;
-        };
+        ConfigUpdateJson update;
+        auto error = glz::read_json(update, req.body);
+        if (error) {
+            response.statusCode = 400;
+            response.statusMessage = "Bad Request";
+            response.body = "{\"success\":false,\"message\":\"Invalid JSON\"}";
+            return response;
+        }
 
         bool changed = false;
 
-        if (auto val = getBool("edgeLeft")) {
-            mConfig.edgeLeft = *val;
+        if (update.edgeLeft.has_value()) {
+            mConfig.edgeLeft = *update.edgeLeft;
             changed = true;
         }
-        if (auto val = getBool("edgeRight")) {
-            mConfig.edgeRight = *val;
+        if (update.edgeRight.has_value()) {
+            mConfig.edgeRight = *update.edgeRight;
             changed = true;
         }
-        if (auto val = getBool("edgeTop")) {
-            mConfig.edgeTop = *val;
+        if (update.edgeTop.has_value()) {
+            mConfig.edgeTop = *update.edgeTop;
             changed = true;
         }
-        if (auto val = getBool("edgeBottom")) {
-            mConfig.edgeBottom = *val;
+        if (update.edgeBottom.has_value()) {
+            mConfig.edgeBottom = *update.edgeBottom;
             changed = true;
         }
-        if (auto val = getBool("lockCursorToScreen")) {
-            mConfig.lockCursorToScreen = *val;
+        if (update.lockCursorToScreen.has_value()) {
+            mConfig.lockCursorToScreen = *update.lockCursorToScreen;
             changed = true;
         }
-        if (auto val = getBool("verbose")) {
-            mConfig.verbose = *val;
+        if (update.verbose.has_value()) {
+            mConfig.verbose = *update.verbose;
             changed = true;
         }
-        if (auto val = getBool("logKeycodes")) {
-            mConfig.logKeycodes = *val;
+        if (update.logKeycodes.has_value()) {
+            mConfig.logKeycodes = *update.logKeycodes;
             changed = true;
         }
 
@@ -663,13 +703,19 @@ bool Konflikt::init()
         HttpResponse response;
         response.contentType = "application/json";
 
-        // Parse JSON body: {"from": 55, "to": 133} or {"preset": "mac-to-linux"}
-        const std::string &body = req.body;
+        KeyRemapRequestJson request;
+        auto error = glz::read_json(request, req.body);
+        if (error) {
+            response.statusCode = 400;
+            response.statusMessage = "Bad Request";
+            response.body = "{\"success\":false,\"message\":\"Invalid JSON\"}";
+            return response;
+        }
 
         // Check for preset
-        size_t presetPos = body.find("\"preset\"");
-        if (presetPos != std::string::npos) {
-            if (body.find("\"mac-to-linux\"") != std::string::npos) {
+        if (request.preset.has_value()) {
+            const std::string &preset = *request.preset;
+            if (preset == "mac-to-linux") {
                 mConfig.keyRemap[55] = 133;   // Command Left -> Super Left
                 mConfig.keyRemap[54] = 134;   // Command Right -> Super Right
                 mConfig.keyRemap[58] = 64;    // Option Left -> Alt Left
@@ -677,7 +723,7 @@ bool Konflikt::init()
                 response.body = "{\"success\":true,\"message\":\"Applied mac-to-linux preset\"}";
                 log("log", "Applied mac-to-linux key remap preset via API");
                 return response;
-            } else if (body.find("\"linux-to-mac\"") != std::string::npos) {
+            } else if (preset == "linux-to-mac") {
                 mConfig.keyRemap[133] = 55;   // Super Left -> Command Left
                 mConfig.keyRemap[134] = 54;   // Super Right -> Command Right
                 mConfig.keyRemap[64] = 58;    // Alt Left -> Option Left
@@ -685,42 +731,28 @@ bool Konflikt::init()
                 response.body = "{\"success\":true,\"message\":\"Applied linux-to-mac preset\"}";
                 log("log", "Applied linux-to-mac key remap preset via API");
                 return response;
-            } else if (body.find("\"clear\"") != std::string::npos) {
+            } else if (preset == "clear") {
                 mConfig.keyRemap.clear();
                 response.body = "{\"success\":true,\"message\":\"Cleared all key remaps\"}";
                 log("log", "Cleared key remaps via API");
                 return response;
+            } else {
+                response.statusCode = 400;
+                response.statusMessage = "Bad Request";
+                response.body = "{\"success\":false,\"message\":\"Unknown preset: " + preset + "\"}";
+                return response;
             }
         }
 
-        // Parse from/to values
-        auto getInt = [&body](const std::string &key) -> std::optional<int> {
-            size_t pos = body.find("\"" + key + "\"");
-            if (pos == std::string::npos) {
-                return std::nullopt;
-            }
-            pos = body.find(":", pos);
-            if (pos == std::string::npos) {
-                return std::nullopt;
-            }
-            size_t start = body.find_first_of("0123456789", pos);
-            if (start == std::string::npos) {
-                return std::nullopt;
-            }
-            size_t end = body.find_first_not_of("0123456789", start);
-            std::string numStr = body.substr(start, end - start);
-            return std::stoi(numStr);
-        };
-
-        auto fromKey = getInt("from");
-        auto toKey = getInt("to");
-
-        if (fromKey && toKey) {
-            mConfig.keyRemap[static_cast<uint32_t>(*fromKey)] = static_cast<uint32_t>(*toKey);
+        // Check for from/to values
+        if (request.from.has_value() && request.to.has_value()) {
+            uint32_t fromKey = static_cast<uint32_t>(*request.from);
+            uint32_t toKey = static_cast<uint32_t>(*request.to);
+            mConfig.keyRemap[fromKey] = toKey;
             response.body = "{\"success\":true,\"message\":\"Added key remap " +
-                std::to_string(*fromKey) + " -> " + std::to_string(*toKey) + "\"}";
-            log("log", "Added key remap " + std::to_string(*fromKey) + " -> " +
-                std::to_string(*toKey) + " via API");
+                std::to_string(fromKey) + " -> " + std::to_string(toKey) + "\"}";
+            log("log", "Added key remap " + std::to_string(fromKey) + " -> " +
+                std::to_string(toKey) + " via API");
         } else {
             response.statusCode = 400;
             response.statusMessage = "Bad Request";
@@ -735,44 +767,25 @@ bool Konflikt::init()
         HttpResponse response;
         response.contentType = "application/json";
 
-        // Parse JSON body: {"from": 55}
-        const std::string &body = req.body;
-
-        auto getInt = [&body](const std::string &key) -> std::optional<int> {
-            size_t pos = body.find("\"" + key + "\"");
-            if (pos == std::string::npos) {
-                return std::nullopt;
-            }
-            pos = body.find(":", pos);
-            if (pos == std::string::npos) {
-                return std::nullopt;
-            }
-            size_t start = body.find_first_of("0123456789", pos);
-            if (start == std::string::npos) {
-                return std::nullopt;
-            }
-            size_t end = body.find_first_not_of("0123456789", start);
-            std::string numStr = body.substr(start, end - start);
-            return std::stoi(numStr);
-        };
-
-        auto fromKey = getInt("from");
-
-        if (fromKey) {
-            auto it = mConfig.keyRemap.find(static_cast<uint32_t>(*fromKey));
-            if (it != mConfig.keyRemap.end()) {
-                mConfig.keyRemap.erase(it);
-                response.body = "{\"success\":true,\"message\":\"Removed key remap for " +
-                    std::to_string(*fromKey) + "\"}";
-                log("log", "Removed key remap for " + std::to_string(*fromKey) + " via API");
-            } else {
-                response.body = "{\"success\":false,\"message\":\"No remap found for key " +
-                    std::to_string(*fromKey) + "\"}";
-            }
-        } else {
+        KeyRemapDeleteJson request;
+        auto error = glz::read_json(request, req.body);
+        if (error) {
             response.statusCode = 400;
             response.statusMessage = "Bad Request";
-            response.body = "{\"success\":false,\"message\":\"Missing 'from' in request\"}";
+            response.body = "{\"success\":false,\"message\":\"Invalid JSON or missing 'from'\"}";
+            return response;
+        }
+
+        uint32_t fromKey = static_cast<uint32_t>(request.from);
+        auto it = mConfig.keyRemap.find(fromKey);
+        if (it != mConfig.keyRemap.end()) {
+            mConfig.keyRemap.erase(it);
+            response.body = "{\"success\":true,\"message\":\"Removed key remap for " +
+                std::to_string(fromKey) + "\"}";
+            log("log", "Removed key remap for " + std::to_string(fromKey) + " via API");
+        } else {
+            response.body = "{\"success\":false,\"message\":\"No remap found for key " +
+                std::to_string(fromKey) + "\"}";
         }
 
         return response;
