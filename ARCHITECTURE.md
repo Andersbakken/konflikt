@@ -1,6 +1,6 @@
 # Konflikt Architecture
 
-This document describes the architecture of Konflikt, a cross-platform KVM (Keyboard, Video, Mouse) switch application. The native C++ implementation eliminates the Node.js dependency.
+This document describes the architecture of Konflikt, a cross-platform KVM (Keyboard, Video, Mouse) switch application.
 
 ## Overview
 
@@ -115,10 +115,7 @@ konflikt/
 │   │       ├── StatusBarController.swift
 │   │       └── Konflikt-Bridging-Header.h
 │   │
-│   ├── webpage/                   # React UI (unchanged)
-│   │   └── ...
-│   │
-│   └── native/                    # Legacy native code (reference)
+│   └── webpage/                   # React UI
 │       └── ...
 │
 ├── third_party/

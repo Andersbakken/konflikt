@@ -1,8 +1,8 @@
-# Konflikt Native Rewrite - Remaining Tasks
+# Konflikt - Remaining Tasks
 
 ## Current Status
 
-The native C++ rewrite is largely functional. The macOS Swift app builds and runs with CMake/Ninja. Service discovery, clipboard sync, scroll events, config management, and auto-reconnection are all implemented.
+The native C++ implementation is largely functional. The macOS Swift app builds and runs with CMake/Ninja. Service discovery, clipboard sync, scroll events, config management, and auto-reconnection are all implemented.
 
 ## Completed
 

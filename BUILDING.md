@@ -1,10 +1,6 @@
 # Building Konflikt
 
-Konflikt can be built in two modes:
-1. **Native C++ build** (recommended) - No Node.js required
-2. **Legacy Node.js build** - Original implementation
-
-## Native Build (Linux)
+## Linux
 
 ### Prerequisites
 
@@ -78,7 +74,7 @@ Key remapping options:
 Debug options:
 - `--debug-api` - Enable debug API endpoint (`/api/log`)
 
-## Native Build (macOS)
+## macOS
 
 ### Prerequisites
 
@@ -146,16 +142,6 @@ cd src/webpage
 npm install
 npm run build
 # Output goes to dist/ui/
-```
-
-## Legacy Node.js Build
-
-For the original Node.js-based implementation:
-
-```bash
-npm install
-npm run build
-npm start
 ```
 
 ## Packaging
