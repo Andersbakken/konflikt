@@ -106,7 +106,11 @@ The native C++ rewrite is largely functional. The macOS Swift app builds and run
   - TLS config options: useTLS, tlsCertFile, tlsKeyFile, tlsKeyPassphrase
   - CLI options: --tls, --tls-cert, --tls-key, --tls-passphrase
   - Certificate generation script: scripts/generate-cert.sh
-- [ ] WSS client-side support (connect to wss:// servers)
+  - HTTP endpoint /api/cert for clients to download server certificate
+  - HTTP endpoint /api/server-info returns server TLS status
+- [x] WSS client-side support (connect to wss:// servers)
+  - Client uses TLS when useTLS config is enabled
+  - Self-signed certs supported (no verification by default)
 - [ ] Config file signing or encryption (optional)
   - Prevent tampering with config files
   - Could use simple HMAC or full encryption

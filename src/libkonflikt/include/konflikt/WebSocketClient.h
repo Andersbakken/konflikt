@@ -24,6 +24,13 @@ struct WebSocketClientCallbacks
     std::function<void(const std::string &error)> onError;
 };
 
+/// SSL/TLS configuration for WebSocket client
+struct WebSocketClientSSLConfig
+{
+    std::string caFile;         // Path to CA certificate file (optional, for verification)
+    bool verifyPeer { false };  // Whether to verify server certificate (disabled for self-signed)
+};
+
 /// WebSocket client using uWebSockets
 class WebSocketClient
 {
@@ -38,7 +45,10 @@ public:
     /// Set callbacks
     void setCallbacks(WebSocketClientCallbacks callbacks);
 
-    /// Connect to a server
+    /// Enable TLS for connections
+    void setSSL(const WebSocketClientSSLConfig &config);
+
+    /// Connect to a server (ws:// or wss://)
     bool connect(const std::string &host, int port, const std::string &path = "/ws");
 
     /// Disconnect from server
@@ -65,6 +75,9 @@ public:
     /// Get last connected port
     int port() const { return mPort; }
 
+    /// Check if SSL is enabled
+    bool isSSL() const { return mSSLEnabled; }
+
 private:
     struct Impl;
     std::unique_ptr<Impl> mImpl;
@@ -74,6 +87,8 @@ private:
     std::string mHost;
     int mPort { 0 };
     std::string mPath;
+    bool mSSLEnabled { false };
+    WebSocketClientSSLConfig mSSLConfig;
 };
 
 } // namespace konflikt

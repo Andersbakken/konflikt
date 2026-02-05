@@ -15,6 +15,10 @@ namespace konflikt {
 
 namespace {
 
+// Thread-local SSL mode flag for callbacks
+// This is set before creating the socket context and used in callbacks
+thread_local int gSSLMode = 0;
+
 // Base64 encoding for WebSocket key
 const char base64_chars[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
@@ -80,6 +84,10 @@ struct WebSocketClient::Impl
     std::string connectPath;
     std::string websocketKey;
 
+    // SSL configuration
+    bool useSSL { false };
+    WebSocketClientSSLConfig sslConfig;
+
     WebSocketClientCallbacks callbacks;
     WebSocketState state { WebSocketState::Disconnected };
 
@@ -138,7 +146,7 @@ struct WebSocketClient::Impl
             frame.push_back(static_cast<uint8_t>(data[i]) ^ mask[i % 4]);
         }
 
-        us_socket_write(0, socket, reinterpret_cast<const char *>(frame.data()), static_cast<int>(frame.size()), 0);
+        us_socket_write(useSSL ? 1 : 0, socket, reinterpret_cast<const char *>(frame.data()), static_cast<int>(frame.size()), 0);
     }
 
     void processReceivedData(const char *data, int length)
@@ -246,7 +254,7 @@ struct WebSocketClient::Impl
                     if (socket) {
                         // Send close frame back
                         sendFrame(0x08, nullptr, 0);
-                        us_socket_close(0, socket, 0, nullptr);
+                        us_socket_close(useSSL ? 1 : 0, socket, 0, nullptr);
                     }
                     break;
                 case 0x09: // Ping
@@ -267,7 +275,7 @@ struct WebSocketClient::Impl
         (void)ip;
         (void)ip_length;
 
-        Impl *impl = static_cast<Impl *>(us_socket_context_ext(0, us_socket_context(0, s)));
+        Impl *impl = static_cast<Impl *>(us_socket_context_ext(gSSLMode, us_socket_context(gSSLMode, s)));
         impl->socket = s;
 
         // Send WebSocket handshake
@@ -282,14 +290,14 @@ struct WebSocketClient::Impl
                 << "\r\n";
 
         std::string requestStr = request.str();
-        us_socket_write(0, s, requestStr.c_str(), static_cast<int>(requestStr.size()), 0);
+        us_socket_write(gSSLMode, s, requestStr.c_str(), static_cast<int>(requestStr.size()), 0);
 
         return s;
     }
 
     static struct us_socket_t *onData(struct us_socket_t *s, char *data, int length)
     {
-        Impl *impl = static_cast<Impl *>(us_socket_context_ext(0, us_socket_context(0, s)));
+        Impl *impl = static_cast<Impl *>(us_socket_context_ext(gSSLMode, us_socket_context(gSSLMode, s)));
         impl->lastActivityTime = std::chrono::steady_clock::now();
         impl->processReceivedData(data, length);
         return s;
@@ -297,7 +305,7 @@ struct WebSocketClient::Impl
 
     static struct us_socket_t *onWritable(struct us_socket_t *s)
     {
-        Impl *impl = static_cast<Impl *>(us_socket_context_ext(0, us_socket_context(0, s)));
+        Impl *impl = static_cast<Impl *>(us_socket_context_ext(gSSLMode, us_socket_context(gSSLMode, s)));
 
         // Send queued messages
         std::lock_guard<std::mutex> lock(impl->mutex);
@@ -315,7 +323,7 @@ struct WebSocketClient::Impl
         (void)code;
         (void)reason;
 
-        Impl *impl = static_cast<Impl *>(us_socket_context_ext(0, us_socket_context(0, s)));
+        Impl *impl = static_cast<Impl *>(us_socket_context_ext(gSSLMode, us_socket_context(gSSLMode, s)));
         impl->socket = nullptr;
         impl->handshakeComplete = false;
 
@@ -331,7 +339,7 @@ struct WebSocketClient::Impl
 
     static struct us_socket_t *onEnd(struct us_socket_t *s)
     {
-        return us_socket_close(0, s, 0, nullptr);
+        return us_socket_close(gSSLMode, s, 0, nullptr);
     }
 
     static struct us_socket_t *onTimeout(struct us_socket_t *s)
@@ -343,7 +351,7 @@ struct WebSocketClient::Impl
     {
         (void)code;
 
-        Impl *impl = static_cast<Impl *>(us_socket_context_ext(0, us_socket_context(0, s)));
+        Impl *impl = static_cast<Impl *>(us_socket_context_ext(gSSLMode, us_socket_context(gSSLMode, s)));
         impl->state = WebSocketState::Error;
 
         if (impl->callbacks.onError) {
@@ -379,6 +387,9 @@ struct WebSocketClient::Impl
             receiveBuffer.clear();
             connectStartTime = std::chrono::steady_clock::now();
 
+            // Set thread-local SSL mode for callbacks
+            gSSLMode = useSSL ? 1 : 0;
+
             // Create event loop
             loop = us_create_loop(nullptr, [](struct us_loop_t *) {
             }, [](struct us_loop_t *) {
@@ -388,9 +399,18 @@ struct WebSocketClient::Impl
             // Store our pointer in the loop extension
             *static_cast<Impl **>(us_loop_ext(loop)) = this;
 
-            // Create socket context
+            // Create socket context (SSL or non-SSL)
             struct us_socket_context_options_t options = {};
-            context = us_create_socket_context(0, loop, sizeof(Impl *), options);
+            if (useSSL) {
+                // For SSL, optionally set CA file for server verification
+                if (!sslConfig.caFile.empty()) {
+                    options.ca_file_name = sslConfig.caFile.c_str();
+                }
+                // Note: self-signed certs typically don't verify by default
+                context = us_create_socket_context(1, loop, sizeof(Impl *), options);
+            } else {
+                context = us_create_socket_context(0, loop, sizeof(Impl *), options);
+            }
 
             if (!context) {
                 state = WebSocketState::Error;
@@ -403,26 +423,26 @@ struct WebSocketClient::Impl
             }
 
             // Store our pointer in the context extension
-            *static_cast<Impl **>(us_socket_context_ext(0, context)) = this;
+            *static_cast<Impl **>(us_socket_context_ext(gSSLMode, context)) = this;
 
             // Set up callbacks
-            us_socket_context_on_open(0, context, onOpen);
-            us_socket_context_on_data(0, context, onData);
-            us_socket_context_on_writable(0, context, onWritable);
-            us_socket_context_on_close(0, context, onClose);
-            us_socket_context_on_end(0, context, onEnd);
-            us_socket_context_on_timeout(0, context, onTimeout);
-            us_socket_context_on_connect_error(0, context, onConnectError);
+            us_socket_context_on_open(gSSLMode, context, onOpen);
+            us_socket_context_on_data(gSSLMode, context, onData);
+            us_socket_context_on_writable(gSSLMode, context, onWritable);
+            us_socket_context_on_close(gSSLMode, context, onClose);
+            us_socket_context_on_end(gSSLMode, context, onEnd);
+            us_socket_context_on_timeout(gSSLMode, context, onTimeout);
+            us_socket_context_on_connect_error(gSSLMode, context, onConnectError);
 
-            // Connect
-            socket = us_socket_context_connect(0, context, host.c_str(), port, nullptr, 0, 0);
+            // Connect (SSL or non-SSL)
+            socket = us_socket_context_connect(gSSLMode, context, host.c_str(), port, nullptr, 0, 0);
 
             if (!socket) {
                 state = WebSocketState::Error;
                 if (callbacks.onError) {
                     callbacks.onError("Failed to initiate connection");
                 }
-                us_socket_context_free(0, context);
+                us_socket_context_free(gSSLMode, context);
                 us_loop_free(loop);
                 context = nullptr;
                 loop = nullptr;
@@ -436,7 +456,7 @@ struct WebSocketClient::Impl
                     std::lock_guard<std::mutex> lock(mutex);
                     if (shouldDisconnect && socket) {
                         sendFrame(0x08, nullptr, 0); // Close frame
-                        us_socket_close(0, socket, 0, nullptr);
+                        us_socket_close(gSSLMode, socket, 0, nullptr);
                         shouldDisconnect = false;
                     }
 
@@ -459,7 +479,7 @@ struct WebSocketClient::Impl
                             callbacks.onError("Connection timeout");
                         }
                         if (socket) {
-                            us_socket_close(0, socket, 0, nullptr);
+                            us_socket_close(gSSLMode, socket, 0, nullptr);
                         }
                         break;
                     }
@@ -481,7 +501,7 @@ struct WebSocketClient::Impl
                             if (callbacks.onError) {
                                 callbacks.onError("Connection lost (no pong response)");
                             }
-                            us_socket_close(0, socket, 0, nullptr);
+                            us_socket_close(gSSLMode, socket, 0, nullptr);
                             break;
                         }
                     } else if (sinceLastActivity > PING_INTERVAL_MS) {
@@ -498,7 +518,7 @@ struct WebSocketClient::Impl
 
             // Cleanup
             if (context) {
-                us_socket_context_free(0, context);
+                us_socket_context_free(gSSLMode, context);
                 context = nullptr;
             }
             if (loop) {
@@ -529,6 +549,14 @@ WebSocketClient::~WebSocketClient()
 void WebSocketClient::setCallbacks(WebSocketClientCallbacks callbacks)
 {
     mImpl->callbacks = std::move(callbacks);
+}
+
+void WebSocketClient::setSSL(const WebSocketClientSSLConfig &config)
+{
+    mSSLEnabled = true;
+    mSSLConfig = config;
+    mImpl->useSSL = true;
+    mImpl->sslConfig = config;
 }
 
 bool WebSocketClient::connect(const std::string &host, int port, const std::string &path)

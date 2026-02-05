@@ -8,6 +8,7 @@
 
 #include <chrono>
 #include <filesystem>
+#include <fstream>
 #include <functional>
 #include <openssl/sha.h>
 #include <sstream>
@@ -91,6 +92,40 @@ bool Konflikt::init()
         log("log", "Serving UI from " + mConfig.uiPath);
     }
 
+    // API endpoint for server info (including TLS availability)
+    mHttpServer->route("GET", "/api/server-info", [this](const HttpRequest &) {
+        HttpResponse response;
+        response.contentType = "application/json";
+        response.body = "{\"name\":\"" + mConfig.instanceName + "\","
+                       "\"port\":" + std::to_string(mConfig.port) + ","
+                       "\"tls\":" + (mConfig.useTLS ? "true" : "false") + "}";
+        return response;
+    });
+
+    // API endpoint to download server certificate (for TLS trust)
+    if (mConfig.useTLS && !mConfig.tlsCertFile.empty()) {
+        mHttpServer->route("GET", "/api/cert", [this](const HttpRequest &) {
+            HttpResponse response;
+
+            // Read certificate file
+            std::ifstream certFile(mConfig.tlsCertFile);
+            if (certFile.is_open()) {
+                std::stringstream buffer;
+                buffer << certFile.rdbuf();
+                response.body = buffer.str();
+                response.contentType = "application/x-pem-file";
+                response.headers["Content-Disposition"] = "attachment; filename=\"konflikt-server.crt\"";
+            } else {
+                response.statusCode = 404;
+                response.statusMessage = "Not Found";
+                response.body = "Certificate not available";
+            }
+
+            return response;
+        });
+        log("log", "Certificate available at /api/cert");
+    }
+
     // Set up platform event handler for server role
     if (mConfig.role == InstanceRole::Server) {
         mLayoutManager = std::make_unique<LayoutManager>();
@@ -110,6 +145,16 @@ bool Konflikt::init()
     } else {
         // Client role: create WebSocket client
         mWsClient = std::make_unique<WebSocketClient>();
+
+        // Enable TLS if configured
+        if (mConfig.useTLS) {
+            WebSocketClientSSLConfig sslConfig;
+            // For self-signed certs, we don't verify by default
+            sslConfig.verifyPeer = false;
+            mWsClient->setSSL(sslConfig);
+            log("log", "TLS enabled for WebSocket client");
+        }
+
         mWsClient->setCallbacks({ .onConnect = [this]() {
             updateStatus(ConnectionStatus::Connected, "Connected to server");
             mReconnectAttempts = 0;       // Reset on successful connection
