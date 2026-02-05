@@ -18,6 +18,11 @@
     config.screenY = 0;
     config.screenWidth = 0;
     config.screenHeight = 0;
+    config.edgeLeft = YES;
+    config.edgeRight = YES;
+    config.edgeTop = YES;
+    config.edgeBottom = YES;
+    config.lockCursorToScreen = NO;
     config.verbose = NO;
     return config;
 }
@@ -47,6 +52,11 @@
         _config.screenY = config.screenY;
         _config.screenWidth = config.screenWidth;
         _config.screenHeight = config.screenHeight;
+        _config.edgeLeft = config.edgeLeft;
+        _config.edgeRight = config.edgeRight;
+        _config.edgeTop = config.edgeTop;
+        _config.edgeBottom = config.edgeBottom;
+        _config.lockCursorToScreen = config.lockCursorToScreen;
         _config.verbose = config.verbose;
 
         if (config.instanceId) {
@@ -169,6 +179,16 @@
 - (void)quit
 {
     _impl->quit();
+}
+
+- (void)setLockCursorToScreen:(BOOL)locked
+{
+    _impl->setLockCursorToScreen(locked);
+}
+
+- (BOOL)isLockCursorToScreen
+{
+    return _impl->isLockCursorToScreen() ? YES : NO;
 }
 
 @end

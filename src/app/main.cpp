@@ -34,6 +34,11 @@ void printUsage(const char *programName)
               << "  --port=PORT           Port to use (default: 3000)\n"
               << "  --ui-dir=PATH         Directory containing UI files\n"
               << "  --name=NAME           Display name for this machine\n"
+              << "  --no-edge-left        Disable left edge screen transition\n"
+              << "  --no-edge-right       Disable right edge screen transition\n"
+              << "  --no-edge-top         Disable top edge screen transition\n"
+              << "  --no-edge-bottom      Disable bottom edge screen transition\n"
+              << "  --lock-cursor         Lock cursor to current screen\n"
               << "  --verbose             Enable verbose logging\n"
               << "  -h, --help            Show this help message\n"
               << std::endl;
@@ -98,6 +103,16 @@ int main(int argc, char *argv[])
             config.uiPath = arg.substr(9);
         } else if (arg.rfind("--name=", 0) == 0) {
             config.instanceName = arg.substr(7);
+        } else if (arg == "--no-edge-left") {
+            config.edgeLeft = false;
+        } else if (arg == "--no-edge-right") {
+            config.edgeRight = false;
+        } else if (arg == "--no-edge-top") {
+            config.edgeTop = false;
+        } else if (arg == "--no-edge-bottom") {
+            config.edgeBottom = false;
+        } else if (arg == "--lock-cursor") {
+            config.lockCursorToScreen = true;
         } else {
             std::cerr << "Error: Unknown option '" << arg << "'" << std::endl;
             printUsage(argv[0]);

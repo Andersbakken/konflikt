@@ -32,6 +32,11 @@ typedef NS_ENUM(NSInteger, KonfliktConnectionStatus) {
 @property(nonatomic) int screenY;
 @property(nonatomic) int screenWidth;
 @property(nonatomic) int screenHeight;
+@property(nonatomic) BOOL edgeLeft;
+@property(nonatomic) BOOL edgeRight;
+@property(nonatomic) BOOL edgeTop;
+@property(nonatomic) BOOL edgeBottom;
+@property(nonatomic) BOOL lockCursorToScreen;
 @property(nonatomic, copy, nullable) NSString *uiPath;
 @property(nonatomic) BOOL verbose;
 @property(nonatomic, copy, nullable) NSString *logFile;
@@ -71,6 +76,10 @@ typedef NS_ENUM(NSInteger, KonfliktConnectionStatus) {
 
 /// Request quit (signal to stop running)
 - (void)quit;
+
+/// Lock/unlock cursor to current screen
+- (void)setLockCursorToScreen:(BOOL)locked;
+- (BOOL)isLockCursorToScreen;
 
 @end
 
