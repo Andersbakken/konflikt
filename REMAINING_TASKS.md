@@ -79,7 +79,7 @@ The native C++ rewrite is largely functional. The macOS Swift app builds and run
 
 #### 5. Preferences UI
 - [ ] macOS: Preferences window in Swift app
-- [ ] Hot key configuration for manual screen switching
+- [x] Hot key for cursor lock toggle (lockCursorHotkey config, default: Scroll Lock)
 
 ### Lower Priority
 
@@ -158,6 +158,7 @@ Example config:
   "edgeTop": true,
   "edgeBottom": true,
   "lockCursorToScreen": false,
+  "lockCursorHotkey": 107,
   "verbose": false
 }
 ```

@@ -25,6 +25,7 @@ struct ConfigJson
     bool edgeTop { true };
     bool edgeBottom { true };
     bool lockCursorToScreen { false };
+    int lockCursorHotkey { 107 };  // Default: Scroll Lock
     std::string uiPath;
     bool verbose { false };
     std::string logFile;
@@ -52,6 +53,7 @@ struct glz::meta<konflikt::ConfigJson>
         "edgeTop", &T::edgeTop,
         "edgeBottom", &T::edgeBottom,
         "lockCursorToScreen", &T::lockCursorToScreen,
+        "lockCursorHotkey", &T::lockCursorHotkey,
         "uiPath", &T::uiPath,
         "verbose", &T::verbose,
         "logFile", &T::logFile);
@@ -127,6 +129,7 @@ std::optional<Config> ConfigManager::load(const std::string &path)
     config.edgeTop = jsonConfig.edgeTop;
     config.edgeBottom = jsonConfig.edgeBottom;
     config.lockCursorToScreen = jsonConfig.lockCursorToScreen;
+    config.lockCursorHotkey = static_cast<uint32_t>(jsonConfig.lockCursorHotkey);
     config.uiPath = jsonConfig.uiPath;
     config.verbose = jsonConfig.verbose;
     config.logFile = jsonConfig.logFile;
@@ -168,6 +171,7 @@ bool ConfigManager::save(const Config &config, const std::string &path)
     jsonConfig.edgeTop = config.edgeTop;
     jsonConfig.edgeBottom = config.edgeBottom;
     jsonConfig.lockCursorToScreen = config.lockCursorToScreen;
+    jsonConfig.lockCursorHotkey = static_cast<int>(config.lockCursorHotkey);
     jsonConfig.uiPath = config.uiPath;
     jsonConfig.verbose = config.verbose;
     jsonConfig.logFile = config.logFile;

@@ -314,6 +314,14 @@ void Konflikt::onPlatformEvent(const Event &event)
 
         case EventType::KeyPress:
         case EventType::KeyRelease: {
+            // Check for hotkey (only on key press)
+            if (event.type == EventType::KeyPress && mConfig.lockCursorHotkey != 0 &&
+                event.keycode == mConfig.lockCursorHotkey) {
+                // Toggle cursor lock
+                setLockCursorToScreen(!mConfig.lockCursorToScreen);
+                return; // Don't forward the hotkey
+            }
+
             if (mHasVirtualCursor) {
                 InputEventData data;
                 data.x = mVirtualCursor.x;

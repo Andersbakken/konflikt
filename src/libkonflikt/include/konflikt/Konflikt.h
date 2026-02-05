@@ -55,6 +55,10 @@ struct Config
     // Lock cursor to current screen (disable transitions)
     bool lockCursorToScreen { false };
 
+    // Hotkey for toggling cursor lock (keycode, 0 = disabled)
+    // Default: Scroll Lock key (macOS: 107, Linux: 78)
+    uint32_t lockCursorHotkey { 107 };
+
     // UI settings
     std::string uiPath;      // Path to React UI files
 
