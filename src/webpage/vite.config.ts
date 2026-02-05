@@ -4,6 +4,10 @@ import react from "@vitejs/plugin-react";
 export default defineConfig({
     plugins: [react()],
     base: "/ui/",
+    resolve: {
+        // Resolve modules from symlink location, not target - needed for out-of-source builds
+        preserveSymlinks: true
+    },
     build: {
         outDir: "../../dist/ui",
         emptyOutDir: true

@@ -162,7 +162,7 @@ struct HttpServer::Impl
             }
         }
 
-        app.listen(requestedPort, [this, requestedPort](us_listen_socket_t *socket) {
+        app.listen(requestedPort, [this](us_listen_socket_t *socket) {
             if (socket) {
                 listenSocket = socket;
                 port = us_socket_local_port(false, reinterpret_cast<us_socket_t *>(socket));

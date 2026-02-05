@@ -88,7 +88,8 @@ target_compile_options(konflikt PRIVATE
     -Wall
     -Wextra
     -Wpedantic
-    -Wno-missing-braces  # Suppress false positive from glaze library
+    -Wno-missing-braces           # Suppress false positive from glaze library
+    -Wno-deprecated-declarations  # Suppress aligned_storage_t warning from uWebSockets
 )
 
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
