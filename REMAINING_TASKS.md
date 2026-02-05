@@ -229,6 +229,7 @@ All endpoints support `?pretty` query parameter for formatted JSON output.
 - `GET /api/server-info` - Server name, port, TLS status
 - `GET /api/status` - Instance status, connection info, client details
 - `GET /api/servers` - List of discovered servers via mDNS auto-discovery
+- `GET /api/layout` - Current screen layout/arrangement (server only)
 - `GET /api/config` - Get current runtime configuration
 - `POST /api/config` - Update runtime config (JSON body with edgeLeft, edgeRight, edgeTop, edgeBottom, lockCursorToScreen, verbose, logKeycodes)
 - `POST /api/config/save` - Save current config to file

@@ -104,6 +104,24 @@ struct DiscoveredServersJson
     std::vector<DiscoveredServerJson> servers;
 };
 
+// For GET /api/layout (screen arrangement)
+struct ScreenLayoutEntryJson
+{
+    std::string instanceId;
+    std::string displayName;
+    int32_t x;
+    int32_t y;
+    int32_t width;
+    int32_t height;
+    bool isServer;
+    bool online;
+};
+
+struct ScreenLayoutJson
+{
+    std::vector<ScreenLayoutEntryJson> screens;
+};
+
 struct LogEntryJson
 {
     std::string timestamp;
@@ -268,6 +286,28 @@ struct glz::meta<konflikt::DiscoveredServersJson>
 {
     using T = konflikt::DiscoveredServersJson;
     static constexpr auto value = object("servers", &T::servers);
+};
+
+template <>
+struct glz::meta<konflikt::ScreenLayoutEntryJson>
+{
+    using T = konflikt::ScreenLayoutEntryJson;
+    static constexpr auto value = object(
+        "instanceId", &T::instanceId,
+        "displayName", &T::displayName,
+        "x", &T::x,
+        "y", &T::y,
+        "width", &T::width,
+        "height", &T::height,
+        "isServer", &T::isServer,
+        "online", &T::online);
+};
+
+template <>
+struct glz::meta<konflikt::ScreenLayoutJson>
+{
+    using T = konflikt::ScreenLayoutJson;
+    static constexpr auto value = object("screens", &T::screens);
 };
 
 template <>
@@ -605,6 +645,40 @@ bool Konflikt::init()
             }
         } else {
             response.body = "{\"servers\":[]}";
+        }
+        return response;
+    });
+
+    // API endpoint for screen layout (server only, shows screen arrangement)
+    mHttpServer->route("GET", "/api/layout", [this](const HttpRequest &req) {
+        HttpResponse response;
+        response.contentType = "application/json";
+
+        ScreenLayoutJson layout;
+        if (mLayoutManager) {
+            for (const auto &screen : mLayoutManager->getLayout()) {
+                layout.screens.push_back({
+                    screen.instanceId,
+                    screen.displayName,
+                    screen.x,
+                    screen.y,
+                    screen.width,
+                    screen.height,
+                    screen.isServer,
+                    screen.online
+                });
+            }
+        }
+
+        auto json = glz::write_json(layout);
+        if (json) {
+            if (req.path.find("pretty") != std::string::npos) {
+                response.body = glz::prettify_json(*json);
+            } else {
+                response.body = *json;
+            }
+        } else {
+            response.body = "{\"screens\":[]}";
         }
         return response;
     });
