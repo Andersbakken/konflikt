@@ -384,6 +384,126 @@ bool Konflikt::init()
         return response;
     });
 
+    // API endpoint to add a key remap
+    mHttpServer->route("POST", "/api/keyremap", [this](const HttpRequest &req) {
+        HttpResponse response;
+        response.contentType = "application/json";
+
+        // Parse JSON body: {"from": 55, "to": 133} or {"preset": "mac-to-linux"}
+        const std::string &body = req.body;
+
+        // Check for preset
+        size_t presetPos = body.find("\"preset\"");
+        if (presetPos != std::string::npos) {
+            if (body.find("\"mac-to-linux\"") != std::string::npos) {
+                mConfig.keyRemap[55] = 133;   // Command Left -> Super Left
+                mConfig.keyRemap[54] = 134;   // Command Right -> Super Right
+                mConfig.keyRemap[58] = 64;    // Option Left -> Alt Left
+                mConfig.keyRemap[61] = 108;   // Option Right -> Alt Right
+                response.body = "{\"success\":true,\"message\":\"Applied mac-to-linux preset\"}";
+                log("log", "Applied mac-to-linux key remap preset via API");
+                return response;
+            } else if (body.find("\"linux-to-mac\"") != std::string::npos) {
+                mConfig.keyRemap[133] = 55;   // Super Left -> Command Left
+                mConfig.keyRemap[134] = 54;   // Super Right -> Command Right
+                mConfig.keyRemap[64] = 58;    // Alt Left -> Option Left
+                mConfig.keyRemap[108] = 61;   // Alt Right -> Option Right
+                response.body = "{\"success\":true,\"message\":\"Applied linux-to-mac preset\"}";
+                log("log", "Applied linux-to-mac key remap preset via API");
+                return response;
+            } else if (body.find("\"clear\"") != std::string::npos) {
+                mConfig.keyRemap.clear();
+                response.body = "{\"success\":true,\"message\":\"Cleared all key remaps\"}";
+                log("log", "Cleared key remaps via API");
+                return response;
+            }
+        }
+
+        // Parse from/to values
+        auto getInt = [&body](const std::string &key) -> std::optional<int> {
+            size_t pos = body.find("\"" + key + "\"");
+            if (pos == std::string::npos) {
+                return std::nullopt;
+            }
+            pos = body.find(":", pos);
+            if (pos == std::string::npos) {
+                return std::nullopt;
+            }
+            size_t start = body.find_first_of("0123456789", pos);
+            if (start == std::string::npos) {
+                return std::nullopt;
+            }
+            size_t end = body.find_first_not_of("0123456789", start);
+            std::string numStr = body.substr(start, end - start);
+            return std::stoi(numStr);
+        };
+
+        auto fromKey = getInt("from");
+        auto toKey = getInt("to");
+
+        if (fromKey && toKey) {
+            mConfig.keyRemap[static_cast<uint32_t>(*fromKey)] = static_cast<uint32_t>(*toKey);
+            response.body = "{\"success\":true,\"message\":\"Added key remap " +
+                std::to_string(*fromKey) + " -> " + std::to_string(*toKey) + "\"}";
+            log("log", "Added key remap " + std::to_string(*fromKey) + " -> " +
+                std::to_string(*toKey) + " via API");
+        } else {
+            response.statusCode = 400;
+            response.statusMessage = "Bad Request";
+            response.body = "{\"success\":false,\"message\":\"Missing 'from' or 'to' in request\"}";
+        }
+
+        return response;
+    });
+
+    // API endpoint to delete a key remap
+    mHttpServer->route("DELETE", "/api/keyremap", [this](const HttpRequest &req) {
+        HttpResponse response;
+        response.contentType = "application/json";
+
+        // Parse JSON body: {"from": 55}
+        const std::string &body = req.body;
+
+        auto getInt = [&body](const std::string &key) -> std::optional<int> {
+            size_t pos = body.find("\"" + key + "\"");
+            if (pos == std::string::npos) {
+                return std::nullopt;
+            }
+            pos = body.find(":", pos);
+            if (pos == std::string::npos) {
+                return std::nullopt;
+            }
+            size_t start = body.find_first_of("0123456789", pos);
+            if (start == std::string::npos) {
+                return std::nullopt;
+            }
+            size_t end = body.find_first_not_of("0123456789", start);
+            std::string numStr = body.substr(start, end - start);
+            return std::stoi(numStr);
+        };
+
+        auto fromKey = getInt("from");
+
+        if (fromKey) {
+            auto it = mConfig.keyRemap.find(static_cast<uint32_t>(*fromKey));
+            if (it != mConfig.keyRemap.end()) {
+                mConfig.keyRemap.erase(it);
+                response.body = "{\"success\":true,\"message\":\"Removed key remap for " +
+                    std::to_string(*fromKey) + "\"}";
+                log("log", "Removed key remap for " + std::to_string(*fromKey) + " via API");
+            } else {
+                response.body = "{\"success\":false,\"message\":\"No remap found for key " +
+                    std::to_string(*fromKey) + "\"}";
+            }
+        } else {
+            response.statusCode = 400;
+            response.statusMessage = "Bad Request";
+            response.body = "{\"success\":false,\"message\":\"Missing 'from' in request\"}";
+        }
+
+        return response;
+    });
+
     // Set up platform event handler for server role
     if (mConfig.role == InstanceRole::Server) {
         mLayoutManager = std::make_unique<LayoutManager>();
