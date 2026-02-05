@@ -141,6 +141,31 @@ public:
     {
         if (event.type == EventType::MouseMove) {
             xcb_warp_pointer(mConnection, XCB_NONE, mScreen->root, 0, 0, 0, 0, event.state.x, event.state.y);
+        } else if (event.type == EventType::MouseScroll) {
+            // X11 scroll events are button press/release events
+            // Button 4 = scroll up, 5 = scroll down, 6 = scroll left, 7 = scroll right
+            int scrollY = static_cast<int>(event.state.scrollY);
+            int scrollX = static_cast<int>(event.state.scrollX);
+
+            // Vertical scroll
+            if (scrollY != 0) {
+                uint8_t button = scrollY > 0 ? 4 : 5; // 4=up, 5=down
+                int count = std::abs(scrollY);
+                for (int i = 0; i < count; i++) {
+                    xcb_test_fake_input(mConnection, XCB_BUTTON_PRESS, button, XCB_CURRENT_TIME, mScreen->root, 0, 0, 0);
+                    xcb_test_fake_input(mConnection, XCB_BUTTON_RELEASE, button, XCB_CURRENT_TIME, mScreen->root, 0, 0, 0);
+                }
+            }
+
+            // Horizontal scroll
+            if (scrollX != 0) {
+                uint8_t button = scrollX > 0 ? 7 : 6; // 7=right, 6=left
+                int count = std::abs(scrollX);
+                for (int i = 0; i < count; i++) {
+                    xcb_test_fake_input(mConnection, XCB_BUTTON_PRESS, button, XCB_CURRENT_TIME, mScreen->root, 0, 0, 0);
+                    xcb_test_fake_input(mConnection, XCB_BUTTON_RELEASE, button, XCB_CURRENT_TIME, mScreen->root, 0, 0, 0);
+                }
+            }
         } else {
             uint8_t button = 1;
             if (event.button == MouseButton::Right)
@@ -431,7 +456,40 @@ private:
             case XCB_INPUT_RAW_BUTTON_PRESS:
             case XCB_INPUT_RAW_BUTTON_RELEASE: {
                 auto *raw = reinterpret_cast<xcb_input_raw_button_press_event_t *>(ge);
-                event.type = ge->event_type == XCB_INPUT_RAW_BUTTON_PRESS ? EventType::MousePress : EventType::MouseRelease;
+                bool isPress = ge->event_type == XCB_INPUT_RAW_BUTTON_PRESS;
+
+                // Handle scroll wheel (buttons 4-7)
+                // Only process press events for scroll (release is meaningless for scroll)
+                if (raw->detail >= 4 && raw->detail <= 7) {
+                    if (!isPress)
+                        break; // Ignore release events for scroll
+
+                    event.type = EventType::MouseScroll;
+                    event.state = getState();
+
+                    // Button 4 = scroll up (+Y), 5 = down (-Y), 6 = left (-X), 7 = right (+X)
+                    switch (raw->detail) {
+                        case 4:
+                            event.state.scrollY = 1.0;
+                            break;
+                        case 5:
+                            event.state.scrollY = -1.0;
+                            break;
+                        case 6:
+                            event.state.scrollX = -1.0;
+                            break;
+                        case 7:
+                            event.state.scrollX = 1.0;
+                            break;
+                    }
+
+                    if (onEvent)
+                        onEvent(event);
+                    break;
+                }
+
+                // Handle regular mouse buttons
+                event.type = isPress ? EventType::MousePress : EventType::MouseRelease;
 
                 if (raw->detail == 1)
                     event.button = MouseButton::Left;
@@ -440,7 +498,7 @@ private:
                 else if (raw->detail == 3)
                     event.button = MouseButton::Right;
                 else
-                    break; // Ignore scroll wheel
+                    break; // Ignore other buttons
 
                 event.state = getState();
                 if (onEvent)

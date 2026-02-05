@@ -24,11 +24,12 @@ The native C++ rewrite is largely functional. The macOS Swift app builds and run
 
 ### Platform Implementations
 - [x] Linux (X11/XCB) - PlatformLinux.cpp
-  - Input capture via XInput2 raw events
-  - Input injection via XTest
+  - Input capture via XInput2 raw events (including scroll wheel)
+  - Input injection via XTest (including scroll wheel)
   - Display enumeration via RandR
   - Cursor show/hide via pointer grab
   - Clipboard text (basic)
+  - Service discovery via Avahi (when available)
 - [x] macOS (CoreGraphics) - PlatformMac.mm
   - Input capture via CGEventTap (including scroll wheel)
   - Input injection via CGEventPost (including scroll wheel)
@@ -66,9 +67,9 @@ The native C++ rewrite is largely functional. The macOS Swift app builds and run
 ### Medium Priority
 
 #### 3. Linux Platform Updates
-- [ ] Implement ServiceDiscoveryLinux.cpp using Avahi
-- [ ] Implement scroll capture in PlatformLinux.cpp
-- [ ] Implement scroll injection in PlatformLinux.cpp
+- [x] Implement ServiceDiscoveryLinux.cpp using Avahi (with fallback stub when Avahi not available)
+- [x] Implement scroll capture in PlatformLinux.cpp (buttons 4-7 as scroll events)
+- [x] Implement scroll injection in PlatformLinux.cpp (via XTest fake button press)
 
 #### 4. Clipboard Sync Enhancements
 - [ ] Handle multi-format clipboard (images, files)
