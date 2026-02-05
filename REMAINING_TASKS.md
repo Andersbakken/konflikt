@@ -22,6 +22,7 @@ The native C++ rewrite is largely functional. The macOS Swift app builds and run
 - [x] ConfigManager for loading/saving JSON config files
 - [x] Auto-reconnection logic for clients
 - [x] WebSocket heartbeat with ping/pong for dead connection detection
+- [x] Graceful server shutdown notification protocol
 
 ### Platform Implementations
 - [x] Linux (X11/XCB) - PlatformLinux.cpp
@@ -86,7 +87,7 @@ The native C++ rewrite is largely functional. The macOS Swift app builds and run
 - [x] Auto-reconnection logic for clients (DONE)
 - [x] Connection timeout handling (10 second timeout during handshake)
 - [x] WebSocket heartbeat/ping-pong (30s interval, 10s timeout)
-- [ ] Handle server restart gracefully (notify clients)
+- [x] Handle server restart gracefully (server_shutdown message, faster reconnection)
 - [ ] Improve error messages and logging
 
 #### 7. Performance Optimization

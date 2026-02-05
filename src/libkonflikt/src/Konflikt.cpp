@@ -102,7 +102,9 @@ bool Konflikt::init()
         mWsClient = std::make_unique<WebSocketClient>();
         mWsClient->setCallbacks({ .onConnect = [this]() {
             updateStatus(ConnectionStatus::Connected, "Connected to server");
-            mReconnectAttempts = 0; // Reset on successful connection
+            mReconnectAttempts = 0;       // Reset on successful connection
+            mExpectingReconnect = false;  // Clear graceful shutdown flag
+            mExpectedRestartDelayMs = 0;
                 // Send handshake
             HandshakeRequest req;
             req.instanceId = mConfig.instanceId;
@@ -186,11 +188,26 @@ void Konflikt::run()
                 mReconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
 
                 uint64_t now = timestamp();
-                if (now - mLastReconnectAttempt >= RECONNECT_DELAY_MS) {
+                // Use shorter delay if server sent graceful shutdown, or use expected restart delay
+                uint64_t delay = RECONNECT_DELAY_MS;
+                if (mExpectingReconnect) {
+                    // If server told us when it expects to be back, use that + small buffer
+                    // Otherwise use a shorter delay for graceful restarts
+                    delay = mExpectedRestartDelayMs > 0
+                        ? static_cast<uint64_t>(mExpectedRestartDelayMs) + 500
+                        : 1000;
+                }
+
+                if (now - mLastReconnectAttempt >= delay) {
                     mLastReconnectAttempt = now;
                     mReconnectAttempts++;
-                    log("log", "Reconnection attempt " + std::to_string(mReconnectAttempts) +
-                        "/" + std::to_string(MAX_RECONNECT_ATTEMPTS));
+                    if (mExpectingReconnect) {
+                        log("log", "Reconnecting after graceful server shutdown (attempt " +
+                            std::to_string(mReconnectAttempts) + ")");
+                    } else {
+                        log("log", "Reconnection attempt " + std::to_string(mReconnectAttempts) +
+                            "/" + std::to_string(MAX_RECONNECT_ATTEMPTS));
+                    }
                     updateStatus(ConnectionStatus::Connecting, "Reconnecting...");
                     mWsClient->reconnect();
                 }
@@ -376,6 +393,10 @@ void Konflikt::onWebSocketMessage(const std::string &message, void *connection)
         auto cs = fromJson<ClipboardSyncMessage>(message);
         if (cs)
             handleClipboardSync(*cs);
+    } else if (*msgType == "server_shutdown") {
+        auto ss = fromJson<ServerShutdownMessage>(message);
+        if (ss)
+            handleServerShutdown(*ss);
     }
 }
 
@@ -809,6 +830,36 @@ void Konflikt::handleClipboardSync(const ClipboardSyncMessage &message)
             log("verbose", "Clipboard synced from " + message.sourceInstanceId);
         }
     }
+}
+
+void Konflikt::handleServerShutdown(const ServerShutdownMessage &message)
+{
+    log("log", "Server shutting down: " + message.reason);
+
+    // Mark that we're expecting reconnection (graceful shutdown)
+    mExpectingReconnect = true;
+    mExpectedRestartDelayMs = message.delayMs;
+
+    // Reset reconnection attempts since this is a graceful shutdown
+    mReconnectAttempts = 0;
+
+    // Update status to inform user
+    updateStatus(ConnectionStatus::Disconnected, "Server shutdown: " + message.reason);
+}
+
+void Konflikt::notifyShutdown(const std::string &reason, int32_t delayMs)
+{
+    if (mConfig.role != InstanceRole::Server) {
+        return;
+    }
+
+    ServerShutdownMessage message;
+    message.reason = reason;
+    message.delayMs = delayMs;
+    message.timestamp = timestamp();
+
+    broadcastToClients(toJson(message));
+    log("log", "Sent shutdown notification to clients: " + reason);
 }
 
 void Konflikt::checkClipboardChange()

@@ -92,6 +92,9 @@ public:
     /// Request quit
     void quit();
 
+    /// Notify clients of graceful shutdown (server only)
+    void notifyShutdown(const std::string &reason = "shutdown", int32_t delayMs = 0);
+
     /// Get current configuration
     const Config &config() const { return mConfig; }
 
@@ -130,6 +133,7 @@ private:
     void handleActivateClient(const ActivateClientMessage &message);
     void handleDeactivationRequest(const DeactivationRequestMessage &message);
     void handleClipboardSync(const ClipboardSyncMessage &message);
+    void handleServerShutdown(const ServerShutdownMessage &message);
 
     // Clipboard
     void checkClipboardChange();
@@ -207,6 +211,8 @@ private:
     // Reconnection
     uint64_t mLastReconnectAttempt { 0 };
     int mReconnectAttempts { 0 };
+    bool mExpectingReconnect { false };  // Set when server sent graceful shutdown
+    int32_t mExpectedRestartDelayMs { 0 };
     static constexpr int MAX_RECONNECT_ATTEMPTS = 10;
     static constexpr uint64_t RECONNECT_DELAY_MS = 3000;
 

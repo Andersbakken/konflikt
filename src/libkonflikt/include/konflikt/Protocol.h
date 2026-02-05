@@ -197,6 +197,16 @@ struct ClipboardSyncMessage
     uint64_t timestamp {};
 };
 
+/// Server shutdown notification
+/// Sent to clients before server shuts down gracefully
+struct ServerShutdownMessage
+{
+    std::string type = "server_shutdown";
+    std::string reason;   // "restart", "maintenance", "user_requested", etc.
+    int32_t delayMs {};   // Estimated delay before server is back (0 = unknown)
+    uint64_t timestamp {};
+};
+
 // ============================================================================
 // Glaze Metadata (for JSON serialization)
 // ============================================================================
@@ -408,6 +418,17 @@ struct glz::meta<konflikt::ClipboardSyncMessage>
         "format", &T::format,
         "data", &T::data,
         "sequence", &T::sequence,
+        "timestamp", &T::timestamp);
+};
+
+template <>
+struct glz::meta<konflikt::ServerShutdownMessage>
+{
+    using T = konflikt::ServerShutdownMessage;
+    static constexpr auto value = object(
+        "type", &T::type,
+        "reason", &T::reason,
+        "delayMs", &T::delayMs,
         "timestamp", &T::timestamp);
 };
 
