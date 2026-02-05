@@ -10,6 +10,7 @@ enum ConnectionStatus {
 
 protocol StatusBarControllerDelegate: AnyObject {
     func openConfiguration()
+    func openPreferences()
     func requestAccessibility()
     func toggleLaunchAtLogin(_ enabled: Bool)
     func isLaunchAtLoginEnabled() -> Bool
@@ -57,10 +58,15 @@ class StatusBarController {
 
         menu?.addItem(NSMenuItem.separator())
 
-        // Open Configuration
-        let configItem = NSMenuItem(title: "Open Configuration...", action: #selector(openConfigurationClicked), keyEquivalent: ",")
+        // Open Configuration (Web UI)
+        let configItem = NSMenuItem(title: "Open Web UI...", action: #selector(openConfigurationClicked), keyEquivalent: "")
         configItem.target = self
         menu?.addItem(configItem)
+
+        // Preferences
+        let prefsItem = NSMenuItem(title: "Preferences...", action: #selector(openPreferencesClicked), keyEquivalent: ",")
+        prefsItem.target = self
+        menu?.addItem(prefsItem)
 
         menu?.addItem(NSMenuItem.separator())
 
@@ -187,6 +193,10 @@ class StatusBarController {
 
     @objc private func openConfigurationClicked() {
         delegate?.openConfiguration()
+    }
+
+    @objc private func openPreferencesClicked() {
+        delegate?.openPreferences()
     }
 
     @objc private func accessibilityClicked() {

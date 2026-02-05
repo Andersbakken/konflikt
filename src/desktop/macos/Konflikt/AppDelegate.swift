@@ -4,6 +4,7 @@ import ServiceManagement
 class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusBarController: StatusBarController?
     private var processManager: ProcessManager?
+    private var preferencesWindow: PreferencesWindow?
     private var configPort: Int = 3000
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -26,8 +27,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             }
         }
 
-        // Start the backend process
-        startBackend()
+        // Show preferences on first launch
+        if Preferences.shared.isFirstLaunch {
+            showPreferences()
+        }
+
+        // Start the backend process if auto-connect is enabled
+        if Preferences.shared.autoConnect {
+            startBackend()
+        }
     }
 
     func applicationWillTerminate(_ notification: Notification) {
@@ -41,15 +49,27 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let backendPath = findBackendPath()
 
         if let path = backendPath {
+            let prefs = Preferences.shared
             processManager.startProcess(
                 backendPath: path,
-                role: detectRole(),
-                port: configPort
+                role: prefs.role,
+                serverAddress: prefs.serverAddress,
+                port: prefs.serverPort > 0 ? prefs.serverPort : nil,
+                verbose: prefs.verboseLogging
             )
         } else {
             print("Could not find backend path")
             statusBarController?.updateStatus(.error, message: "Backend not found")
         }
+    }
+
+    private func showPreferences() {
+        if preferencesWindow == nil {
+            preferencesWindow = PreferencesWindow()
+            preferencesWindow?.preferencesDelegate = self
+        }
+        preferencesWindow?.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
     }
 
     private func findBackendPath() -> String? {
@@ -85,10 +105,16 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         return nil
     }
 
-    private func detectRole() -> String {
-        // Could be made configurable via preferences
-        // For now, detect based on whether a server is already running
-        return "client"
+}
+
+// MARK: - PreferencesWindowDelegate
+extension AppDelegate: PreferencesWindowDelegate {
+    func preferencesDidChange() {
+        // Restart backend with new settings
+        processManager?.stopProcess()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+            self.startBackend()
+        }
     }
 }
 
@@ -97,6 +123,10 @@ extension AppDelegate: StatusBarControllerDelegate {
     func openConfiguration() {
         let url = URL(string: "http://localhost:\(configPort)/ui")!
         NSWorkspace.shared.open(url)
+    }
+
+    func openPreferences() {
+        showPreferences()
     }
 
     func requestAccessibility() {

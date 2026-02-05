@@ -27,7 +27,7 @@ class ProcessManager {
         "~/.nvm/versions/node/*/bin/node"  // NVM installations
     ]
 
-    func startProcess(backendPath: String, role: String, port: Int? = nil) {
+    func startProcess(backendPath: String, role: String, serverAddress: String? = nil, port: Int? = nil, verbose: Bool = false) {
         guard process == nil else {
             print("Process already running")
             return
@@ -42,11 +42,20 @@ class ProcessManager {
         process?.executableURL = URL(fileURLWithPath: nodePath)
 
         var arguments = [backendPath, "--role=\(role)"]
+
+        if let server = serverAddress, !server.isEmpty, role == "client" {
+            arguments.append("--server=\(server)")
+        }
+
         if let port = port {
             arguments.append("--port=\(port)")
             currentPort = port
         }
-        arguments.append("-vv")  // Verbose logging
+
+        if verbose {
+            arguments.append("-vv")
+        }
+
         process?.arguments = arguments
 
         // Set up environment

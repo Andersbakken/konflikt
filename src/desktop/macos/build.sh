@@ -34,6 +34,8 @@ SWIFT_FILES=(
     "$SOURCE_DIR/AccessibilityHelper.swift"
     "$SOURCE_DIR/ProcessManager.swift"
     "$SOURCE_DIR/LaunchAtLoginHelper.swift"
+    "$SOURCE_DIR/Preferences.swift"
+    "$SOURCE_DIR/PreferencesWindow.swift"
 )
 
 echo "Compiling Swift sources..."
