@@ -6,8 +6,10 @@
 
 #include <functional>
 #include <memory>
+#include <mutex>
 #include <string>
 #include <unordered_map>
+#include <vector>
 
 namespace konflikt {
 
@@ -71,6 +73,9 @@ struct Config
     // Logging
     bool verbose { false };
     std::string logFile;
+
+    // Debug API (enables /api/log endpoint)
+    bool enableDebugApi { false };
 };
 
 /// Connection status
@@ -148,6 +153,12 @@ public:
 
     /// Get the HTTP server port (may differ from config if auto-assigned)
     int httpPort() const;
+
+    /// Get the number of connected clients (server only)
+    size_t clientCount() const { return mConnectedClients.size(); }
+
+    /// Get the names of connected clients (server only)
+    std::vector<std::string> connectedClientNames() const;
 
 private:
     // Event handlers
@@ -234,7 +245,17 @@ private:
     uint64_t mLastDeactivationRequest { 0 };
 
     // Client connection tracking (for server)
+    struct ConnectedClient
+    {
+        std::string instanceId;
+        std::string displayName;
+        int32_t screenWidth {};
+        int32_t screenHeight {};
+        uint64_t connectedAt {};
+        bool active { false };  // Currently receiving input
+    };
     std::unordered_map<void *, std::string> mConnectionToInstanceId;
+    std::unordered_map<std::string, ConnectedClient> mConnectedClients;
 
     // Clipboard sync
     std::string mLastClipboardText;
@@ -252,6 +273,17 @@ private:
     // Callbacks
     StatusCallback mStatusCallback;
     LogCallback mLogCallback;
+
+    // Log buffer for debug API
+    struct LogEntry
+    {
+        std::string timestamp;
+        std::string level;
+        std::string message;
+    };
+    std::vector<LogEntry> mLogBuffer;
+    static constexpr size_t MAX_LOG_ENTRIES = 500;
+    mutable std::mutex mLogBufferMutex;
 };
 
 } // namespace konflikt

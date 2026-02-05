@@ -3,6 +3,7 @@
 #include "konflikt/HttpServer.h"
 #include "konflikt/LayoutManager.h"
 #include "konflikt/ServiceDiscovery.h"
+#include "konflikt/Version.h"
 #include "konflikt/WebSocketClient.h"
 #include "konflikt/WebSocketServer.h"
 
@@ -22,6 +23,21 @@ Konflikt::Konflikt(const Config &config)
 {
     // Generate identifiers
     mMachineId = generateMachineId();
+
+    // Auto-generate instanceId if not provided
+    if (mConfig.instanceId.empty()) {
+        char hostname[256];
+        gethostname(hostname, sizeof(hostname));
+        // Use first 8 chars of machine ID + hostname for readability
+        mConfig.instanceId = std::string(hostname) + "-" + mMachineId.substr(0, 8);
+    }
+
+    // Auto-generate instanceName if not provided
+    if (mConfig.instanceName.empty()) {
+        char hostname[256];
+        gethostname(hostname, sizeof(hostname));
+        mConfig.instanceName = hostname;
+    }
 }
 
 Konflikt::~Konflikt()
@@ -92,6 +108,14 @@ bool Konflikt::init()
         log("log", "Serving UI from " + mConfig.uiPath);
     }
 
+    // API endpoint for version
+    mHttpServer->route("GET", "/api/version", [](const HttpRequest &) {
+        HttpResponse response;
+        response.contentType = "application/json";
+        response.body = "{\"version\":\"" + std::string(VERSION) + "\"}";
+        return response;
+    });
+
     // API endpoint for server info (including TLS availability)
     mHttpServer->route("GET", "/api/server-info", [this](const HttpRequest &) {
         HttpResponse response;
@@ -124,6 +148,103 @@ bool Konflikt::init()
             return response;
         });
         log("log", "Certificate available at /api/cert");
+    }
+
+    // API endpoint for server status
+    mHttpServer->route("GET", "/api/status", [this](const HttpRequest &) {
+        HttpResponse response;
+        response.contentType = "application/json";
+
+        std::stringstream ss;
+        ss << "{";
+        ss << "\"version\":\"" << VERSION << "\",";
+        ss << "\"role\":\"" << (mConfig.role == InstanceRole::Server ? "server" : "client") << "\",";
+        ss << "\"instanceId\":\"" << mConfig.instanceId << "\",";
+        ss << "\"instanceName\":\"" << mConfig.instanceName << "\",";
+        ss << "\"status\":\"" << (mRunning ? "running" : "stopped") << "\",";
+        ss << "\"connection\":\"";
+        switch (mConnectionStatus) {
+            case ConnectionStatus::Connected: ss << "connected"; break;
+            case ConnectionStatus::Connecting: ss << "connecting"; break;
+            case ConnectionStatus::Disconnected: ss << "disconnected"; break;
+            case ConnectionStatus::Error: ss << "error"; break;
+        }
+        ss << "\",";
+
+        if (mConfig.role == InstanceRole::Server && mWsServer) {
+            ss << "\"clientCount\":" << mWsServer->clientCount() << ",";
+            ss << "\"tls\":" << (mConfig.useTLS ? "true" : "false") << ",";
+            ss << "\"port\":" << mWsServer->port() << ",";
+            ss << "\"activeClient\":\"" << mActivatedClientId << "\",";
+            ss << "\"clients\":[";
+            bool first = true;
+            for (const auto &[id, client] : mConnectedClients) {
+                if (!first) {
+                    ss << ",";
+                }
+                first = false;
+                ss << "{";
+                ss << "\"instanceId\":\"" << client.instanceId << "\",";
+                ss << "\"displayName\":\"" << client.displayName << "\",";
+                ss << "\"screenWidth\":" << client.screenWidth << ",";
+                ss << "\"screenHeight\":" << client.screenHeight << ",";
+                ss << "\"connectedAt\":" << client.connectedAt << ",";
+                ss << "\"active\":" << (client.active ? "true" : "false");
+                ss << "}";
+            }
+            ss << "]";
+        } else {
+            ss << "\"serverHost\":\"" << mConfig.serverHost << "\",";
+            ss << "\"serverPort\":" << mConfig.serverPort << ",";
+            ss << "\"connectedServer\":\"" << mConnectedServerName << "\"";
+        }
+
+        ss << "}";
+        response.body = ss.str();
+        return response;
+    });
+
+    // API endpoint for recent logs (only if debug API is enabled)
+    if (mConfig.enableDebugApi) {
+        mHttpServer->route("GET", "/api/log", [this](const HttpRequest &) {
+            HttpResponse response;
+            response.contentType = "application/json";
+
+            std::stringstream ss;
+            ss << "{\"logs\":[";
+
+            {
+                std::lock_guard<std::mutex> lock(mLogBufferMutex);
+                bool first = true;
+                for (const auto &entry : mLogBuffer) {
+                    if (!first) {
+                        ss << ",";
+                    }
+                    first = false;
+                    ss << "{\"timestamp\":\"" << entry.timestamp << "\",";
+                    ss << "\"level\":\"" << entry.level << "\",";
+                    // Escape quotes in message
+                    ss << "\"message\":\"";
+                    for (char c : entry.message) {
+                        if (c == '"') {
+                            ss << "\\\"";
+                        } else if (c == '\\') {
+                            ss << "\\\\";
+                        } else if (c == '\n') {
+                            ss << "\\n";
+                        } else {
+                            ss << c;
+                        }
+                    }
+                    ss << "\"}";
+                }
+            }
+
+            ss << "]}";
+            response.body = ss.str();
+            return response;
+        });
+        log("log", "Debug API enabled at /api/log");
     }
 
     // Set up platform event handler for server role
@@ -164,7 +285,7 @@ bool Konflikt::init()
             HandshakeRequest req;
             req.instanceId = mConfig.instanceId;
             req.instanceName = mConfig.instanceName;
-            req.version = "2.0.0";
+            req.version = VERSION;
             req.capabilities = { "input_events", "screen_info" };
             req.timestamp = timestamp();
             mWsClient->send(toJson(req));
@@ -311,6 +432,15 @@ void Konflikt::quit()
 int Konflikt::httpPort() const
 {
     return mHttpServer ? mHttpServer->port() : mConfig.port;
+}
+
+std::vector<std::string> Konflikt::connectedClientNames() const
+{
+    std::vector<std::string> names;
+    for (const auto &[id, client] : mConnectedClients) {
+        names.push_back(client.displayName);
+    }
+    return names;
 }
 
 void Konflikt::onPlatformEvent(const Event &event)
@@ -486,6 +616,7 @@ void Konflikt::onClientDisconnected(void *connection)
             mLayoutManager->setClientOnline(instanceId, false);
         }
         mConnectionToInstanceId.erase(it);
+        mConnectedClients.erase(instanceId);
     }
 }
 
@@ -501,7 +632,7 @@ void Konflikt::handleHandshakeRequest(const HandshakeRequest &request, void *con
     response.accepted = true;
     response.instanceId = mConfig.instanceId;
     response.instanceName = mConfig.instanceName;
-    response.version = "2.0.0";
+    response.version = VERSION;
     response.capabilities = { "input_events", "screen_info" };
     response.timestamp = timestamp();
 
@@ -585,6 +716,16 @@ void Konflikt::handleClientRegistration(const ClientRegistrationMessage &message
     }
 
     log("log", "Client registered: " + message.displayName);
+
+    // Track client details
+    ConnectedClient client;
+    client.instanceId = message.instanceId;
+    client.displayName = message.displayName;
+    client.screenWidth = message.screenWidth;
+    client.screenHeight = message.screenHeight;
+    client.connectedAt = timestamp();
+    client.active = false;
+    mConnectedClients[message.instanceId] = client;
 
     auto entry = mLayoutManager->registerClient(
         message.instanceId,
@@ -732,7 +873,21 @@ bool Konflikt::checkScreenTransition(int32_t x, int32_t y)
 
 void Konflikt::activateClient(const std::string &targetInstanceId, int32_t cursorX, int32_t cursorY)
 {
+    // Clear active flag on previous client
+    if (!mActivatedClientId.empty()) {
+        auto prevIt = mConnectedClients.find(mActivatedClientId);
+        if (prevIt != mConnectedClients.end()) {
+            prevIt->second.active = false;
+        }
+    }
+
     mActivatedClientId = targetInstanceId;
+
+    // Set active flag on new client
+    auto it = mConnectedClients.find(targetInstanceId);
+    if (it != mConnectedClients.end()) {
+        it->second.active = true;
+    }
 
     ActivateClientMessage msg;
     msg.targetInstanceId = targetInstanceId;
@@ -761,6 +916,14 @@ void Konflikt::activateClient(const std::string &targetInstanceId, int32_t curso
 
 void Konflikt::deactivateRemoteScreen()
 {
+    // Clear active flag on deactivated client
+    if (!mActivatedClientId.empty()) {
+        auto it = mConnectedClients.find(mActivatedClientId);
+        if (it != mConnectedClients.end()) {
+            it->second.active = false;
+        }
+    }
+
     mVirtualCursor = { 0, 0 };
     mHasVirtualCursor = false;
     mActivatedClientId.clear();
@@ -834,23 +997,58 @@ void Konflikt::log(const std::string &level, const std::string &message)
         mLogCallback(level, message);
     }
 
-    // Also print to stderr for debugging
+    // Get timestamp
+    auto now = std::chrono::system_clock::now();
+    auto time = std::chrono::system_clock::to_time_t(now);
+    auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+        now.time_since_epoch()) % 1000;
+
+    struct tm tm_buf;
+    localtime_r(&time, &tm_buf);
+
+    char timeStr[32];
+    snprintf(timeStr, sizeof(timeStr), "%02d:%02d:%02d.%03d",
+             tm_buf.tm_hour, tm_buf.tm_min, tm_buf.tm_sec,
+             static_cast<int>(ms.count()));
+
+    // Print to stderr for debugging
     if (mConfig.verbose || level == "error" || level == "log") {
-        // Get timestamp
-        auto now = std::chrono::system_clock::now();
-        auto time = std::chrono::system_clock::to_time_t(now);
-        auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
-            now.time_since_epoch()) % 1000;
-
-        struct tm tm_buf;
-        localtime_r(&time, &tm_buf);
-
-        char timeStr[32];
-        snprintf(timeStr, sizeof(timeStr), "%02d:%02d:%02d.%03d",
-                 tm_buf.tm_hour, tm_buf.tm_min, tm_buf.tm_sec,
-                 static_cast<int>(ms.count()));
-
         fprintf(stderr, "[%s] [%s] %s\n", timeStr, level.c_str(), message.c_str());
+    }
+
+    // Store in log buffer for debug API (filter sensitive key data)
+    if (mConfig.enableDebugApi) {
+        std::string filteredMessage = message;
+
+        // Filter out keycode and key text from messages
+        // Patterns like "keycode=123" or "key='x'" are sensitive
+        auto filterPattern = [&filteredMessage](const std::string &pattern, const std::string &replacement) {
+            size_t pos = 0;
+            while ((pos = filteredMessage.find(pattern, pos)) != std::string::npos) {
+                size_t endPos = pos + pattern.length();
+                // Find the end of the value
+                while (endPos < filteredMessage.length() &&
+                       filteredMessage[endPos] != ' ' &&
+                       filteredMessage[endPos] != ',' &&
+                       filteredMessage[endPos] != ')') {
+                    endPos++;
+                }
+                filteredMessage.replace(pos, endPos - pos, replacement);
+                pos += replacement.length();
+            }
+        };
+
+        filterPattern("keycode=", "keycode=[redacted]");
+        filterPattern("text=", "text=[redacted]");
+        filterPattern("key=", "key=[redacted]");
+
+        std::lock_guard<std::mutex> lock(mLogBufferMutex);
+        mLogBuffer.push_back({ timeStr, level, filteredMessage });
+
+        // Keep buffer bounded
+        if (mLogBuffer.size() > MAX_LOG_ENTRIES) {
+            mLogBuffer.erase(mLogBuffer.begin());
+        }
     }
 }
 

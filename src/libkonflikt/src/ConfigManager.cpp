@@ -33,6 +33,7 @@ struct ConfigJson
     std::string tlsKeyPassphrase;
     bool verbose { false };
     std::string logFile;
+    bool enableDebugApi { false };
 };
 
 } // namespace konflikt
@@ -64,12 +65,13 @@ struct glz::meta<konflikt::ConfigJson>
         "tlsKeyFile", &T::tlsKeyFile,
         "tlsKeyPassphrase", &T::tlsKeyPassphrase,
         "verbose", &T::verbose,
-        "logFile", &T::logFile);
+        "logFile", &T::logFile,
+        "enableDebugApi", &T::enableDebugApi);
 };
 
 namespace konflikt {
 
-std::string ConfigManager::getDefaultConfigPath()
+std::string ConfigManager::getUserConfigPath()
 {
     std::string configDir;
 
@@ -80,9 +82,9 @@ std::string ConfigManager::getDefaultConfigPath()
         configDir = std::string(home) + "/Library/Application Support/Konflikt";
     }
 #else
-    // Linux: ~/.config/konflikt/config.json
+    // Linux (XDG spec): $XDG_CONFIG_HOME/konflikt/config.json
     const char *xdgConfig = std::getenv("XDG_CONFIG_HOME");
-    if (xdgConfig) {
+    if (xdgConfig && xdgConfig[0] != '\0') {
         configDir = std::string(xdgConfig) + "/konflikt";
     } else {
         const char *home = std::getenv("HOME");
@@ -97,6 +99,54 @@ std::string ConfigManager::getDefaultConfigPath()
     }
 
     return configDir + "/config.json";
+}
+
+std::vector<std::string> ConfigManager::getSystemConfigPaths()
+{
+    std::vector<std::string> paths;
+
+#ifdef __APPLE__
+    // macOS: /Library/Application Support/Konflikt/config.json
+    paths.push_back("/Library/Application Support/Konflikt/config.json");
+#else
+    // Linux (XDG spec): $XDG_CONFIG_DIRS/konflikt/config.json
+    // XDG_CONFIG_DIRS is colon-separated, default is /etc/xdg
+    const char *xdgConfigDirs = std::getenv("XDG_CONFIG_DIRS");
+    std::string dirs = (xdgConfigDirs && xdgConfigDirs[0] != '\0') ? xdgConfigDirs : "/etc/xdg";
+
+    size_t start = 0;
+    size_t end;
+    while ((end = dirs.find(':', start)) != std::string::npos) {
+        if (end > start) {
+            paths.push_back(dirs.substr(start, end - start) + "/konflikt/config.json");
+        }
+        start = end + 1;
+    }
+    if (start < dirs.length()) {
+        paths.push_back(dirs.substr(start) + "/konflikt/config.json");
+    }
+#endif
+
+    return paths;
+}
+
+std::string ConfigManager::getDefaultConfigPath()
+{
+    // First check user config
+    std::string userPath = getUserConfigPath();
+    if (!userPath.empty() && std::filesystem::exists(userPath)) {
+        return userPath;
+    }
+
+    // Then check system config paths
+    for (const auto &path : getSystemConfigPaths()) {
+        if (std::filesystem::exists(path)) {
+            return path;
+        }
+    }
+
+    // Return user path as default for creating new config
+    return userPath;
 }
 
 std::optional<Config> ConfigManager::load(const std::string &path)
@@ -145,6 +195,7 @@ std::optional<Config> ConfigManager::load(const std::string &path)
     config.tlsKeyPassphrase = jsonConfig.tlsKeyPassphrase;
     config.verbose = jsonConfig.verbose;
     config.logFile = jsonConfig.logFile;
+    config.enableDebugApi = jsonConfig.enableDebugApi;
 
     return config;
 }
@@ -191,6 +242,7 @@ bool ConfigManager::save(const Config &config, const std::string &path)
     jsonConfig.tlsKeyPassphrase = config.tlsKeyPassphrase;
     jsonConfig.verbose = config.verbose;
     jsonConfig.logFile = config.logFile;
+    jsonConfig.enableDebugApi = config.enableDebugApi;
 
     auto json = glz::write_json(jsonConfig);
     if (!json) {

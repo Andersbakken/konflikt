@@ -4,6 +4,7 @@
 
 #include <optional>
 #include <string>
+#include <vector>
 
 namespace konflikt {
 
@@ -11,7 +12,18 @@ namespace konflikt {
 class ConfigManager
 {
 public:
-    /// Get default config file path (~/.config/konflikt/config.json)
+    /// Get user-specific config file path
+    /// macOS: ~/Library/Application Support/Konflikt/config.json
+    /// Linux: $XDG_CONFIG_HOME/konflikt/config.json (default: ~/.config/konflikt/)
+    static std::string getUserConfigPath();
+
+    /// Get system-wide config file paths (in priority order)
+    /// macOS: /Library/Application Support/Konflikt/config.json
+    /// Linux: $XDG_CONFIG_DIRS/konflikt/config.json (default: /etc/xdg/konflikt/)
+    static std::vector<std::string> getSystemConfigPaths();
+
+    /// Get default config file path (first existing path, or user path for new configs)
+    /// Searches: user config, then system config paths
     static std::string getDefaultConfigPath();
 
     /// Load configuration from file

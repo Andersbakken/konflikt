@@ -263,4 +263,18 @@
     return _impl->saveConfig() ? YES : NO;
 }
 
+- (NSUInteger)clientCount
+{
+    return static_cast<NSUInteger>(_impl->clientCount());
+}
+
+- (NSArray<NSString *> *)connectedClientNames
+{
+    NSMutableArray<NSString *> *names = [NSMutableArray array];
+    for (const auto &name : _impl->connectedClientNames()) {
+        [names addObject:[NSString stringWithUTF8String:name.c_str()]];
+    }
+    return names;
+}
+
 @end

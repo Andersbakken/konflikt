@@ -157,9 +157,15 @@ src/macos/
 
 ## Config File Format
 
-Config file location:
+Config file locations (searched in order, first found wins):
+
+**User config (takes precedence):**
 - macOS: `~/Library/Application Support/Konflikt/config.json`
-- Linux: `~/.config/konflikt/config.json`
+- Linux: `$XDG_CONFIG_HOME/konflikt/config.json` (default: `~/.config/konflikt/`)
+
+**System config (fallback):**
+- macOS: `/Library/Application Support/Konflikt/config.json`
+- Linux: `$XDG_CONFIG_DIRS/konflikt/config.json` (default: `/etc/xdg/konflikt/`)
 
 Example config:
 ```json
@@ -176,9 +182,21 @@ Example config:
   "edgeBottom": true,
   "lockCursorToScreen": false,
   "lockCursorHotkey": 107,
-  "verbose": false
+  "useTLS": false,
+  "tlsCertFile": "",
+  "tlsKeyFile": "",
+  "verbose": false,
+  "enableDebugApi": false
 }
 ```
+
+## HTTP API Endpoints
+
+- `GET /api/version` - Version info
+- `GET /api/server-info` - Server name, port, TLS status
+- `GET /api/status` - Instance status, connection info, client details (including connected clients array with instanceId, displayName, screenWidth, screenHeight, connectedAt, active)
+- `GET /api/cert` - Download server TLS certificate (if TLS enabled)
+- `GET /api/log` - Recent logs with key data filtered (if `enableDebugApi` enabled)
 
 ## Notes for Continuation
 

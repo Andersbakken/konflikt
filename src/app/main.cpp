@@ -2,6 +2,7 @@
 
 #include <konflikt/ConfigManager.h>
 #include <konflikt/Konflikt.h>
+#include <konflikt/Version.h>
 
 #include <csignal>
 #include <cstdlib>
@@ -9,6 +10,8 @@
 #include <filesystem>
 #include <iostream>
 #include <string>
+
+using konflikt::VERSION;
 
 namespace {
 
@@ -22,8 +25,6 @@ void signalHandler(int signal)
     }
     std::exit(signal == SIGINT ? 0 : 1);
 }
-
-static const char *VERSION = "2.0.0";
 
 void printUsage(const char *programName)
 {
@@ -47,6 +48,7 @@ void printUsage(const char *programName)
               << "  --tls-cert=PATH       Path to TLS certificate file (PEM)\n"
               << "  --tls-key=PATH        Path to TLS private key file (PEM)\n"
               << "  --tls-passphrase=PASS Passphrase for encrypted key (optional)\n"
+              << "  --debug-api           Enable debug API endpoint (/api/log)\n"
               << "  --verbose             Enable verbose logging\n"
               << "  -v, --version         Show version information\n"
               << "  -h, --help            Show this help message\n"
@@ -170,6 +172,8 @@ int main(int argc, char *argv[])
             config.useTLS = true;
         } else if (arg.rfind("--tls-passphrase=", 0) == 0) {
             config.tlsKeyPassphrase = arg.substr(17);
+        } else if (arg == "--debug-api") {
+            config.enableDebugApi = true;
         } else {
             std::cerr << "Error: Unknown option '" << arg << "'" << std::endl;
             printUsage(argv[0]);

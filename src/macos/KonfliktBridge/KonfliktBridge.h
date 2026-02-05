@@ -94,6 +94,12 @@ typedef NS_ENUM(NSInteger, KonfliktConnectionStatus) {
 /// Save current configuration to file
 - (BOOL)saveConfig;
 
+/// Get the number of connected clients (server only)
+- (NSUInteger)clientCount;
+
+/// Get the names of connected clients (server only)
+- (NSArray<NSString *> *)connectedClientNames;
+
 @end
 
 NS_ASSUME_NONNULL_END
