@@ -101,6 +101,16 @@ The native C++ rewrite is largely functional. The macOS Swift app builds and run
 - [ ] Multi-monitor awareness (per-display screen edges)
 - [x] Lock cursor to screen option (lockCursorToScreen config + setLockCursorToScreen API)
 
+#### 10. Security (Optional)
+- [ ] WSS (WebSocket Secure) support for client-server communication
+  - Generate self-signed certs with OpenSSL during install/first run
+  - TLS encryption for all network traffic between machines
+  - Config option to enable/disable (off by default for simplicity)
+- [ ] Config file signing or encryption (optional)
+  - Prevent tampering with config files
+  - Could use simple HMAC or full encryption
+- [ ] Note: HTTP for config UI is acceptable (browsers won't trust self-signed certs anyway)
+
 #### 9. Packaging & Distribution
 - [x] Linux: Debian packaging files (packaging/debian/)
 - [x] Linux: Systemd user service (packaging/konflikt.service)
