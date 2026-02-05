@@ -7,6 +7,8 @@ class StatusBarController {
     private let statusItem: NSStatusItem
     private let menu: NSMenu
     private var statusMenuItem: NSMenuItem?
+    private var preferencesWindowController: PreferencesWindowController?
+    weak var konflikt: Konflikt?
 
     init() {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
@@ -37,6 +39,11 @@ class StatusBarController {
         openUIItem.target = self
         menu.addItem(openUIItem)
 
+        // Preferences
+        let prefsItem = NSMenuItem(title: "Preferences...", action: #selector(showPreferences), keyEquivalent: ",")
+        prefsItem.target = self
+        menu.addItem(prefsItem)
+
         menu.addItem(NSMenuItem.separator())
 
         // Quit
@@ -57,6 +64,13 @@ class StatusBarController {
         if let url = URL(string: "http://localhost:\(port)/ui/") {
             NSWorkspace.shared.open(url)
         }
+    }
+
+    @objc private func showPreferences() {
+        if preferencesWindowController == nil {
+            preferencesWindowController = PreferencesWindowController(konflikt: konflikt)
+        }
+        preferencesWindowController?.showWindow()
     }
 
     @objc private func quit() {

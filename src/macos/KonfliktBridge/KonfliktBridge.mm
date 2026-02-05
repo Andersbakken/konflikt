@@ -191,4 +191,29 @@
     return _impl->isLockCursorToScreen() ? YES : NO;
 }
 
+- (void)setEdgeLeft:(BOOL)left right:(BOOL)right top:(BOOL)top bottom:(BOOL)bottom
+{
+    _impl->setEdgeTransitions(left, right, top, bottom);
+}
+
+- (BOOL)edgeLeft
+{
+    return _impl->edgeLeft() ? YES : NO;
+}
+
+- (BOOL)edgeRight
+{
+    return _impl->edgeRight() ? YES : NO;
+}
+
+- (BOOL)edgeTop
+{
+    return _impl->edgeTop() ? YES : NO;
+}
+
+- (BOOL)edgeBottom
+{
+    return _impl->edgeBottom() ? YES : NO;
+}
+
 @end

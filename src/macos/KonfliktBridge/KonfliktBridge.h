@@ -81,6 +81,13 @@ typedef NS_ENUM(NSInteger, KonfliktConnectionStatus) {
 - (void)setLockCursorToScreen:(BOOL)locked;
 - (BOOL)isLockCursorToScreen;
 
+/// Set which screen edges trigger transitions
+- (void)setEdgeLeft:(BOOL)left right:(BOOL)right top:(BOOL)top bottom:(BOOL)bottom;
+- (BOOL)edgeLeft;
+- (BOOL)edgeRight;
+- (BOOL)edgeTop;
+- (BOOL)edgeBottom;
+
 @end
 
 NS_ASSUME_NONNULL_END

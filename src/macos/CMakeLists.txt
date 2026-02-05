@@ -46,6 +46,7 @@ add_executable(KonfliktApp MACOSX_BUNDLE
     Konflikt/main.swift
     Konflikt/AppDelegate.swift
     Konflikt/StatusBarController.swift
+    Konflikt/PreferencesWindowController.swift
 )
 
 target_link_libraries(KonfliktApp

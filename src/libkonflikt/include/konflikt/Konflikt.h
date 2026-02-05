@@ -112,6 +112,13 @@ public:
     void setLockCursorToScreen(bool locked);
     bool isLockCursorToScreen() const { return mConfig.lockCursorToScreen; }
 
+    /// Set which screen edges trigger transitions
+    void setEdgeTransitions(bool left, bool right, bool top, bool bottom);
+    bool edgeLeft() const { return mConfig.edgeLeft; }
+    bool edgeRight() const { return mConfig.edgeRight; }
+    bool edgeTop() const { return mConfig.edgeTop; }
+    bool edgeBottom() const { return mConfig.edgeBottom; }
+
     /// Get current configuration
     const Config &config() const { return mConfig; }
 

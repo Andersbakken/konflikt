@@ -36,6 +36,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, KonfliktDelegate {
             return
         }
 
+        // Pass konflikt instance to status bar controller for preferences
+        statusBarController?.konflikt = konflikt
+
         // Start on background thread
         backgroundThread = Thread { [weak self] in
             self?.konflikt?.run()

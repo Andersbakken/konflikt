@@ -78,7 +78,7 @@ The native C++ rewrite is largely functional. The macOS Swift app builds and run
 - [ ] Test clipboard sync between machines
 
 #### 5. Preferences UI
-- [ ] macOS: Preferences window in Swift app
+- [x] macOS: Preferences window in Swift app (edge transitions, cursor lock)
 - [x] Hot key for cursor lock toggle (lockCursorHotkey config, default: Scroll Lock)
 
 ### Lower Priority

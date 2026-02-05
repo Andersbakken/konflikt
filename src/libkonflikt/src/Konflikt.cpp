@@ -895,6 +895,19 @@ void Konflikt::setLockCursorToScreen(bool locked)
     log("log", locked ? "Cursor locked to screen" : "Cursor unlocked");
 }
 
+void Konflikt::setEdgeTransitions(bool left, bool right, bool top, bool bottom)
+{
+    mConfig.edgeLeft = left;
+    mConfig.edgeRight = right;
+    mConfig.edgeTop = top;
+    mConfig.edgeBottom = bottom;
+    log("log", std::string("Edge transitions: ") +
+        "L=" + (left ? "on" : "off") + " " +
+        "R=" + (right ? "on" : "off") + " " +
+        "T=" + (top ? "on" : "off") + " " +
+        "B=" + (bottom ? "on" : "off"));
+}
+
 void Konflikt::checkClipboardChange()
 {
     if (!mPlatform) {
